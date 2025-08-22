@@ -44,7 +44,7 @@ class RF1RW[T <: Data](sourceL:Int, depth:Int, gen: T) extends Module {
 // Stage: Maxium Registers That need to be read
 // Bank: Storage Bank
 // Depth: Per Bank Depth
-class RFPipe[T <: Data, S <: RF1RW[T]](stage: Int, bank: Int, depth: Int, gen: T, storageUnit: (Int, Int, T) => S) extends Module {
+class RFPipe[T <: UInt, S <: RF1RW[T]](stage: Int, bank: Int, depth: Int, gen: T, storageUnit: (Int, Int, T) => S) extends Module {
   val ptrL = log2Ceil(bank) + log2Ceil(depth)
   val readReq = IO(Input(Vec(stage,UInt(ptrL.W))))       // Read Request
   val write = IO(Input(new RFWReq(ptrL, gen))) // Write Request
@@ -55,8 +55,13 @@ class RFPipe[T <: Data, S <: RF1RW[T]](stage: Int, bank: Int, depth: Int, gen: T
 
   val raw_req = Wire(Vec(bank, Vec(stage + 1, new RF1RWReq(stage, depth, gen))))
   val req = raw_req.map(_.reduceTree((l,r) => {
-    chisel3.assert(!(l.valid & r.valid), "RFPipe Bank Conflict!")
-    Mux(l.valid, l, r)
+    chisel3.assert(!((l.valid & r.valid) | (l.write & r.write) | (l.wdata & r.wdata)), "RFPipe Bank Conflict!")
+    val t = Wire(new RF1RWReq(stage, depth, gen))
+    t := Mux(l.valid, l, r)
+    t.valid := l.valid | r.valid
+    t.write := l.write | r.write
+    t.wdata := l.wdata | r.wdata
+    t
   }))
   val resp = Wire(Vec(bank, new RF1RWResp(stage, depth, gen)))
 
@@ -69,23 +74,23 @@ class RFPipe[T <: Data, S <: RF1RW[T]](stage: Int, bank: Int, depth: Int, gen: T
   val req_pipe = Wire(Vec(stage, Vec(stage, UInt(ptrL.W))))
   req_pipe(0) := readReq
   for(s <- 1 until stage) {
-    val prev_req = RegNext(req_pipe(s - 1))
-    req_pipe(s) := prev_req
+    val prevReq = RegNext(req_pipe(s - 1))
+    req_pipe(s) := prevReq
   }
 
   // Issue Request
   for(s <- 0 until stage) {
     val req = req_pipe(s)(s)
-    val b = req(log2Ceil(bank)-1, 0)
-    val a = req(ptrL-1, log2Ceil(bank))
+    val trueAddr = req(ptrL-1, log2Ceil(bank))
+    val trueBank = req(log2Ceil(bank)-1, 0)
     raw_req.zipWithIndex.foreach {case(req, index) => {
-      req(s).valid := b =/= index.asUInt
+      req(s).valid := trueBank =/= index.asUInt
       req(s).write := 0.B
       req(s).source := OneHot.encoding(s, stage + 1)
-      req(s).addr := a
+      req(s).addr := trueAddr
       req(s).wdata := 0.U
     }}
-    readResp(s) := resp.reduceTree((l,r) => Mux(l.source(s), l, r)).rdata
+    readResp(s) := resp.map((resp) => Mux(resp.source(s), resp.rdata, 0.U)).reduce(_|_)
   }
   raw_req.zipWithIndex.foreach {case(req, index) => {
     req(stage).valid := write.addr(ptrL-1, log2Ceil(bank)) =/= index.asUInt
