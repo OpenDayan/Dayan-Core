@@ -1,17 +1,17 @@
 // See README.md for license details.
 
-ThisBuild / scalaVersion     := "2.13.16"
+ThisBuild / scalaVersion     := "2.13.15"
 ThisBuild / version          := "0.1.0"
 ThisBuild / organization     := "com.github.gmlayer0"
 
-val chiselVersion = "7.0.0-RC1"
+val chiselVersion = "6.6.0"
 
 lazy val root = (project in file("."))
   .settings(
     name := "GPU-Chisel",
     libraryDependencies ++= Seq(
       "org.chipsalliance" %% "chisel" % chiselVersion,
-      "org.scalatest" %% "scalatest" % "3.2.19" % "test",
+      "org.scalatest" %% "scalatest" % "3.2.7" % "test",
     ),
     scalacOptions ++= Seq(
       "-language:reflectiveCalls",
