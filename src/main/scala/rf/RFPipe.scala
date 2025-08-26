@@ -28,7 +28,12 @@ class RF1RWResp[T <: Data](sourceL:Int, depth:Int, gen: T) extends Bundle {
 //  def resp = Output(new RF1RWResp(sourceL, depth, gen))
 //}
 
-class RF1RW[T <: Data](sourceL:Int, depth:Int, gen: T) extends Module {
+trait RF1RWIntf[T <: Data] {
+  val req: RF1RWReq[T]
+  val resp: RF1RWResp[T]
+}
+
+class RF1RW[T <: Data](sourceL:Int, depth:Int, gen: T) extends Module with RF1RWIntf[T]{
   val req = IO(Input(new RF1RWReq(sourceL, depth, gen)))
   val resp = IO(Output(new RF1RWResp(sourceL, depth, gen)))
   val mem = Reg(Vec(depth, gen))
@@ -44,7 +49,8 @@ class RF1RW[T <: Data](sourceL:Int, depth:Int, gen: T) extends Module {
 // Stage: Maxium Registers That need to be read
 // Bank: Storage Bank
 // Depth: Per Bank Depth
-class RFPipe[T <: UInt, S <: RF1RW[T]](stage: Int, bank: Int, depth: Int, gen: T, storageUnit: (Int, Int, T) => S) extends Module {
+class RFPipe[T <: UInt, S <:  Module with RF1RWIntf[T]]
+(stage: Int, bank: Int, depth: Int, gen: T, storageUnit: (Int, Int, T) => S) extends Module {
   val ptrL = log2Ceil(bank) + log2Ceil(depth)
   val readReq = IO(Input(Vec(stage,UInt(ptrL.W))))       // Read Request
   val write = IO(Input(new RFWReq(ptrL, gen))) // Write Request
@@ -105,9 +111,7 @@ object RFPipe extends App {
   ChiselStage.emitSystemVerilogFile(
     new RFPipe(
       4, 4, 32, UInt(32.W),
-      (stage, depth, gen: UInt) => {
-        new RF1RW(stage, depth, gen)
-      }
+      (stage, depth, gen: UInt) => new RF1RW(stage, depth, gen)
     ),
     firtoolOpts = Array("-disable-all-randomization", "-strip-debug-info", "-preserve-aggregate=vec")
   )
