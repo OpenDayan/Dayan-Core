@@ -1,8 +1,8 @@
 package uram
 
 import chisel3._
-import chisel3.util.HasBlackBoxResource
-import circt.stage.ChiselStage
+import chisel3.util._
+import _root_.circt.stage.ChiselStage
 
 class UltraRAMBase(DWIDTH: Int = 72, AWIDTH: Int = 12) extends
   BlackBox(Map("DWIDTH" -> DWIDTH, "AWIDTH" -> AWIDTH))
@@ -14,7 +14,7 @@ class UltraRAMBase(DWIDTH: Int = 72, AWIDTH: Int = 12) extends
     val write_enable = Input(Bool ())
     val read_enable  = Input(Bool ())
     val addra = Input(UInt(AWIDTH.W))
-    val dina = Input(SInt(DWIDTH.W))
+    val dina = Input(UInt(DWIDTH.W))
     val addrb = Input(UInt(AWIDTH.W))
     val doutb = Output(UInt(DWIDTH.W))
   })
@@ -24,29 +24,30 @@ class UltraRAMBase(DWIDTH: Int = 72, AWIDTH: Int = 12) extends
 
 }
 
-class UltraRAM extends Module with URAMBackend[UInt]{
+class UltraRAM(id: Int, depth: Int, dataWidth: Int) extends Module with URAMBackend{
+  val log2Depth = log2Ceil(depth)
   val latency: Int = 2
   val re: Bool = IO(Input(Bool()))
-  val raddr: UInt = IO(Input(UInt(12.W)))
-  val rdata: UInt = IO(Output(UInt(64.W)))
+  val raddr: UInt = IO(Input(UInt(log2Depth.W)))
+  val rdata: UInt = IO(Output(UInt(dataWidth.W)))
   val we: Bool = IO(Input(Bool()))
-  val waddr: UInt = IO(Input(UInt(12.W)))
-  val wdata: UInt = IO(Input(UInt(64.W)))
+  val waddr: UInt = IO(Input(UInt(log2Depth.W)))
+  val wdata: UInt = IO(Input(UInt(dataWidth.W)))
 
-  val uBase = Module(new UltraRAMBase(72, 12))
+  val uBase = Module(new UltraRAMBase(dataWidth, log2Depth))
   uBase.io.core_clk := clock
   uBase.io.reset := reset
   uBase.io.write_enable := we
   uBase.io.read_enable := re
   uBase.io.addra := waddr
   uBase.io.addrb := raddr
-  uBase.io.dina := wdata.zext
-  rdata := uBase.io.doutb(63, 0)
+  uBase.io.dina := wdata
+  rdata := uBase.io.doutb
 }
 
 object UltraRAM extends App {
   ChiselStage.emitSystemVerilogFile(
-    new UltraRAM(),
+    new UltraRAM(1, 4096, 64),
     firtoolOpts = Array("-disable-all-randomization", "-strip-debug-info", "-preserve-aggregate=vec")
   )
 }
