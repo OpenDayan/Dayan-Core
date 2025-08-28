@@ -17,6 +17,7 @@ class UltraRAMBase(DWIDTH: Int = 72, AWIDTH: Int = 12) extends
     val dina = Input(UInt(DWIDTH.W))
     val addrb = Input(UInt(AWIDTH.W))
     val doutb = Output(UInt(DWIDTH.W))
+    val id = Input(UInt(32.W))
   })
   addResource("/verilog/UltraRAMBase.sv")
   require(DWIDTH <= 72, "In URAM, data width should be equal or less than 72bits")
@@ -24,7 +25,7 @@ class UltraRAMBase(DWIDTH: Int = 72, AWIDTH: Int = 12) extends
 
 }
 
-class UltraRAM(id: Int, depth: Int, dataWidth: Int) extends Module with URAMBackend{
+class UltraRAM(depth: Int, dataWidth: Int) extends Module with URAMBackend{
   val log2Depth = log2Ceil(depth)
   val latency: Int = 2
   val re: Bool = IO(Input(Bool()))
@@ -33,6 +34,7 @@ class UltraRAM(id: Int, depth: Int, dataWidth: Int) extends Module with URAMBack
   val we: Bool = IO(Input(Bool()))
   val waddr: UInt = IO(Input(UInt(log2Depth.W)))
   val wdata: UInt = IO(Input(UInt(dataWidth.W)))
+  val id: UInt = IO(Input(UInt(32.W)))
 
   val uBase = Module(new UltraRAMBase(dataWidth, log2Depth))
   uBase.io.core_clk := clock
@@ -42,12 +44,13 @@ class UltraRAM(id: Int, depth: Int, dataWidth: Int) extends Module with URAMBack
   uBase.io.addra := waddr
   uBase.io.addrb := raddr
   uBase.io.dina := wdata
+  uBase.io.id := id
   rdata := uBase.io.doutb
 }
 
 object UltraRAM extends App {
   ChiselStage.emitSystemVerilogFile(
-    new UltraRAM(1, 4096, 64),
+    new UltraRAM(4096, 64),
     firtoolOpts = Array("-disable-all-randomization", "-strip-debug-info", "-preserve-aggregate=vec")
   )
 }

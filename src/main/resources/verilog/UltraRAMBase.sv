@@ -17,7 +17,8 @@ module UltraRAMBase #(
     input wire [DWIDTH-1:0] dina,      // Data <wire_or_reg>
     input wire [AWIDTH-1:0] addra,     // Write Address
     input wire [AWIDTH-1:0] addrb,     // Read  Address
-    output reg [DWIDTH-1:0] doutb      // Data Output
+    output reg [DWIDTH-1:0] doutb,     // Data Output
+    input wire[31:0] id
 );
 
 (* ram_style = "ultra" *)
