@@ -3,6 +3,17 @@ package fpmath
 import chisel3._
 import chisel3.util._
 
+trait U8U4FusedMxNyKzMul {
+  val latency: Int
+  val a_u4:Vec[Vec[UInt]]
+  val b_u4:Vec[Vec[UInt]]
+  val a_u8:Vec[UInt]
+  val b_u8:Vec[UInt]
+  val u8: Bool
+  val u4_out: Vec[Vec[Vec[UInt]]]
+  val u8_out: Vec[Vec[UInt]]
+}
+
 class FP8E4M3 extends Bundle {
   val s = UInt(1.W)
   val f = UInt(4.W)
@@ -35,23 +46,23 @@ class BF16Unpack extends Bundle {
 }
 
 package object converter {
-  val func_unpack_e4m3 = (input:UInt, index: Int) => {
+  val func_unpack_e4m3 = (input:UInt) => {
     val fp8Val = Wire(new FP8Unpack)
     // E4M3 S7 E6 5 4 3 M2 1 0
-    val rawSign = input(8 * index + 7)
-    val rawFrac = input(8 * index + 6, 8 * index + 3)
-    val rawMantissa = Cat(Mux(rawFrac === 0.U, 0.U(1.W), 1.U(1.W)) ,input(8 * index + 2, 8 * index + 0))
+    val rawSign = input(7)
+    val rawFrac = input(6, 3)
+    val rawMantissa = Cat(Mux(rawFrac === 0.U, 0.U(1.W), 1.U(1.W)) ,input(2, 0))
     fp8Val.s := rawSign
     fp8Val.f := rawFrac
     fp8Val.m := rawMantissa
     fp8Val
   }
-  val func_unpack_bf16 = (input:UInt, index: Int) => {
+  val func_unpack_bf16 = (input:UInt) => {
     val bf16Val = Wire(new BF16Unpack)
     // BF16 S15 E14 13 12 11 10 9 8 7 M6 5 4 3 2 1 0
-    val rawSign = input(16 * index + 15)
-    val rawFrac = input(16 * index + 14, 16 * index + 7)
-    val rawMantissa = Cat(Mux(rawFrac === 0.U, 0.U(1.W), 1.U(1.W)) ,input(16 * index + 6, 16 * index + 0))
+    val rawSign = input(15)
+    val rawFrac = input(14, 7)
+    val rawMantissa = Cat(Mux(rawFrac === 0.U, 0.U(1.W), 1.U(1.W)) ,input(6, 0))
     bf16Val.s := rawSign
     bf16Val.f := rawFrac
     bf16Val.m := rawMantissa
