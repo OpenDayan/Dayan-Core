@@ -2,7 +2,9 @@
 test_run_dir/*
 ### XilinxISE template
 # intermediate build files
+/generated
 /*.sv
+/*.fst
 *.bgn
 *.bit
 *.bld

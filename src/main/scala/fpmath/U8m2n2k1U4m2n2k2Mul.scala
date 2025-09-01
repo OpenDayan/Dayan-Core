@@ -59,6 +59,12 @@ class U8m2n2k1U4m2n2k2Mul(tM: Int, tN: Int, tK: Int) extends Module with U8U4Fus
 object U8m2n2k1U4m2n2k2Mul extends App {
   ChiselStage.emitSystemVerilogFile(
     new U8m2n2k1U4m2n2k2Mul(2, 2, 2),
-    firtoolOpts = Array("-disable-all-randomization", "-strip-debug-info", "-preserve-aggregate=vec")
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/U8m2n2k1U4m2n2k2Mul"
+    )
   )
 }

@@ -128,6 +128,12 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
 object FP8BF16FusedDPUnit extends App {
   ChiselStage.emitSystemVerilogFile(
     new FP8BF16FusedDPUnit((tM, tN, tK) => new U8m2n2k1U4m2n2k2Mul(tM, tN, tK)),
-    firtoolOpts = Array("-disable-all-randomization", "-strip-debug-info", "-preserve-aggregate=vec")
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/FP8BF16FusedDPUnit"
+    )
   )
 }
