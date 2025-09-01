@@ -4,7 +4,8 @@ test_run_dir/*
 # intermediate build files
 /generated
 /*.sv
-/*.fst
+wave
+UnitTest.mk
 *.bgn
 *.bit
 *.bld
