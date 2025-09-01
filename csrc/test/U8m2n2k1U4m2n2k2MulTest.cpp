@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
     VU8m2n2k1U4m2n2k2Mul *dut = new VU8m2n2k1U4m2n2k2Mul;
     Verilated::traceEverOn(true);
     VerilatedFstC * m_trace = new VerilatedFstC;
-    dut->trace(m_trace, 99z);
+    dut->trace(m_trace, 99);
     m_trace->open("wave/VU8m2n2k1U4m2n2k2Mul.fst");
 
     dut->clock = 0;

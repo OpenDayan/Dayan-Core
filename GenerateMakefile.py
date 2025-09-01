@@ -1,14 +1,13 @@
-# Module Map: "ModuleName":"ModulePackage"
+import json
 
-module_map = {
-    "U8m2n2k1U4m2n2k2Mul": "fpmath"
-}
+with open('UnitTestConfig.json', 'r') as f:
+    module_map = json.load(f)
 
 # Generate One Module Makefile
 def generateOneModuleMakefile(moduleName: str, modulePackage: str):
     return '''
 build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
-	verilator --trace --trace-fst -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f --exe csrc/test/{Name}Test.cpp
+	verilator --trace --trace-fst -CFLAGS -Wno-narrowing -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f --exe csrc/test/{Name}Test.cpp
 	make -C build/V{Name} -f V{Name}.mk V{Name}
 
 .PHONY: generated/{Name}/filelist.f
@@ -32,7 +31,7 @@ for name in module_map:
 
 str_builder += '\n'
 for name in module_map:
-    str_builder += generateOneModuleMakefile(name, module_map[name])
+    str_builder += generateOneModuleMakefile(name, module_map[name]['Package'])
 
 with open('UnitTest.mk', 'w') as f:
     f.write(str_builder)
