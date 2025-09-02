@@ -111,7 +111,7 @@ package object converter {
     val shamt = shamt_raw(max_shift_width - 1, 0)
     val sticky_mask =
       ((1.U << shamt).asUInt - 1.U)(len - 1, 0) | Fill(len, exceed_max_shift)
-    Tuple2(Mux(exceed_max_shift, 0.U, x >> shamt_raw), (x.asUInt & sticky_mask).orR)
+    Tuple2(Mux(exceed_max_shift, 0.S, x >> shamt_raw), (x.asUInt & sticky_mask).orR.asSInt)
   }
 
 }

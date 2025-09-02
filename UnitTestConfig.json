@@ -4,5 +4,8 @@
     },
     "FP8BF16FusedDPUnit": {
         "Package": "fpmath"
+    },
+    "FP8BF16FusedDPArray": {
+        "Package": "fpmath"
     }
 }

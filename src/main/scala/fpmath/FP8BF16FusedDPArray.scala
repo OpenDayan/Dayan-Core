@@ -47,8 +47,10 @@ wE: Int = 9, wF: Int = 25, wI: Int = 24, wAdder: Int = 32, enableStickBit: Boole
     val mulUnitModule = Module(new FP8BF16FusedDPUnit(mulGen, tM = tM, tN = tN, tK = tK,
       wE = wE, wF = wI, wI = wI, enableStickBit = enableStickBit))
     mulUnitModule.bf16 := bf16
-    mulUnitModule.a_in := a.slice(tm * tM, (tm + 1) * tM).map(_.slice(tk * tK, (tk + 1) * tK))
-    mulUnitModule.b_in := b.slice(tn * tN, (tn + 1) * tN).map(_.slice(tk * tK, (tk + 1) * tK))
+//    mulUnitModule.a_in := a.slice(tm * tM, (tm + 1) * tM).map(_.slice(tk * tK, (tk + 1) * tK))
+    mulUnitModule.a_in := VecInit.tabulate(tM, tK)((um, uk) => a(tm * tM + um)(tk * tK + uk))
+//    mulUnitModule.b_in := b.slice(tn * tN, (tn + 1) * tN).map(_.slice(tk * tK, (tk + 1) * tK))
+    mulUnitModule.b_in := VecInit.tabulate(tN, tK)((un, uk) => b(tn * tN + un)(tk * tK + uk))
     mulUnitModule
   })))
   var expLatency = mulMatrix(0)(0)(0).latency - 1
@@ -59,27 +61,38 @@ wE: Int = 9, wF: Int = 25, wI: Int = 24, wAdder: Int = 32, enableStickBit: Boole
   // Reduce Input Vec(K / tK + 1)
   val maxExp = VecInit.tabulate(M, N)((m, n) => {
     val rawExp = VecInit.tabulate(K / tK + 1)( tk => {
-      Mux((tk == (K / tK)).B, cin_exp_pipe(expLatency)(m)(n), mulMatrix(m/tM)(n/tN)(tk).c_exp(m%tM)(n%tN))
+      var r: UInt = 0.U
+      if (tk == (K / tK)) {
+        r = cin_exp_pipe(expLatency)(m)(n)
+      } else {
+        r = mulMatrix(m / tM)(n / tN)(tk).c_exp(m % tM)(n % tN)
+      }
+      r
     })
     rawExp.reduceTree((l, r) => {
       Mux(l > r, l, r)
     })
   })
   val diffExp = VecInit.tabulate(M, N, K / tK + 1)((m, n, tk) => {
-    Mux((tk == (K / tK)).B,
-      maxExp(m)(m) - cin_exp_pipe(expLatency)(m)(n),
-      maxExp(m)(m) - mulMatrix(m/tM)(n/tN)(tk).c_exp(m%tM)(n%tN))
+    var r = 0.U
+    if(tk == (K / tK)){
+      r = maxExp(m)(m) - cin_exp_pipe(expLatency)(m)(n)
+    } else {
+      r = maxExp(m)(m) - mulMatrix(m/tM)(n/tN)(tk).c_exp(m%tM)(n%tN)
+    }
+    r
   })
 
   val maxExpPipe  = pipe.genPipe(RegNext(maxExp), 2)
   val diffExpPipe = pipe.genPipe(RegNext(diffExp), 1)
 
   val fracS0 = VecInit.tabulate(M, N, K / tK + 1)((m, n, tk) => {
-    val v = Wire(SInt(wAdder.W))
-    val valFrac = Mux((tk == (K / tK)).B,
-      Cat(cin_frac_pipe(fracLatency)(m)(n), 0.S((wAdder - wE).W)).asSInt,
-      Cat(mulMatrix(m/tM)(n/tN)(tk).c_frac(m%tM)(n%tN), 0.S((wAdder - wI).W)).asSInt
-    )
+    var valFrac = 0.S
+    if(tk == (K / tK)) {
+      valFrac = Cat(cin_frac_pipe(fracLatency)(m)(n), 0.S((wAdder - wE).W)).asSInt
+    } else {
+      valFrac = Cat(mulMatrix(m/tM)(n/tN)(tk).c_frac(m%tM)(n%tN), 0.S((wAdder - wI).W)).asSInt
+    }
     val shiftedFrac = converter.shiftRightSigned(valFrac, diffExpPipe(0)(m)(n)(tk))
     Mux(enableStickBit.B, shiftedFrac._1.asUInt | shiftedFrac._2.asUInt, shiftedFrac._1.asUInt).asSInt
   })
@@ -109,7 +122,7 @@ wE: Int = 9, wF: Int = 25, wI: Int = 24, wAdder: Int = 32, enableStickBit: Boole
     val curMax = Cat(0.U(1.W), maxExpPipe(2)(m)(n)).asSInt
     val tryMax = curMax -& diff
     Mux(
-      tryMax(tryMax.getWidth-1).asBool, 0.U(wE), // UnderFlow
+      tryMax(tryMax.getWidth-1).asBool, 0.U(wE.W), // UnderFlow
     Mux(
       tryMax(tryMax.getWidth-2).asBool, (1.U << wE).asUInt - 1.U, // OverFlow
       tryMax(wE - 1, 0)
@@ -119,6 +132,22 @@ wE: Int = 9, wF: Int = 25, wI: Int = 24, wAdder: Int = 32, enableStickBit: Boole
 
   // Output Assembling
   cout_exp  := RegNext(expS2)
-  cout_frac := RegNext(VecInit.tabulate(M,N)((m,n) => fracSignedS2(m)(n)(wMerge-1, wMerge-wF)))
+  cout_frac := RegNext(VecInit.tabulate(M,N)((m,n) => fracSignedS2(m)(n)(wMerge-1, wMerge-wF).asSInt))
 
 }
+
+object FP8BF16FusedDPArray extends App {
+  ChiselStage.emitSystemVerilog(
+    new FP8BF16FusedDPArray((tM, tN, tK) => new U8m2n2k1U4m2n2k2Mul(tM, tN, tK),
+      M = 2, N = 2, K = 2
+    ),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/FP8BF16FusedDPArray"
+    )
+  )
+}
+
