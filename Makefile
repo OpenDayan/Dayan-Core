@@ -4,14 +4,22 @@ VERILATOR_FLAGS = --top-module $(TOP) \
 	--output-split-cfuncs 500 \
 	-I$(abspath generated)
 
+all: UnitTest.mk
+
 include UnitTest.mk
 
 .PHONY: UnitTest.mk
-UnitTest.mk: GenerateMakefile.py UnitTestConfig.json
+UnitTest.mk: GenerateMakefile.py UnitTestConfig.json generated/testbenchTemplate
 	python3 GenerateMakefile.py
 
-all: UnitTest.mk
+generated/testbenchTemplate:
+	mkdir -p generated/testbenchTemplate
 
-build:
-	mkdir build
+wave:
+	mkdir -p wave
 
+clean:
+	rm -rf build
+	rm -rf generated
+	rm -rf wave
+	rm -rf UnitTest.mk

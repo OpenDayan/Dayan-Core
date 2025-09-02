@@ -1,5 +1,8 @@
 {
     "U8m2n2k1U4m2n2k2Mul": {
         "Package": "fpmath"
+    },
+    "FP8BF16FusedDPUnit": {
+        "Package": "fpmath"
     }
 }

@@ -12,10 +12,10 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
 (
   mulGen: (Int, Int, Int) => S,
   tM: Int = 2, tN: Int = 2, tK: Int = 2,
-  wE: Int = 9, wF: Int = 17, wI: Int = 17, enableStickBit: Boolean = false
+  wE: Int = 9, wF: Int = 24, wI: Int = 24, enableStickBit: Boolean = false
 ) extends Module {
   require(wF >= 17, "BF16 Should be full precise")
-  require(wI >= wF, "Inner Fraction Adder should support BF16 Data-path")
+  require(wI >= wF, "Inner Fraction Adder should GE than output Fraction Width")
   require(tK == 2, "tK Must be 2 for now.")
   val a_in = IO(Input(Vec(tM, Vec(tK, UInt(8.W))))) // Packed m2k2-FP8 or m2k1-BF16 (m,k)
   val b_in = IO(Input(Vec(tN, Vec(tK, UInt(8.W)))))
@@ -31,8 +31,16 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
 
   val a_fp8 = VecInit.tabulate(tM,tK)((m, k) => converter.func_unpack_e4m3(a_in(m)(k)))
   val b_fp8 = VecInit.tabulate(tN,tK)((n, k) => converter.func_unpack_e4m3(b_in(n)(k)))
-  val a_bf16 = VecInit.tabulate(tM)(m => converter.func_unpack_bf16(a_in(m).asUInt))
-  val b_bf16 = VecInit.tabulate(tN)(n => converter.func_unpack_bf16(b_in(n).asUInt))
+  for(m <- 0 until tM) {
+    val a_bf16_view = Cat(a_in(m)(1), a_in(m)(0))
+    dontTouch(a_bf16_view)
+  }
+  for(n <- 0 until tN) {
+    val b_bf16_view = Cat(b_in(n)(1), b_in(n)(0))
+    dontTouch(b_bf16_view)
+  }
+  val a_bf16 = VecInit.tabulate(tM)(m => converter.func_unpack_bf16(Cat(a_in(m)(1), a_in(m)(0))))
+  val b_bf16 = VecInit.tabulate(tN)(n => converter.func_unpack_bf16(Cat(b_in(n)(1), b_in(n)(0))))
 
   /* Fraction Computation Logic */
   val fused_mul = Module(mulGen(tM, tN, tK))
@@ -56,7 +64,6 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
       hi := a_bf16(m).f(7, 4) +& b_bf16(n).f(7, 4)
       lo := a_bf16(m).f(3, 0) +& b_bf16(n).f(3, 0)
       hi_sgn := a_bf16(m).s ^ b_bf16(n).s
-      lo_sgn := a_bf16(m).s ^ b_bf16(n).s
     }.otherwise {
       hi := a_fp8(m)(1).f +& b_fp8(n)(1).f
       lo := a_fp8(m)(0).f +& b_fp8(n)(0).f
@@ -112,7 +119,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
       val mantB = raw(wI - 1, 0).asSInt
       val mantA = Cat(raw(wI + 8, wI), 0.U((wI - 9).W)).asSInt
       val exp = raw(wI + 9 + 8, wI + 9)
-      val frac = mantA + mantB
+      val frac = Mux(bf16_s3, mantB, mantA + mantB)
 
       when(bf16_s3) {
         c_exp(m)(n) := RegNext(exp(8, 9-wE))
@@ -120,13 +127,19 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
         c_exp(m)(n) := RegNext(exp(8, 9-wE) + 240.U(9.W)(8, 9-wE)) // Aligned to BF16 Exp
       }
       c_frac(m)(n) := RegNext(frac(wI - 1, wI - wF).asSInt)
+      // For Debugger: Temporarly Align To FP32 for better Debug View
+      val fp32_view_module = Module(new FPRundingModule(wE, wF, 125))
+      fp32_view_module.exp := c_exp(m)(n)
+      fp32_view_module.frac := c_frac(m)(n).asUInt
+      val fp32_view = fp32_view_module.fp
+      dontTouch(fp32_view)
     }
   }
 
 }
 
 object FP8BF16FusedDPUnit extends App {
-  ChiselStage.emitSystemVerilogFile(
+  ChiselStage.emitSystemVerilog(
     new FP8BF16FusedDPUnit((tM, tN, tK) => new U8m2n2k1U4m2n2k2Mul(tM, tN, tK)),
     firtoolOpts = Array(
       "-disable-all-randomization",
