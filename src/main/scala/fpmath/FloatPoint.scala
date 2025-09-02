@@ -104,5 +104,14 @@ package object converter {
       ((1.U << shamt).asUInt - 1.U)(len - 1, 0) | Fill(len, exceed_max_shift)
     Tuple2(Mux(exceed_max_shift, 0.U, x >> shamt_raw), (x & sticky_mask).orR)
   }
+  val shiftRightSigned = (x: SInt, shamt_raw: UInt) => {
+    val len = x.getWidth
+    val max_shift_width = log2Up(len)
+    val exceed_max_shift = shamt_raw > len.U
+    val shamt = shamt_raw(max_shift_width - 1, 0)
+    val sticky_mask =
+      ((1.U << shamt).asUInt - 1.U)(len - 1, 0) | Fill(len, exceed_max_shift)
+    Tuple2(Mux(exceed_max_shift, 0.U, x >> shamt_raw), (x.asUInt & sticky_mask).orR)
+  }
 
 }

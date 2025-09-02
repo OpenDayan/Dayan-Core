@@ -7,7 +7,7 @@ with open('UnitTestConfig.json', 'r') as f:
 def generateOneModuleMakefile(moduleName: str, modulePackage: str):
     return '''
 build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
-	verilator --trace --trace-fst -CFLAGS -Wno-narrowing --top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f --exe csrc/test/{Name}Test.cpp
+	verilator --assert --trace --trace-fst -CFLAGS -Wno-narrowing --top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f --exe csrc/test/{Name}Test.cpp
 	make -C build/V{Name} -f V{Name}.mk V{Name}
 
 .PHONY: generated/{Name}/filelist.f

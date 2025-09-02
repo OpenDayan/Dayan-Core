@@ -4,7 +4,9 @@ import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
-// Designed for FPGA Usage
+// Generic Module, Support tM tN Configuration.
+// In Xilinx FPGA: tM==tN==2, for better Utilization of DSP48E2
+// In Asic Flow: tM==tN==1, for smaller area and power consumption
 // wE: width of Exponent
 // wF: width of Fraction (Signed)
 // wI: width of Inner Fraction Adder for FP8
@@ -12,8 +14,9 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
 (
   mulGen: (Int, Int, Int) => S,
   tM: Int = 2, tN: Int = 2, tK: Int = 2,
-  wE: Int = 9, wF: Int = 24, wI: Int = 24, enableStickBit: Boolean = false
+  wE: Int = 9, wF: Int = 24, wI: Int = 24, enableStickBit: Boolean = true
 ) extends Module {
+  val latency = 4
   require(wF >= 17, "BF16 Should be full precise")
   require(wI >= wF, "Inner Fraction Adder should GE than output Fraction Width")
   require(tK == 2, "tK Must be 2 for now.")
@@ -99,7 +102,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
   val c_s2 = VecInit.tabulate(tM, tN)((m,n) => {
     val raw = c_exp_max_s2(m)(n)
     val diff = raw(4, 0)
-    val max  = raw(13, 5)
+    val max  = Mux(bf16, raw(13, 5) + 240.U, raw(13, 5))
     val flip_ab = raw(14)
     val a_sgn = raw(16)
     val a = Cat(0.U(1.W), mul_u4_result_s2(m)(n)(flip_ab)).asSInt
@@ -121,15 +124,11 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
       val exp = raw(wI + 9 + 8, wI + 9)
       val frac = Mux(bf16_s3, mantB, mantA + mantB)
 
-      when(bf16_s3) {
-        c_exp(m)(n) := RegNext(exp(8, 9-wE))
-      }.otherwise {
-        c_exp(m)(n) := RegNext(exp(8, 9-wE) + 240.U(9.W)(8, 9-wE)) // Aligned to BF16 Exp
-      }
+      c_exp(m)(n) := exp(wE-1, 0)
       c_frac(m)(n) := RegNext(frac(wI - 1, wI - wF).asSInt)
       // For Debugger: Temporarly Align To FP32 for better Debug View
       val fp32_view_module = Module(new FPRundingModule(wE, wF, 125))
-      fp32_view_module.exp := c_exp(m)(n)
+      fp32_view_module.exp := RegNext(exp(wE-1, 0))
       fp32_view_module.frac := c_frac(m)(n).asUInt
       val fp32_view = fp32_view_module.fp
       dontTouch(fp32_view)

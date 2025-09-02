@@ -4,6 +4,8 @@ import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
+import utils.UnsignedMulBase
+
 class U8m2n2k1U4m2n2k2Mul(tM: Int, tN: Int, tK: Int) extends Module with U8U4FusedMxNyKzMul{
   require(tM == 2)
   require(tN == 2)
@@ -25,8 +27,8 @@ class U8m2n2k1U4m2n2k2Mul(tM: Int, tN: Int, tK: Int) extends Module with U8U4Fus
   // U4:
   //   Mul0: (a(1,0), 0.U(12.W), a(0,0)) * (b(1,0), 0.U(4.W), b(0,0)) = (c0(1,1), c0(1,0), c0(0,1), c0(0,0))
   //   Mul1: (a(1,1), 0.U(12.W), a(0,1)) * (b(1,1), 0.U(4.W), b(0,1)) = (c1(1,1), c1(1,0), c1(0,1), c1(0,0))
-  val mul_a_s1 = Reg(Vec(2,UInt(27.W)))
-  val mul_b_s1 = Reg(Vec(2,UInt(18.W)))
+  val mul_a_s1 = Reg(Vec(2,UInt(26.W)))
+  val mul_b_s1 = Reg(Vec(2,UInt(17.W)))
   when(u8) {
     mul_a_s1(0) := Cat(0.U, a_u8(1), 0.U(8.W), a_u8(0))
     mul_a_s1(1) := Cat(0.U, a_u8(1), 0.U(8.W), a_u8(0))
@@ -41,9 +43,11 @@ class U8m2n2k1U4m2n2k2Mul(tM: Int, tN: Int, tK: Int) extends Module with U8U4Fus
 
   // Core Multiplier
   val mul_s2 = VecInit.tabulate(2)(i => {
-    val mul = Reg(UInt(45.W))
-    mul := mul_a_s1(i) * mul_b_s1(i)
-    mul
+//    val mul = mul_a_s1(i) * mul_b_s1(i)
+    val mulCore = Module(new UnsignedMulBase(26, 17))
+    mulCore.io.a := mul_a_s1(i)
+    mulCore.io.b := mul_b_s1(i)
+    RegNext(mulCore.io.c)
   })
 
   // Result View
