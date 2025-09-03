@@ -1,4 +1,21 @@
 #pragma once
+#include <vector>
+
+static inline std::vector<float> GenRandomFloats(int count, float scale) {
+    std::vector<float> r(count);
+    for(int i = 0; i < count; i ++) {
+        r[i] = (double)scale * (rand() - RAND_MAX/2) / (double)RAND_MAX;
+    }
+    return r;
+}
+
+static inline uint8_t getUpper(uint16_t a) {
+    return (a >> 8) & 0xff;
+}
+
+static inline uint8_t getLower(uint16_t a) {
+    return a & 0xff;
+}
 
 static inline uint16_t FP32ToBF16(float a) {
     uint32_t aI = *(int*)&a;
@@ -9,6 +26,10 @@ static inline float BF16ToFP32(uint16_t a) {
     uint32_t e = a << 16;
     float aF = *(float*)&e;
     return aF;
+}
+
+static inline float BF16Clip(float a) {
+    return BF16ToFP32(FP32ToBF16(a));
 }
 
 union fp32_int32 {

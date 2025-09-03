@@ -94,17 +94,18 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
     val lo = raw.lo
     val diff = hi.zext - lo.zext
     val hi_is_bigger = !diff(5).asBool
-    val max = Cat(0.U(4.W), Mux(hi_is_bigger, hi, lo)) + 241.U
+    val fp8_max = (Cat(0.U(4.W), Mux(hi_is_bigger, hi, lo)) - 11.U).asSInt
+    val bf16_max = converter.clipAdd(Cat(hi, 0.U(4.W)).zext, Cat(0.U(4.W), lo).zext - 252.S, 255.S, -256.S)(8, 0).asSInt
     val diff_abs = Mux(hi_is_bigger, diff, -diff).asUInt(4, 0) // 0 - 30
     val r = Wire(new Bundle {
       val flip_01 = Bool()
       val sgn = UInt()
-      val max = UInt()
+      val max = SInt()
       val diff = UInt()
     })
     r.flip_01 := hi_is_bigger
     r.sgn := Mux(!hi_is_bigger | bf16_s1, Cat(lo_sgn, hi_sgn), Cat(hi_sgn, lo_sgn))
-    r.max := Mux(bf16_s1, Cat(hi, 0.U(4.W)) + Cat(0.U(4.W), lo), max)
+    r.max := Mux(bf16_s1, bf16_max, fp8_max) // bias == 0
     r.diff := diff_abs
     r
   })
@@ -130,7 +131,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
     // Exp(9), Signed MantissaA(9), Signed MantissaB(wI)
 //    MixedVecInit(max, Mux(fp8_0_sgn, -fp8_0, fp8_0) , Mux(fp8_1_sgn, -b_merge, b_merge))
     val r = Wire(new Bundle{
-      val max = UInt()
+      val max = SInt()
       val frac_0 = SInt()
       val frac_1 = SInt()
     })
@@ -146,7 +147,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
     val fracMain = Cat(raw.frac_0, 0.U((wI - 10).W)).asSInt  // Fixed Signed  S2.(wI - 4)
     val fracSecond = raw.frac_1                              // Fixed Signed  S2.(wI - 4)
     val r = Wire(new Bundle {
-      val exp = UInt()
+      val exp = SInt()
       val frac = SInt()
     })
     // For FP8: S3.(wI - 3) => clip to S1.(wI - 3)
@@ -158,9 +159,9 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
 
   // Output Logic
 
-  val c_exp_s2 = IO(Output(Vec(tM, Vec(tN, UInt(wE.W)))))
-  val c_exp_s3 = IO(Output(Vec(tM, Vec(tN, UInt(wE.W)))))
-  val c_exp_s4 = IO(Output(Vec(tM, Vec(tN, UInt(wE.W)))))  // Packed m2n2-Exp Output, exp + 254 represent
+  val c_exp_s2 = IO(Output(Vec(tM, Vec(tN, SInt(wE.W)))))
+  val c_exp_s3 = IO(Output(Vec(tM, Vec(tN, SInt(wE.W)))))
+  val c_exp_s4 = IO(Output(Vec(tM, Vec(tN, SInt(wE.W)))))  // Packed m2n2-Exp Output, exp no bias represent
   val c_frac_s4 = IO(Output(Vec(tM, Vec(tN, SInt(wF.W))))) // Packed m2n2-Frac Signed 3.(wF-3)
   val fp32Dbg = IO(Output(Vec(tM, Vec(tN, UInt(32.W)))))
   for(m <- 0 until tM) {
@@ -175,7 +176,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
 
       // For Debugger: Temporarly Align To FP32 for better Debug View
       if(debugFP32Output) {
-        val fp32_view_module = Module(new FPRundingModule(wE, wF, 125))
+        val fp32_view_module = Module(new FPRundingModule(wE, wF, 0))
         fp32_view_module.exp := raw.exp
         fp32_view_module.frac := raw.frac.asUInt
         fp32Dbg(m)(n) := fp32_view_module.fp

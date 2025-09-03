@@ -13,7 +13,7 @@ VFP8BF16FusedDPUnit *dut;
 unsigned long long sim_time = 0;
 
 #define EPS 10e-2
-#define FPCheck(ref, target, str) if(fabs((ref) - (target)) >= EPS) {printf("%s Not match, ref: %f, target: %f\n", str, (ref), (target)); stopFlag = 2;}
+#define FPCheck(ref, target, str) if(fabs((ref) - (target)) >= EPS) {printf("%s Not match, ref: %f, target: %f\n", str, (ref), (target)); if(!stopFlag) stopFlag = 2;}
 
 unsigned int stopFlag = 0;
 
