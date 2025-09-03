@@ -22,8 +22,8 @@ wE: Int = 9, wF: Int = 25, wI: Int = 24, wAdder: Int = 32, enableStickBit: Boole
   // Input Matrix
   val a = IO(Input(Vec(M, Vec(K, UInt(8.W)))))
   val b = IO(Input(Vec(N, Vec(K, UInt(8.W)))))
-  val a_scale = IO(Input(Vec(M, UInt(8.W))))
-  val b_scale = IO(Input(Vec(N, UInt(8.W))))
+  val a_scale = IO(Input(Vec(M, SInt(9.W)))) // Bias == 0 [-127, 128]
+  val b_scale = IO(Input(Vec(N, SInt(9.W)))) // Bias == 0 [-127, 128]
   val cin_exp = IO(Input(Vec(M, Vec(N, UInt(wE.W)))))   // Bias == 127 - 2 == 125
   val cin_frac = IO(Input(Vec(M, Vec(N, SInt(wF.W)))))
 
@@ -57,6 +57,12 @@ wE: Int = 9, wF: Int = 25, wI: Int = 24, wAdder: Int = 32, enableStickBit: Boole
   var fracLatency = mulMatrix(0)(0)(0).latency
 
   // Align Logic
+  val scaleExp = VecInit.tabulate(M, N)((m, n) => {
+//    val in = a_scale_pipe(expLatency)(m) +& b_scale_pipe(expLatency)(n)
+//    Mux(in(9,8) === 2.U, 255.S, in)
+    converter.clipAdd(a_scale_pipe(expLatency)(m), b_scale_pipe(expLatency)(n),
+      255.S, converter.getMinSInt(a_scale.getWidth + 1))
+  })
   // Get Max Exp Value for each (m, n) pair.
   // Reduce Input Vec(K / tK + 1)
   val maxExp = VecInit.tabulate(M, N)((m, n) => {
@@ -108,26 +114,19 @@ wE: Int = 9, wF: Int = 25, wI: Int = 24, wAdder: Int = 32, enableStickBit: Boole
   // Output Rounding(LZC) for Frac
   val fracSignS2 = VecInit.tabulate(M, N)((m, n) => fracS2(m)(n)(wMerge-1))
   val fracAbsS2 = VecInit.tabulate(M, N)((m, n) => Mux(fracS2(m)(n)(wMerge-1).asBool,
-    -fracS2(m)(n), fracS2(m)(n))(wMerge-2,0))
+    -fracS2(m)(n), fracS2(m)(n)).asUInt)
   val fracLZCS2 = VecInit.tabulate(M, N)((m, n) => {CLZ(fracAbsS2(m)(n))})
   val fracShiftedS2 = VecInit.tabulate(M, N)((m, n) => fracAbsS2(m)(n) << fracLZCS2(m)(n))
   val fracSignedS2 = VecInit.tabulate(M, N)((m, n) => {
-    val c = Cat(0.U(1.W), fracShiftedS2(m)(n)).asSInt
+    val c = fracShiftedS2(m)(n).zext
     Mux(fracSignS2(m)(n), -c, c)
   })
 
   // Output Rounding for Exp
   val expS2 = VecInit.tabulate(M, N)((m ,n) => {
-    val diff = Cat(0.U(1.W), fracLZCS2(m)(n)).asSInt - (wMerge - wAdder).S
-    val curMax = Cat(0.U(1.W), maxExpPipe(2)(m)(n)).asSInt
-    val tryMax = curMax -& diff
-    Mux(
-      tryMax(tryMax.getWidth-1).asBool, 0.U(wE.W), // UnderFlow
-    Mux(
-      tryMax(tryMax.getWidth-2).asBool, (1.U << wE).asUInt - 1.U, // OverFlow
-      tryMax(wE - 1, 0)
-    )
-    )(wE - 1, 0)
+    val curMax = maxExpPipe(2)(m)(n).zext
+    val diff = fracLZCS2(m)(n).zext - (wMerge - wAdder).S
+    converter.clipAdd(curMax, diff, converter.getMaxSInt(wE + 1), 0.S)(wE - 1, 0)
   })
 
   // Output Assembling
@@ -139,7 +138,7 @@ wE: Int = 9, wF: Int = 25, wI: Int = 24, wAdder: Int = 32, enableStickBit: Boole
 object FP8BF16FusedDPArray extends App {
   ChiselStage.emitSystemVerilog(
     new FP8BF16FusedDPArray((tM, tN, tK) => new U8m2n2k1U4m2n2k2Mul(tM, tN, tK),
-      M = 2, N = 2, K = 2
+      M = 4, N = 8, K = 32
     ),
     firtoolOpts = Array(
       "-disable-all-randomization",

@@ -49,6 +49,8 @@ def generateOneTestbenchTemplate(moduleName: str):
 VerilatedContext *contextp;
 V{Name} *dut;
 unsigned long long sim_time = 0;
+bool stopFlag = false;
+
 static inline void mainLoop()
 {{
 }}
@@ -74,7 +76,7 @@ int main(int argc, char **argv)
         contextp->timeInc(1);
     }}
     dut->reset = 0;
-    while (sim_time < MAX_SIM_TIME)
+    while (sim_time < MAX_SIM_TIME && !stopFlag)
     {{
         dut->clock ^= 1;
         dut->eval();

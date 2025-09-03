@@ -114,4 +114,40 @@ package object converter {
     Tuple2(Mux(exceed_max_shift, 0.S, x >> shamt_raw), (x.asUInt & sticky_mask).orR.asSInt)
   }
 
+  val getMaxUInt = (width: Int) => (1.toLong << width).U - 1.U
+  val getMaxSInt = (width: Int) => (1.toLong << (width - 1)).S - 1.S
+  val getMinSInt = (width: Int) => (1.toLong << (width - 1)).S
+
+  val clipOpSS = (op: (SInt, SInt) => SInt, x: SInt, y: SInt, upperBound: SInt, lowerBound: SInt) => {
+    val raw = op(x, y)
+    val r = Mux(raw > upperBound, upperBound,
+      Mux(raw < lowerBound, lowerBound, raw))
+    r
+  }
+
+  val clipAdd = (x: SInt, y: SInt, upperBound: SInt, lowerBound: SInt) => {
+    clipOpSS((a: SInt, b: SInt) => a +& b, x, y, upperBound, lowerBound)
+  }
+
+  val clipSub = (x: SInt, y: SInt, upperBound: SInt, lowerBound: SInt) => {
+    clipOpSS((a: SInt, b: SInt) => a -& b, x, y, upperBound, lowerBound)
+  }
+
+  val clipAddSign = (x: SInt, y: SInt) => {
+    val width = x.getWidth
+    val upperBound = getMaxSInt(width)
+    val lowerBound = getMaxSInt(width)
+    clipAdd(x, y, upperBound, lowerBound)
+  }
+  val clipAddUnsign = (x: UInt, y: UInt) => {
+    val width = x.getWidth
+    val upperBound = getMaxUInt(width)
+    clipAdd(x.zext, y.zext, upperBound.zext, 0.S)(width - 1, 0).asUInt
+  }
+  val clipAddUnsignSign = (x: UInt, y: SInt) => {
+    val width = x.getWidth
+    val upperBound = getMaxUInt(width).zext
+    clipAdd(x.zext, y, upperBound, 0.S)(width - 1, 0).asUInt
+  }
+
 }

@@ -14,14 +14,11 @@ class FPRundingModule(wE: Int, wF: Int, bias: Int) extends Module {
 
   val clzFrac = CLZ(fracAbs)
   val trueFrac = fracAbs << clzFrac
-  val addedExp = Mux(exp < clzFrac, 0.U, exp - clzFrac)
-
-  val trueExp = Mux(addedExp < bias.U, 0.U, addedExp - bias.U)
-  val clippedExp = Mux(trueExp > 255.U, 255.U(8.W), trueExp(7, 0))
+  val addedExp = converter.clipSub(exp.zext, (bias.U +& clzFrac).zext, 255.S, 0.S)
 
   if(wF >= 24) {
-    fp := Cat(sign, clippedExp, trueFrac(wF - 2, wF - 2 - 22))
+    fp := Cat(sign, addedExp(7, 0), trueFrac(wF - 2, wF - 2 - 22))
   } else {
-    fp := Cat(sign, clippedExp, trueFrac(wF - 2, 0), 0.U((24 - wF).W))
+    fp := Cat(sign, addedExp(7, 0), trueFrac(wF - 2, 0), 0.U((24 - wF).W))
   }
 }
