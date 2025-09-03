@@ -28,9 +28,8 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
   val bf16_s1 = RegNext(bf16)
   val bf16_s2 = RegNext(bf16_s1)
   val bf16_s3 = RegNext(bf16_s2)
-
-  val c_exp = IO(Output(Vec(tM, Vec(tN, UInt(wE.W)))))  // Packed m2n2-Exp Output, exp + 254 represent
-  val c_frac = IO(Output(Vec(tM, Vec(tN, SInt(wF.W))))) // Packed m2n2-Frac Signed 3.(wF-3)
+  val bf16_s4 = RegNext(bf16_s3)
+  dontTouch(bf16_s4)
 
   val a_fp8 = VecInit.tabulate(tM,tK)((m, k) => converter.func_unpack_e4m3(a_in(m)(k)))
   val b_fp8 = VecInit.tabulate(tN,tK)((n, k) => converter.func_unpack_e4m3(b_in(n)(k)))
@@ -93,7 +92,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
     val lo_sgn = raw.lo_sgn
     val hi = raw.hi
     val lo = raw.lo
-    val diff = hi.asSInt -& lo.asSInt
+    val diff = hi.zext - lo.zext
     val hi_is_bigger = !diff(5).asBool
     val max = Cat(0.U(4.W), Mux(hi_is_bigger, hi, lo)) + 241.U
     val diff_abs = Mux(hi_is_bigger, diff, -diff).asUInt(4, 0) // 0 - 30
@@ -119,14 +118,15 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
     val max       = raw.max
     val flip_01   = raw.flip_01
     val fp8_0_sgn = raw.sgn(1)
-    val fp8_0 = mul_u4_result_s2(m)(n)(flip_01).zext                      // Fixed 2.6
+    val fp8_0 = mul_u4_result_s2(m)(n)(flip_01).zext                        // Fixed S2.6
     val fp8_1_sgn = raw.sgn(0)
-    val fp8_1 = Cat(mul_u4_result_s2(m)(n)(1.U-flip_01), 0.U((wI - 9).W)) // Fixed Unsigned 2.(wI - 3)
-    val fp8_1_shifter = converter.shiftRight(fp8_1, diff)                 // Fixed Unsigned 2.(wI - 3)
+    val fp8_1 = Cat(mul_u4_result_s2(m)(n)(1.U-flip_01), 0.U((wI - 10).W))  // Fixed Unsigned 2.(wI - 4)
+    val fp8_1_shifter = converter.shiftRight(fp8_1, diff)                   // Fixed Unsigned 2.(wI - 4)
     val fp8_1_shifted = Mux(enableStickBit.B, fp8_1_shifter._1 | fp8_1_shifter._2.asUInt, fp8_1_shifter._1)
-//    val b_shifted = fp8_1_shifter._1
-    val bf16_frac = Cat(mul_u8_result_s2(m)(n), 0.U((wI - 17).W))         // Fixed Unsigned 2.(wI - 3)
-    val b_merge = Mux(bf16_s2, bf16_frac.zext, fp8_1_shifted.zext)        // Fixed Signed  S2.(wI - 3)
+//    val fp8_1_shifted = fp8_1_shifter._1
+//    val fp8_1_shifted = 0.U
+    val bf16_frac = Cat(mul_u8_result_s2(m)(n), 0.U((wI - 17).W))                   // Fixed Unsigned 2.(wI - 3)
+    val b_merge = Mux(bf16_s2, bf16_frac.zext, Cat(0.U, fp8_1_shifted).zext)        // Fixed Signed PS2.(wI - 4)
     // Exp(9), Signed MantissaA(9), Signed MantissaB(wI)
 //    MixedVecInit(max, Mux(fp8_0_sgn, -fp8_0, fp8_0) , Mux(fp8_1_sgn, -b_merge, b_merge))
     val r = Wire(new Bundle{
@@ -141,23 +141,43 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
   })
   val c_s3 = RegNext(next_c_s3)
 
+  val next_c_s4 = VecInit.tabulate(tM, tN)((m, n) => {
+    val raw = c_s3(m)(n)
+    val fracMain = Cat(raw.frac_0, 0.U((wI - 10).W)).asSInt  // Fixed Signed  S2.(wI - 4)
+    val fracSecond = raw.frac_1                              // Fixed Signed  S2.(wI - 4)
+    val r = Wire(new Bundle {
+      val exp = UInt()
+      val frac = SInt()
+    })
+    // For FP8: S3.(wI - 3) => clip to S1.(wI - 3)
+    r.exp := raw.max
+    r.frac := Mux(bf16_s3, fracSecond, (fracMain +& fracSecond(wI - 2, 0).asSInt).asSInt)
+    r
+  })
+  val c_s4 = RegNext(next_c_s4)
+
   // Output Logic
+
+  val c_exp_s2 = IO(Output(Vec(tM, Vec(tN, UInt(wE.W)))))
+  val c_exp_s3 = IO(Output(Vec(tM, Vec(tN, UInt(wE.W)))))
+  val c_exp_s4 = IO(Output(Vec(tM, Vec(tN, UInt(wE.W)))))  // Packed m2n2-Exp Output, exp + 254 represent
+  val c_frac_s4 = IO(Output(Vec(tM, Vec(tN, SInt(wF.W))))) // Packed m2n2-Frac Signed 3.(wF-3)
   val fp32Dbg = IO(Output(Vec(tM, Vec(tN, UInt(32.W)))))
   for(m <- 0 until tM) {
     for(n <- 0 until tN) {
-      val raw = c_s3(m)(n)
-      val mantA = Cat(raw.frac_0, 0.U((wI - 10).W)).asSInt  // Fixed Signed  S2.(wI - 3)
-      val mantB = raw.frac_1                                // Fixed Signed  S2.(wI - 3)
-      val exp = next_c_s3(m)(n).max
-      val frac = Mux(bf16_s3, mantB, (mantA +& mantB)(wI, 1).asSInt)     // For FP8: S3.(wI - 3) => clip to S2.(wI - 3)
+      val raw = c_s4(m)(n)
+      c_exp_s4(m)(n) := raw.exp
+      c_frac_s4(m)(n) := raw.frac
 
-      c_exp(m)(n) := exp(wE - 1, 0)
-      c_frac(m)(n) := RegNext(frac(wI - 1, wI - wF).asSInt)
+      // Early Access to exp For Dot-Product Array
+      c_exp_s2(m)(n) := c_s2(m)(n).max
+      c_exp_s3(m)(n) := c_s3(m)(n).max
+
       // For Debugger: Temporarly Align To FP32 for better Debug View
       if(debugFP32Output) {
         val fp32_view_module = Module(new FPRundingModule(wE, wF, 125))
-        fp32_view_module.exp := RegNext(RegNext(exp(wE-1, 0)))
-        fp32_view_module.frac := c_frac(m)(n).asUInt
+        fp32_view_module.exp := raw.exp
+        fp32_view_module.frac := raw.frac.asUInt
         fp32Dbg(m)(n) := fp32_view_module.fp
       } else {
         fp32Dbg(m)(n) := 0.U
@@ -173,7 +193,7 @@ object FP8BF16FusedDPUnit extends App {
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",
-//      "-preserve-aggregate=vec",
+      "-preserve-aggregate=vec",
       "--split-verilog",
       "-o=generated/FP8BF16FusedDPUnit"
     )

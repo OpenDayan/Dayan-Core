@@ -13,9 +13,9 @@ VFP8BF16FusedDPUnit *dut;
 unsigned long long sim_time = 0;
 
 #define EPS 10e-2
-#define FPCheck(ref, target, str) if(fabs((ref) - (target)) >= EPS) {printf("%s Not match, ref: %f, target: %f\n", str, (ref), (target)); stopFlag = true;}
+#define FPCheck(ref, target, str) if(fabs((ref) - (target)) >= EPS) {printf("%s Not match, ref: %f, target: %f\n", str, (ref), (target)); stopFlag = 2;}
 
-bool stopFlag = false;
+unsigned int stopFlag = 0;
 
 static inline void mainLoop()
 {
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
         contextp->timeInc(1);
     }
     dut->reset = 0;
-    while (sim_time < MAX_SIM_TIME && !stopFlag)
+    while (sim_time < MAX_SIM_TIME)
     {
         dut->clock ^= 1;
         dut->eval();
@@ -108,6 +108,9 @@ int main(int argc, char **argv)
         m_trace->dump(contextp->time());
         contextp->timeInc(1);
         sim_time++;
+        if(stopFlag != 0) {
+            if((--stopFlag) == 0) break;
+        }
     }
     m_trace->close();
     delete dut;

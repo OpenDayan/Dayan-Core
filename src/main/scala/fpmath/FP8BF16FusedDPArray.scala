@@ -71,7 +71,7 @@ wE: Int = 9, wF: Int = 25, wI: Int = 24, wAdder: Int = 32, enableStickBit: Boole
       if (tk == (K / tK)) {
         r = cin_exp_pipe(expLatency)(m)(n)
       } else {
-        r = mulMatrix(m / tM)(n / tN)(tk).c_exp(m % tM)(n % tN)
+        r = mulMatrix(m / tM)(n / tN)(tk).c_exp_s4(m % tM)(n % tN)
       }
       r
     })
@@ -84,7 +84,7 @@ wE: Int = 9, wF: Int = 25, wI: Int = 24, wAdder: Int = 32, enableStickBit: Boole
     if(tk == (K / tK)){
       r = maxExp(m)(m) - cin_exp_pipe(expLatency)(m)(n)
     } else {
-      r = maxExp(m)(m) - mulMatrix(m/tM)(n/tN)(tk).c_exp(m%tM)(n%tN)
+      r = maxExp(m)(m) - mulMatrix(m/tM)(n/tN)(tk).c_exp_s4(m%tM)(n%tN)
     }
     r
   })
@@ -97,7 +97,7 @@ wE: Int = 9, wF: Int = 25, wI: Int = 24, wAdder: Int = 32, enableStickBit: Boole
     if(tk == (K / tK)) {
       valFrac = Cat(cin_frac_pipe(fracLatency)(m)(n), 0.S((wAdder - wE).W)).asSInt
     } else {
-      valFrac = Cat(mulMatrix(m/tM)(n/tN)(tk).c_frac(m%tM)(n%tN), 0.S((wAdder - wI).W)).asSInt
+      valFrac = Cat(mulMatrix(m/tM)(n/tN)(tk).c_frac_s4(m%tM)(n%tN), 0.S((wAdder - wI).W)).asSInt
     }
     val shiftedFrac = converter.shiftRightSigned(valFrac, diffExpPipe(0)(m)(n)(tk))
     Mux(enableStickBit.B, shiftedFrac._1.asUInt | shiftedFrac._2.asUInt, shiftedFrac._1.asUInt).asSInt
