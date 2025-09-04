@@ -12,7 +12,7 @@ build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
 
 .PHONY: generated/{Name}/filelist.f
 generated/{Name}/filelist.f:
-	./mill GPU-Chisel.runMain {Package}.{Name}
+	./mill RVTNG-Chisel.runMain {Package}.{Name}
 
 build/V{Name}:
 	mkdir -p build/V{Name}
