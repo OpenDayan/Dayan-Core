@@ -1,112 +1,35 @@
-Chisel Project Template
+RVT-New
 =======================
 
-You've done the [Chisel Bootcamp](https://github.com/freechipsproject/chisel-bootcamp), and now you
-are ready to start your own Chisel project.  The following procedure should get you started
-with a clean running [Chisel3](https://www.chisel-lang.org/) project.
+新 RVT 指令集设计实现仓库，使用 Chisel 6.6.0。
 
-## Make your own Chisel3 project
+## 构建方式：
+使用 `make UnitTest.mk` 构建单元测试 Makefile 文件
 
-### Dependencies
+使用 `make -j all` 在 Verilator 中执行所有测试
 
-#### JDK 11 or newer
+## 查看波形
 
-We recommend using Java 11 or later LTS releases. While Chisel itself works with Java 8, our preferred build tool Mill requires Java 11. You can install the JDK as your operating system recommends, or use the prebuilt binaries from [Adoptium](https://adoptium.net/) (formerly AdoptOpenJDK).
+推荐使用 `surfer` 替代 `gtkwave` 作为波形查看器。
 
-#### SBT or mill
+Surfer 采用服务端-客户端架构，可在服务端打开波形文件，并通过远程客户端网络访问服务端。
 
-SBT is the most common build tool in the Scala community. You can download it [here](https://www.scala-sbt.org/download.html).
-Mill is another Scala/Java build tool preferred by Chisel's developers.
-This repository includes a bootstrap script `./mill` so that no installation is necessary.
-You can read more about Mill on its website: https://mill-build.org.
+使用 Surfer 查看波形，在服务器集群上使用非常方便。
 
-#### Verilator
+用户不再需要将波形下载到本地，再使用 gtkwave 打开这样的繁琐流程。
 
-The test with `svsim` needs Verilator installed.
-See Verilator installation instructions [here](https://verilator.org/guide/latest/install.html).
+从这里获取 Surfer：[Surfer 官网](https://gitlab.com/surfer-project/surfer)
 
-### How to get started
+在服务器安装好 surver（Surfer 服务端） 并本地安装好 Surfer 后，建议配置 ssh 端口转发，以方便客户端访问服务器。
 
-#### Create a repository from the template
+本项目 Makefile 中，已配置好查看波形的项目。这些项目以 surver_ 开头，如：
 
-This repository is a Github template. You can create your own repository from it by clicking the green `Use this template` in the top right.
-Please leave `Include all branches` **unchecked**; checking it will pollute the history of your new repository.
-For more information, see ["Creating a repository from a template"](https://docs.github.com/en/free-pro-team@latest/github/creating-cloning-and-archiving-repositories/creating-a-repository-from-a-template).
+`make -j surver_FP8BF16FusedUnit`
 
-#### Wait for the template cleanup workflow to complete
+运行该命令后，会自动生成待测硬件，并使用 Verilator 进行仿真生成波形，并使用 surver 打开波形提供服务。
 
-After using the template to create your own blank project, please wait a minute or two for the `Template cleanup` workflow to run which will removes some template-specific stuff from the repository (like the LICENSE).
-Refresh the repository page in your browser until you see a 2nd commit by `actions-user` titled `Template cleanup`.
+surver 服务默认配置在 4000 端口，并使用 00000000 作为密钥。
 
+在用户端（配置好端口转发后），可以使用 `surfer http://127.0.0.1:4000/00000000` 命令查看波形。
 
-#### Clone your repository
-
-Once you have created a repository from this template and the `Template cleanup` workflow has completed, you can click the green button to get a link for cloning your repository.
-Note that it is easiest to push to a repository if you set up SSH with Github, please see the [related documentation](https://docs.github.com/en/free-pro-team@latest/github/authenticating-to-github/connecting-to-github-with-ssh). SSH is required for pushing to a Github repository when using two-factor authentication.
-
-```sh
-git clone git@github.com:gmlayer0/GPU-Chisel.git
-cd GPU-Chisel
-```
-
-#### Set project organization and name in build.sbt
-
-The cleanup workflow will have attempted to provide sensible defaults for `ThisBuild / organization` and `name` in the `build.sbt`.
-Feel free to use your text editor of choice to change them as you see fit.
-
-#### Clean up the README.md file
-
-Again, use you editor of choice to make the README specific to your project.
-
-#### Add a LICENSE file
-
-It is important to have a LICENSE for open source (or closed source) code.
-This template repository has the Unlicense in order to allow users to add any license they want to derivative code.
-The Unlicense is stripped when creating a repository from this template so that users do not accidentally unlicense their own work.
-
-For more information about a license, check out the [Github Docs](https://docs.github.com/en/free-pro-team@latest/github/building-a-strong-community/adding-a-license-to-a-repository).
-
-#### Commit your changes
-```sh
-git commit -m 'Starting GPU-Chisel'
-git push origin main
-```
-
-### Did it work?
-
-You should now have a working Chisel3 project.
-
-You can run the included test with:
-```sh
-sbt test
-```
-
-Alternatively, if you use Mill:
-```sh
-./mill GPU-Chisel.test
-```
-
-You should see a whole bunch of output that ends with something like the following lines
-```
-[info] Tests: succeeded 1, failed 0, canceled 0, ignored 0, pending 0
-[info] All tests passed.
-[success] Total time: 5 s, completed Dec 16, 2020 12:18:44 PM
-```
-If you see the above then...
-
-### It worked!
-
-You are ready to go. We have a few recommended practices and things to do.
-
-* Use packages and following conventions for [structure](https://www.scala-sbt.org/1.x/docs/Directories.html) and [naming](http://docs.scala-lang.org/style/naming-conventions.html)
-* Package names should be clearly reflected in the testing hierarchy
-* Build tests for all your work
-* Read more about testing in SBT in the [SBT docs](https://www.scala-sbt.org/1.x/docs/Testing.html)
-* This template includes a [test dependency](https://www.scala-sbt.org/1.x/docs/Library-Dependencies.html#Per-configuration+dependencies) on [ScalaTest](https://www.scalatest.org/). This, coupled with `svsim` (included with Chisel) and `verilator`, are a starting point for testing Chisel generators.
-  * You can remove this dependency in the build.sbt file if you want to
-* Change the name of your project in the build.sbt file
-* Change your README.md
-
-## Problems? Questions?
-
-Check out the [Chisel Users Community](https://www.chisel-lang.org/community.html) page for links to get in contact!
+在使用 surfer 过程中，若波形存在更新，可以直接在 surfer gui 中使用刷新按钮更新，无需重启 surfer。
