@@ -37,6 +37,27 @@ union fp32_int32 {
     uint32_t bits;
 };
 
+static inline uint32_t FP32ToSExp(float a) {
+    fp32_int32 f;
+    f.f = a;
+    int raw_exp = (f.bits & (0xff << 23)) >> 23;
+    int newval = raw_exp + 1 - 127; // [-126, 129]
+    return newval & 0x1ff;
+}
+
+static inline uint32_t FP32ToSFrac(float a, int width) {
+    fp32_int32 f;
+    f.f = a;
+    uint32_t sgn = (f.bits & (0x1 << 31)) >> 31;
+    uint32_t raw_exp = (f.bits & (0xff << 23)) >> 23;
+    int64_t  raw_frac = f.bits & (0x7fffff);
+    if(raw_exp) raw_frac |= 0x800000;
+    if(sgn) raw_frac = -raw_frac; // Width == 25, s.24
+    if(width < 25) raw_frac = raw_frac >> (25 - width);
+    else raw_frac = raw_frac << (width - 25);
+    return raw_frac & ((1ull << (unsigned long long)width) - 1);
+}
+
 template<int N>
 constexpr int exp_i2() {
     return 1 << N;

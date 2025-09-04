@@ -21,6 +21,17 @@ static inline void mainLoop()
     if(1 || (unsigned)rand() % 2) {
         #include "FP8BF16FusedArrayTestBF16Gen.hpp"
     }
+    if(0) {
+        // CIN Test
+        dut->cin_exp_0_1 = FP32ToSExp(1.5f);
+        dut->cin_frac_0_1 = FP32ToSFrac(1.5f, 25);
+        std::vector<float> r(4);
+        r[0] = 0.0f;
+        r[1] = 1.5f;
+        r[2] = 0.0f;
+        r[3] = 0.0f;
+        results.push(r);
+    }
     if(results.size() > 9) {
         auto r = results.front();
         #include "FP8BF16FusedArrayTestCheckGen.hpp"

@@ -66,8 +66,6 @@ debugFP32Output: Boolean = false
   val s3_cin_exp = RegNext(s2_cin_exp)
   val s4_cin_exp = RegNext(s3_cin_exp)
   val s5_cin_exp = RegNext(s4_cin_exp)
-  val s6_cin_exp = RegNext(s5_cin_exp)
-  val s7_cin_exp = RegNext(s6_cin_exp)
 
   val s1_cin_frac = RegNext(cin_frac)
   val s2_cin_frac = RegNext(s1_cin_frac)
@@ -75,7 +73,6 @@ debugFP32Output: Boolean = false
   val s4_cin_frac = RegNext(s3_cin_frac)
   val s5_cin_frac = RegNext(s4_cin_frac)
   val s6_cin_frac = RegNext(s5_cin_frac)
-  val s7_cin_frac = RegNext(s6_cin_frac)
 
   // Control flow
   val bf16 = IO(Input(Bool()))
@@ -167,7 +164,8 @@ debugFP32Output: Boolean = false
     core.frac_in := VecInit.tabulate(G + 1)(i => {
       var r = SInt()
       if(i == G) {
-        r = s6_cin_frac(m)(n)
+        // wF -> wShifter + log2Ceil(realSK)
+        r = Cat(s6_cin_frac(m)(n), 0.S((wShifter + log2Ceil(realSK) - wF).W)).asSInt
       } else {
         r = s6_frac(m)(n)(i)
       }
@@ -240,7 +238,7 @@ debugFP32Output: Boolean = false
 object FP8BF16FusedDPArray extends App {
   ChiselStage.emitSystemVerilog(
     new FP8BF16FusedDPArray((tM, tN, tK) => new U8m2n2k1U4m2n2k2Mul(tM, tN, tK),
-      M = 4, N = 8, K = 128, sK = 32,
+      M = 2, N = 2, K = 4, sK = 2,
       debugFP32Output = true
     ),
     firtoolOpts = Array(
