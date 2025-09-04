@@ -18,7 +18,9 @@ unsigned int stopFlag = 0;
 static inline void mainLoop()
 {
     static std::queue<std::vector<float>> results;
-    if(1 || (unsigned)rand() % 2) {
+    // int sel = (unsigned)rand() % 2;
+    int sel = 0;
+    if(sel == 0) {
         #include "FP8BF16FusedArrayTestBF16Gen.hpp"
     }
     if(0) {
@@ -49,6 +51,23 @@ static inline void mainLoop()
         dut->b_1_3 = getUpper(FP32ToBF16(1.0));
         r[0] = 0.0f;
         r[1] = 3.0f;
+        r[2] = 0.0f;
+        r[3] = 0.0f;
+        results.push(r);
+    }
+    if(sel == 1) {
+        // FP8 Test
+        dut->bf16 = 0;
+        std::vector<float> r(4);
+        dut->a_scale_0_0 = 1;
+        dut->a_0_0 = FP32ToFP8<4>(2.0);
+        dut->b_0_0 = FP32ToFP8<4>(0.25);
+        dut->a_0_1 = FP32ToFP8<4>(0.5);
+        dut->b_0_1 = FP32ToFP8<4>(1.0);
+        dut->a_0_2 = FP32ToFP8<4>(1.0);
+        dut->b_0_2 = FP32ToFP8<4>(0.5);
+        r[0] = 2.5f;
+        r[1] = 0.0f;
         r[2] = 0.0f;
         r[3] = 0.0f;
         results.push(r);
