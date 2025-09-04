@@ -32,6 +32,27 @@ static inline void mainLoop()
         r[3] = 0.0f;
         results.push(r);
     }
+    if(0) {
+        // Scale Test
+        dut->bf16 = 1;
+        std::vector<float> r(4);
+        dut->a_scale_0_0 = 0;
+        dut->a_0_0 = getLower(FP32ToBF16(1.0));
+        dut->a_0_1 = getUpper(FP32ToBF16(1.0));
+        dut->b_1_0 = getLower(FP32ToBF16(1.0));
+        dut->b_1_1 = getUpper(FP32ToBF16(1.0));
+        dut->a_scale_0_1 = 5;
+        dut->b_scale_1_1 = 3;
+        dut->a_0_2 = getLower(FP32ToBF16(1.0));
+        dut->a_0_3 = getUpper(FP32ToBF16(1.0));
+        dut->b_1_2 = getLower(FP32ToBF16(1.0));
+        dut->b_1_3 = getUpper(FP32ToBF16(1.0));
+        r[0] = 0.0f;
+        r[1] = 3.0f;
+        r[2] = 0.0f;
+        r[3] = 0.0f;
+        results.push(r);
+    }
     if(results.size() > 9) {
         auto r = results.front();
         #include "FP8BF16FusedArrayTestCheckGen.hpp"

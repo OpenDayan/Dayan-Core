@@ -9,6 +9,18 @@ static inline std::vector<float> GenRandomFloats(int count, float scale) {
     return r;
 }
 
+static inline std::vector<int> GenRandomInt(int count, int scale) {
+    std::vector<int> r(count);
+    for(int i = 0; i < count ; i ++) {
+        r[i] = (long long)scale * (rand() - RAND_MAX / 2) / (long long) RAND_MAX;
+    }
+    return r;
+}
+
+static inline float ScaleToFP32(int scale) {
+    return exp2f((float)scale);
+}
+
 static inline uint8_t getUpper(uint16_t a) {
     return (a >> 8) & 0xff;
 }
