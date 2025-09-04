@@ -8,7 +8,7 @@ std::vector<float> r({M} * {N});
 '''.format(M = M, N = N, K = K, SK = SK)
     if enableScale:
         strBuilder += '''
-auto randScale = GenRandomInt(({M} + {N}) * ({K} / {SK}), 1);
+auto randScale = GenRandomInt(({M} + {N}) * ({K} / {SK}), 4);
 '''.format(M = M, N = N, K = K, SK = SK)
     else:
         strBuilder += '''

@@ -3,7 +3,7 @@ dut->bf16 = 1;
 auto randArray = GenRandomFloats((2 + 2) * (2 + 1), 10);
 std::vector<float> r(2 * 2);
 
-auto randScale = GenRandomInt((2 + 2) * (2 / 1), 1);
+auto randScale = GenRandomInt((2 + 2) * (2 / 1), 4);
 dut->a_0_0 = getLower(FP32ToBF16(randArray[0]));
 dut->a_0_1 = getUpper(FP32ToBF16(randArray[0]));
 dut->a_scale_0_0 = randScale[0];
