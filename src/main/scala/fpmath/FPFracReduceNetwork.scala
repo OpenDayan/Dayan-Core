@@ -22,9 +22,10 @@ class FPFracReduceNetwork(
 
   // Stage 1: Shift to position
   val next_s1 = VecInit.tabulate(n)(i => {
+    // S1.(wI - 1)
     val extendedInput = Cat(frac_in(i), 0.U((wI - wF).W)).asSInt
     val shifter = converter.shiftRightSigned(extendedInput, diff(i))
-    val shiftedValue = Wire(UInt(wI.W))
+    val shiftedValue = Wire(SInt(wI.W))
     shiftedValue := Mux(enableStickBit.B, shifter._1.asUInt | shifter._2.asUInt, shifter._1.asUInt).asSInt
     shiftedValue
   })
@@ -35,9 +36,9 @@ class FPFracReduceNetwork(
   val next_s2 = s1.reduceTree((l, r) => {
     l +& r
   })
-  require(next_s2.getWidth == wI + log2Up(n), "Output width should equal to expanded reduce result")
+  require(next_s2.getWidth == wI + log2Ceil(n), "Output width should equal to expanded reduce result")
 
-  val frac_out = IO(Output(SInt((wI+log2Up(n)).W)))
+  val frac_out = IO(Output(SInt((wI + log2Ceil(n)).W)))
   frac_out := RegNext(next_s2)
 
 }
