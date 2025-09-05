@@ -13,7 +13,7 @@ class FPFracReduceNetwork(
 ) extends Module {
   require(n >= 1, "N should larger than 1")
   require(wI >= wF, "Shifter Should Longer than Fraction")
-  val latency = 2
+  val latency = 1 + log2Ceil(n)/3
 
   // Input a group of Fraction and their Exponent Difference
   // Reduce to a single Fraction
@@ -29,16 +29,26 @@ class FPFracReduceNetwork(
     shiftedValue := Mux(enableStickBit.B, shifter._1.asUInt | shifter._2.asUInt, shifter._1.asUInt).asSInt
     shiftedValue
   })
-  val s1 = RegNext(next_s1)
 
-  // Stage 2: Reduce
   // TODO: Optimize me
-  val next_s2 = s1.reduceTree((l, r) => {
-    l +& r
-  })
-  require(next_s2.getWidth == wI + log2Ceil(n), "Output width should equal to expanded reduce result")
+  def buildAddTree(input: Vec[SInt], depth: Int = 0): SInt = {
+    val layerRaw = {
+      if(input.length == 1) {
+        input(0)
+      } else {
+        val l = buildAddTree(VecInit.tabulate((input.length+1)/2)(i => input(i)) ,depth+1)
+        val r = buildAddTree(VecInit.tabulate(input.length/2)(i => input((input.length+1)/2 + i)) ,depth+1)
+        l +& r
+      }
+    }
+    if(depth % 3 == 0) {
+      RegNext(layerRaw)
+    } else {
+      layerRaw
+    }
+  }
 
   val frac_out = IO(Output(SInt((wI + log2Ceil(n)).W)))
-  frac_out := RegNext(next_s2)
+  frac_out := buildAddTree(next_s1, 0)
 
 }

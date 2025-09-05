@@ -64,13 +64,21 @@ def genCheck(M, N):
             str_builder += template.format(i = m * N + n, m = m, n = n)
     return str_builder
 
+def clog2(x):
+    """Ceiling of log2"""
+    if x <= 0:
+        raise ValueError("domain error")
+    return (x-1).bit_length()
+
 M = 4
 N = 8
 K = 64
 sK = 16 # How many element that Share One Scale
 enableScale = 1
 enableCin = 1
-r0Latency = 6 # 5 + log8(K)
+r0Latency = 5 + clog2(K) // 3 # 5 + log2Ceil(K)/3
+
+print('r0Latency: ', r0Latency)
 
 with open('csrc/test/FP8BF16FusedArrayTestBF16Gen.hpp', 'w') as f:
     f.write(genBF16Test(M,N,K,sK, r0Latency, enableScale, enableCin))
