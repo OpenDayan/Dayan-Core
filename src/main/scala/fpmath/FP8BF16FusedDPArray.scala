@@ -92,19 +92,21 @@ debugFP32Output: Boolean = false
   }))))
 
   // Align Logic
-  // s2: Caculate Max exp and diff per Group
-  val s2_exp = VecInit.tabulate(M, N, G)((m, n, g) => VecInit.tabulate(realSK)( rsk => {
-    mulMatrix(m / tM)(n / tN)(g)(rsk).c_exp_s2(m % tM)(n % tN)
+  // s1: Caculate Max exp and diff per Group
+  val s1_exp = VecInit.tabulate(M, N, G)((m, n, g) => VecInit.tabulate(realSK)( rsk => {
+    mulMatrix(m / tM)(n / tN)(g)(rsk).c_exp_s1(m % tM)(n % tN)
     }))
+  val s2_exp = RegNext(s1_exp)
   // Signed 9 Bit with Bias == 0 [-256, 255]
-  val s2_exp_max_group = VecInit.tabulate(M, N, G)((m, n, g) => {
-    s2_exp(m)(n)(g).reduceTree((l, r) => Mux(l < r, r, l))
+  val s1_exp_max_group = VecInit.tabulate(M, N, G)((m, n, g) => {
+    s1_exp(m)(n)(g).reduceTree((l, r) => Mux(l < r, r, l))
   })
+  val s2_exp_max_group = RegNext(s1_exp_max_group)
   val s2_exp_max = VecInit.tabulate(M, N)((m, n) => {
     VecInit.tabulate(G)(g => s2_exp_max_group(m)(n)(g) + s2_scale(m)(n)(g)).reduceTree((l, r) => Mux(l < r, r, l))
   })
-  val s3_exp = RegNext(s2_exp)
   val s3_exp_max = RegNext(s2_exp_max)
+  val s3_exp = RegNext(s2_exp)
   // Unsigned 9 Bit [0, 511]
   val s3_exp_diff = VecInit.tabulate(M, N, realK)((m, n, k) => {
     (s3_exp_max(m)(n) - s3_exp(m)(n)(k / realSK)(k % realSK) - s3_scale(m)(n)(k / realSK)).asUInt

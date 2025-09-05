@@ -27,6 +27,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
   val bf16 = IO(Input(Bool()))                // Compute BF16 * BF16 Instead of FP8 * FP8
 
   // Control Flow
+  val valid_s1 = RegNext(valid)
   val bf16_s1 = RegNext(bf16)
   val bf16_s2 = RegNext(bf16_s1)
   val bf16_s3 = RegNext(bf16_s2)
@@ -73,28 +74,6 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
       hi := a_fp8(m)(1).f +& b_fp8(n)(1).f
       lo := a_fp8(m)(0).f +& b_fp8(n)(0).f
     }
-    val r = Wire(new Bundle {
-      val hi_sgn = Bool()
-      val hi = UInt()
-      val lo_sgn = Bool()
-      val lo = UInt()
-    })
-    r.hi_sgn := hi_sgn
-    r.hi := hi
-    r.lo_sgn := lo_sgn
-    r.lo := lo
-    r
-  })
-  val c_s1 = RegEnable(next_c_s1, valid)
-
-  // Get Align Shift information
-  // Get Max
-  val next_c_s2 = VecInit.tabulate(tM, tN)((m, n) => {
-    val raw = c_s1(m)(n)
-    val hi_sgn = raw.hi_sgn
-    val lo_sgn = raw.lo_sgn
-    val hi = raw.hi
-    val lo = raw.lo
     val diff = hi.zext - lo.zext
     val hi_is_bigger = !diff(5).asBool
     val fp8_max = (Cat(0.U(4.W), Mux(hi_is_bigger, hi, lo)) - 11.U).asSInt
@@ -107,12 +86,13 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
       val diff = UInt()
     })
     r.flip_01 := hi_is_bigger
-    r.sgn := Mux(!hi_is_bigger | bf16_s1, Cat(lo_sgn, hi_sgn), Cat(hi_sgn, lo_sgn))
-    r.max := Mux(bf16_s1, bf16_max, fp8_max) // bias == 0
+    r.sgn := Mux(!hi_is_bigger | bf16, Cat(lo_sgn, hi_sgn), Cat(hi_sgn, lo_sgn))
+    r.max := Mux(bf16, bf16_max, fp8_max) // bias == 0
     r.diff := diff_abs
     r
   })
-  val c_s2 = RegNext(next_c_s2)
+  val c_s1 = RegEnable(next_c_s1, valid)
+  val c_s2 = RegEnable(c_s1, valid_s1)
 
   // Aligning Logic
   // A Register, Do Not Shift
@@ -162,6 +142,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
 
   // Output Logic
 
+  val c_exp_s1 = IO(Output(Vec(tM, Vec(tN, SInt(wE.W)))))
   val c_exp_s2 = IO(Output(Vec(tM, Vec(tN, SInt(wE.W)))))
   val c_exp_s3 = IO(Output(Vec(tM, Vec(tN, SInt(wE.W)))))
   val c_exp_s4 = IO(Output(Vec(tM, Vec(tN, SInt(wE.W)))))  // Packed m2n2-Exp Output, exp no bias represent
@@ -174,6 +155,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
       c_frac_s4(m)(n) := raw.frac
 
       // Early Access to exp For Dot-Product Array
+      c_exp_s1(m)(n) := c_s1(m)(n).max
       c_exp_s2(m)(n) := c_s2(m)(n).max
       c_exp_s3(m)(n) := c_s3(m)(n).max
 
@@ -199,7 +181,7 @@ object FP8BF16FusedDPUnit extends App {
       "-strip-debug-info",
       "-preserve-aggregate=vec",
       "--split-verilog",
-      "-o=generated/FP8BF16FusedDPUnit"
+      "-o=generated/FP8`BF16`FusedDPUnit"
     )
   )
 }
