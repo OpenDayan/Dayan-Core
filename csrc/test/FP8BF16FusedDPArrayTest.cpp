@@ -17,6 +17,7 @@ unsigned int stopFlag = 0;
 
 static inline void mainLoop()
 {
+    static std::queue<std::vector<float>> resultsS4;
     static std::queue<std::vector<float>> results;
     // int sel = (unsigned)rand() % 2;
     int sel = 0;
@@ -25,8 +26,8 @@ static inline void mainLoop()
     }
     if(0) {
         // CIN Test
-        dut->cin_exp_0_1 = FP32ToSExp(1.5f);
-        dut->cin_frac_0_1 = FP32ToSFrac(1.5f, 25);
+        dut->s4_cin_exp_0_1 = FP32ToSExp(1.5f);
+        dut->s4_cin_frac_0_1 = FP32ToSFrac(1.5f, 25);
         std::vector<float> r(4);
         r[0] = 0.0f;
         r[1] = 1.5f;
@@ -72,7 +73,7 @@ static inline void mainLoop()
         r[3] = 0.0f;
         results.push(r);
     }
-    if(results.size() > 9) {
+    if(results.size() > 5) {
         auto r = results.front();
         #include "FP8BF16FusedArrayTestCheckGen.hpp"
         results.pop();

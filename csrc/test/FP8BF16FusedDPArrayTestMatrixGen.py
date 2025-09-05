@@ -36,19 +36,25 @@ dut->b_{n}_{kH} = getUpper(FP32ToBF16(randArray[{i}]));
     for m in range(M):
         for n in range(N):
             if enableCin:
-                strBuilder += "dut->cin_exp_{m}_{n} = FP32ToSExp(randArray[{M} * {K} + {N} * {K} + {i}]);\n".format(m = m, n = n, M = M, N = N, K = K, i = m * N + n)
-                strBuilder += "dut->cin_frac_{m}_{n} = FP32ToSFrac(randArray[{M} * {K} + {N} * {K} + {i}], 25);\n".format(m = m, n = n, M = M, N = N, K = K, i = m * N + n)
-                strBuilder += "r[{i}] = randArray[{M} * {K} + {N} * {K} + {i}] + ".format(m = m, n = n, M = M, N = N, K = K, i = m * N + n)
+                strBuilder += "if(resultsS4.size() >= 4) {"
+                strBuilder += "dut->s4_cin_exp_{m}_{n} = FP32ToSExp(randArray[{M} * {K} + {N} * {K} + {i}]);\n".format(m = m, n = n, M = M, N = N, K = K, i = m * N + n)
+                strBuilder += "dut->s4_cin_frac_{m}_{n} = FP32ToSFrac(randArray[{M} * {K} + {N} * {K} + {i}], 25);\n".format(m = m, n = n, M = M, N = N, K = K, i = m * N + n)
+                strBuilder += "resultsS4.front()[{i}] += randArray[{M} * {K} + {N} * {K} + {i}];\n".format(m = m, n = n, M = M, N = N, K = K, i = m * N + n)
+                strBuilder += "}"
             else:
-                strBuilder += "dut->cin_exp_{m}_{n} = 0;".format(m = m, n = n)
-                strBuilder += "dut->cin_frac_{m}_{n} = 0;".format(m = m, n = n)
-                strBuilder += "r[{i}] = ".format(i = m * N + n)
+                strBuilder += "dut->s4_cin_exp_{m}_{n} = 0;".format(m = m, n = n)
+                strBuilder += "dut->s4_cin_frac_{m}_{n} = 0;".format(m = m, n = n)
+            strBuilder += "r[{i}] = ".format(i = m * N + n)
             for k in range(K):
                 strBuilder += "randArray[{a}] * randArray[{b}] * ScaleToFP32(randScale[{sa}] + randScale[{sb}])".format(a = m * K + k, b = M * K + n * K + k, sa = m * K // SK + k // SK, sb = M * K // SK + n * K // SK + k // SK)
                 if k != K - 1:
                     strBuilder += " + "
             strBuilder += ";\n"
-    strBuilder += '''results.push(r);
+    strBuilder += '''if(resultsS4.size() >= 4) {{
+    results.push(resultsS4.front());
+    resultsS4.pop();
+}}'''
+    strBuilder += '''resultsS4.push(r);
 '''
     space = space * ' '
     return space + strBuilder.replace('\n','\n' + space)

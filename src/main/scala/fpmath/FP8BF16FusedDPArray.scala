@@ -48,8 +48,8 @@ debugFP32Output: Boolean = false
     converter.clipAdd(a_scale(m)(g), b_scale(n)(g), 255.S, -256.S)(8, 0).asSInt
   })
 
-  val cin_exp = IO(Input(Vec(M, Vec(N, SInt(wE.W)))))   // Bias == 0
-  val cin_frac = IO(Input(Vec(M, Vec(N, SInt(wF.W)))))
+//  val cin_exp = IO(Input(Vec(M, Vec(N, SInt(wE.W)))))   // Bias == 0
+//  val cin_frac = IO(Input(Vec(M, Vec(N, SInt(wF.W)))))
 
   // scale reduce: Select Max Scale
   // Signed 9b [-254, 255]
@@ -61,16 +61,18 @@ debugFP32Output: Boolean = false
   val s6_scale = RegNext(s5_scale)
   val s7_scale = RegNext(s6_scale)
 
-  val s1_cin_exp = RegNext(cin_exp)
-  val s2_cin_exp = RegNext(s1_cin_exp)
-  val s3_cin_exp = RegNext(s2_cin_exp)
-  val s4_cin_exp = RegNext(s3_cin_exp)
+//  val s1_cin_exp = RegNext(cin_exp)
+//  val s2_cin_exp = RegNext(s1_cin_exp)
+//  val s3_cin_exp = RegNext(s2_cin_exp)
+//  val s4_cin_exp = RegNext(s3_cin_exp)
+  val s4_cin_exp = IO(Input(Vec(M, Vec(N, SInt(wE.W)))))   // Bias == 0
   val s5_cin_exp = RegNext(s4_cin_exp)
 
-  val s1_cin_frac = RegNext(cin_frac)
-  val s2_cin_frac = RegNext(s1_cin_frac)
-  val s3_cin_frac = RegNext(s2_cin_frac)
-  val s4_cin_frac = RegNext(s3_cin_frac)
+//  val s1_cin_frac = RegNext(cin_frac)
+//  val s2_cin_frac = RegNext(s1_cin_frac)
+//  val s3_cin_frac = RegNext(s2_cin_frac)
+//  val s4_cin_frac = RegNext(s3_cin_frac)
+  val s4_cin_frac = IO(Input(Vec(M, Vec(N, SInt(wF.W)))))
   val s5_cin_frac = RegNext(s4_cin_frac)
   val s6_cin_frac = RegNext(s5_cin_frac)
 
