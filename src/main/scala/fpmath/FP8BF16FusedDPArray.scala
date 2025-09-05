@@ -77,6 +77,7 @@ debugFP32Output: Boolean = false
   val s6_cin_frac = RegNext(s5_cin_frac)
 
   // Control flow
+  val valid = IO(Input(Bool()))  // Clock Enable For First Stage
   val bf16 = IO(Input(Bool()))
 
   // Compute On Input
@@ -85,10 +86,11 @@ debugFP32Output: Boolean = false
       u => {
     val mulUnitModule = Module(new FP8BF16FusedDPUnit(mulGen, tM = tM, tN = tN, tK = tK,
       wE = wE, wF = wMul, wI = wMul, enableStickBit = enableStickBit, debugFP32Output = true))
-    mulUnitModule.bf16 := bf16
-    mulUnitModule.a_in := VecInit.tabulate(tM, tK)((um, uk) => a(tm * tM + um)((g * realSK + u) * tK + uk))
-    mulUnitModule.b_in := VecInit.tabulate(tN, tK)((un, uk) => b(tn * tN + un)((g * realSK + u) * tK + uk))
-    mulUnitModule
+        mulUnitModule.bf16 := bf16
+        mulUnitModule.valid := valid
+        mulUnitModule.a_in := VecInit.tabulate(tM, tK)((um, uk) => a(tm * tM + um)((g * realSK + u) * tK + uk))
+        mulUnitModule.b_in := VecInit.tabulate(tN, tK)((un, uk) => b(tn * tN + un)((g * realSK + u) * tK + uk))
+        mulUnitModule
   }))))
 
   // Align Logic

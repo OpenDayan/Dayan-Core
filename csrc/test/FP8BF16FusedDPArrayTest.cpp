@@ -22,6 +22,7 @@ static inline void mainLoop()
     // int sel = (unsigned)rand() % 2;
     int sel = 0;
     if(sel == 0) {
+        dut->valid = 1;
         #include "FP8BF16FusedArrayTestBF16Gen.hpp"
     }
     if(0) {
@@ -114,8 +115,13 @@ int main(int argc, char **argv)
         contextp->timeInc(1);
         sim_time++;
         if(stopFlag != 0) {
-            if((--stopFlag) == 0) break;
+            if((--stopFlag) == 1) break;
         }
+    }
+    if(!stopFlag) {
+        printf("\033[42;32mVerilator: FP8BF16FusedDPArray Test PASS!\033[0m\n");
+    } else {
+        printf("\033[41;32mVerilator: FP8BF16FusedDPArray Test FAILED!\033[0m\n");
     }
     m_trace->close();
     delete dut;

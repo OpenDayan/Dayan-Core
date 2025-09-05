@@ -22,6 +22,8 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
   require(tK == 2, "tK Must be 2 for now.")
   val a_in = IO(Input(Vec(tM, Vec(tK, UInt(8.W))))) // Packed m2k2-FP8 or m2k1-BF16 (m,k)
   val b_in = IO(Input(Vec(tN, Vec(tK, UInt(8.W)))))
+
+  val valid = IO(Input(Bool()))               // Clock Enable For First Stage
   val bf16 = IO(Input(Bool()))                // Compute BF16 * BF16 Instead of FP8 * FP8
 
   // Control Flow
@@ -49,6 +51,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
   require(fused_mul.latency == 2, "Core Multiplier Latency Must Be 2.")
   val mul_u4_result_s2 = fused_mul.u4_out
   val mul_u8_result_s2 = fused_mul.u8_out
+  fused_mul.valid := valid
   fused_mul.u8 := bf16
   fused_mul.a_u4 := VecInit.tabulate(tM,tK)((m, k) => a_fp8(m)(k).m)
   fused_mul.b_u4 := VecInit.tabulate(tN,tK)((n, k) => b_fp8(n)(k).m)
@@ -82,7 +85,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
     r.lo := lo
     r
   })
-  val c_s1 = RegNext(next_c_s1)
+  val c_s1 = RegEnable(next_c_s1, valid)
 
   // Get Align Shift information
   // Get Max

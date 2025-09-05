@@ -13,6 +13,8 @@ VerilatedContext *contextp;
 VU8m2n2k1U4m2n2k2Mul *dut;
 unsigned long long sim_time = 0;
 
+unsigned int stopFlag = 0;
+
 static inline void mainLoop()
 {
     static std::queue<bool> u8;
@@ -21,6 +23,7 @@ static inline void mainLoop()
     {
         // Core Test Bench
         dut->u8 = 0;
+        dut->valid = 1;
         dut->a_u4_0_0 = (unsigned)rand() % 16;
         dut->a_u4_0_1 = (unsigned)rand() % 16;
         dut->a_u4_1_0 = (unsigned)rand() % 16;
@@ -46,6 +49,7 @@ static inline void mainLoop()
     else
     {
         dut->u8 = 1;
+        dut->valid = 1;
         dut->a_u8_0 = (unsigned)rand() % 256;
         dut->a_u8_1 = (unsigned)rand() % 256;
         dut->b_u8_0 = (unsigned)rand() % 256;
@@ -83,6 +87,7 @@ static inline void mainLoop()
                 printf("%d %d %d %d != %d %d %d %d\n",
                        t[4], t[5], t[6], t[7],
                        dut->u4_out_1_0_0, dut->u4_out_1_0_1, dut->u4_out_1_1_0, dut->u4_out_1_1_1);
+                stopFlag = 3;
             }
         }
         else
@@ -98,6 +103,7 @@ static inline void mainLoop()
                 printf("%d %d %d %d != %d %d %d %d\n",
                        t[0], t[1], t[2], t[3],
                        dut->u8_out_0_0, dut->u8_out_0_1, dut->u8_out_1_0, dut->u8_out_1_1);
+                stopFlag = 3;
             }
         }
         u8.pop();
@@ -141,8 +147,15 @@ int main(int argc, char **argv)
         m_trace->dump(contextp->time());
         contextp->timeInc(1);
         sim_time++;
+        if(stopFlag != 0) {
+            if((--stopFlag) == 1) break;
+        }
     }
-
+    if(!stopFlag) {
+        printf("\033[42;32mVerilator: U8m2n2k1U4m2n2k2Mul Test PASS!\033[0m\n");
+    } else {
+        printf("\033[41;32mVerilator: U8m2n2k1U4m2n2k2Mul Test FAILED!\033[0m\n");
+    }
     m_trace->close();
     delete dut;
     exit(EXIT_SUCCESS);

@@ -10,6 +10,7 @@ trait U8U4FusedMxNyKzMul {
   val a_u8:Vec[UInt]
   val b_u8:Vec[UInt]
   val u8: Bool
+  val valid: Bool
   val u4_out: Vec[Vec[Vec[UInt]]]
   val u8_out: Vec[Vec[UInt]]
 }

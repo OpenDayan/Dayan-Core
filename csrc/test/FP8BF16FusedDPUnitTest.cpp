@@ -13,7 +13,7 @@ VFP8BF16FusedDPUnit *dut;
 unsigned long long sim_time = 0;
 
 #define EPS 10e-2
-#define FPCheck(ref, target, str) if(fabs((ref) - (target)) >= EPS) {printf("%s Not match, ref: %f, target: %f\n", str, (ref), (target)); if(!stopFlag) stopFlag = 2;}
+#define FPCheck(ref, target, str) if(fabs((ref) - (target)) >= EPS) {printf("%s Not match, ref: %f, target: %f\n", str, (ref), (target)); if(!stopFlag) stopFlag = 4;}
 
 unsigned int stopFlag = 0;
 
@@ -22,6 +22,7 @@ static inline void mainLoop()
     static std::queue<std::vector<float>> result;
     if((unsigned) rand() % 2){
         dut->bf16 = 1;
+        dut->valid = 1;
         float a0 = (float) 10 * (((double)rand() / (double)RAND_MAX) - 0.5f); uint16_t aB0 = FP32ToBF16(a0); a0 = BF16ToFP32(aB0);
         float a1 = (float) 10 * (((double)rand() / (double)RAND_MAX) - 0.5f); uint16_t aB1 = FP32ToBF16(a1); a1 = BF16ToFP32(aB1);
         float b0 = (float) 10 * (((double)rand() / (double)RAND_MAX) - 0.5f); uint16_t bB0 = FP32ToBF16(b0); b0 = BF16ToFP32(bB0);
@@ -42,6 +43,7 @@ static inline void mainLoop()
         result.push(r);
     } else {
         dut->bf16 = 0;
+        dut->valid = 1;
         float a00 = (float) 10 * (((double)rand() / (double)RAND_MAX) - 0.5f); uint8_t aB00 = FP32ToFP8<4>(a00);/*printf("a00 %f -> %f\n", a00, FP8ToFP32<4>(aB00));*/a00 = FP8ToFP32<4>(aB00);
         float a01 = (float) 10 * (((double)rand() / (double)RAND_MAX) - 0.5f); uint8_t aB01 = FP32ToFP8<4>(a01);/*printf("a01 %f -> %f\n", a01, FP8ToFP32<4>(aB01));*/a01 = FP8ToFP32<4>(aB01);
         float a10 = (float) 10 * (((double)rand() / (double)RAND_MAX) - 0.5f); uint8_t aB10 = FP32ToFP8<4>(a10);a10 = FP8ToFP32<4>(aB10);
@@ -109,8 +111,13 @@ int main(int argc, char **argv)
         contextp->timeInc(1);
         sim_time++;
         if(stopFlag != 0) {
-            if((--stopFlag) == 0) break;
+            if((--stopFlag) == 1) break;
         }
+    }
+    if(!stopFlag) {
+        printf("\033[42;32mVerilator: FP8BF16FusedDPUnit Test PASS!\033[0m\n");
+    } else {
+        printf("\033[41;32mVerilator: FP8BF16FusedDPUnit Test FAILED!\033[0m\n");
     }
     m_trace->close();
     delete dut;
