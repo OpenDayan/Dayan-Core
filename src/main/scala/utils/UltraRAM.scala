@@ -1,8 +1,9 @@
-package uram
+package utils
 
+import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
-import _root_.circt.stage.ChiselStage
+import uram.URAMBackend
 
 class UltraRAMBase(DWIDTH: Int = 72, AWIDTH: Int = 12) extends
   BlackBox(Map("DWIDTH" -> DWIDTH, "AWIDTH" -> AWIDTH))

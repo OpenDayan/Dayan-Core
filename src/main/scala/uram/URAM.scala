@@ -3,6 +3,7 @@ package uram
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
+import utils.UltraRAM
 
 // Interface Define of URAM
 class URAMRReq[T <: Data](addrWidth: Int, vecWidth: Int, gen: T) extends Bundle {
