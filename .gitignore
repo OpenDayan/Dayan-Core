@@ -4,6 +4,7 @@ test_run_dir/*
 # intermediate build files
 /generated
 /*.sv
+/csrc/test/*Gen.hpp
 wave
 UnitTest.mk
 *.bgn

@@ -51,7 +51,8 @@ dut->b_{n}_{kH} = getUpper(FP32ToBF16(randArray[{i}]));
                     strBuilder += " + "
             strBuilder += ";\n"
     strBuilder += '''resultsR0.push(r);
-'''
+#define r0Latency {r0Latency}
+'''.format(r0Latency=r0Latency)
     space = space * ' '
     return space + strBuilder.replace('\n','\n' + space)
 
@@ -63,10 +64,10 @@ def genCheck(M, N):
             str_builder += template.format(i = m * N + n, m = m, n = n)
     return str_builder
 
-M = 2
-N = 2
-K = 2
-sK = 1 # How many element that Share One Scale
+M = 4
+N = 8
+K = 64
+sK = 16 # How many element that Share One Scale
 enableScale = 1
 enableCin = 1
 r0Latency = 6 # 5 + log8(K)

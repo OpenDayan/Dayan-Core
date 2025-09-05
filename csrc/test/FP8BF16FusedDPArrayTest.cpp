@@ -12,8 +12,8 @@ VFP8BF16FusedDPArray *dut;
 unsigned long long sim_time = 0;
 unsigned int stopFlag = 0;
 
-#define EPS 10e-2
-#define FPCheck(ref, target, str) if(fabs((ref) - (target)) >= EPS) {printf("%s Not match, ref: %f, target: %f\n", str, (ref), (target)); if(!stopFlag) stopFlag = 2;}
+#define EPS 0.02
+#define FPCheck(ref, target, str) if(fabs((ref) - (target))/fabs((ref)) >= EPS) {printf("%s Not match, ref: %f, target: %f\n", str, (ref), (target)); if(!stopFlag) stopFlag = 2;}
 
 static inline void mainLoop()
 {
@@ -76,7 +76,7 @@ static inline void mainLoop()
         r[3] = 0.0f;
         resultsR0.push(r);
     }
-    if(resultsR0.size() > 6) {
+    if(resultsR0.size() > r0Latency) {
         auto r = resultsR0.front();
         results.push(r);
         resultsR0.pop();

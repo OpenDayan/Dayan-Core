@@ -226,7 +226,7 @@ debugFP32Output: Boolean = false
 object FP8BF16FusedDPArray extends App {
   ChiselStage.emitSystemVerilog(
     new FP8BF16FusedDPArray((tM, tN, tK) => new U8m2n2k1U4m2n2k2Mul(tM, tN, tK),
-      M = 2, N = 2, K = 4, sK = 2,
+      M = 4, N = 8, K = 128, sK = 32,
       debugFP32Output = true
     ),
     firtoolOpts = Array(
