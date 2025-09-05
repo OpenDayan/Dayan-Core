@@ -1,11 +1,16 @@
 import json
 
+module_map = {}
 with open('UnitTestConfig.json', 'r') as f:
     module_map = json.load(f)
 
 # Generate One Module Makefile
-def generateOneModuleMakefile(moduleName: str, modulePackage: str):
-    return '''
+def generateOneModuleMakefile(moduleName: str, modulePackage: str, AdditionDeps: dict):
+    str_builder = ''
+    for dep in AdditionDeps:
+        str_builder +='build/V{Name}/V{Name}: {depName}\n'.format(Name=moduleName, depName=dep)
+        str_builder +='{depName}: {depDep}\n	{depCmd}\n'.format(depName=dep, depDep = AdditionDeps[dep]['deps'], depCmd = AdditionDeps[dep]['cmd'])
+    str_builder += '''
 build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
 	verilator --assert --trace --trace-structs --trace-fst -CFLAGS -Wno-narrowing --top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f --exe csrc/test/{Name}Test.cpp
 	make -C build/V{Name} -f V{Name}.mk V{Name}
@@ -24,6 +29,7 @@ wave/V{Name}.fst: build/V{Name}/V{Name} wave
 surver_{Name}: wave/V{Name}.fst
 	surver wave/V{Name}.fst --port 4000 --token 00000000
 '''.format(Name=moduleName, Package=modulePackage)
+    return str_builder
 
 str_builder = 'all:'
 for name in module_map:
@@ -31,7 +37,10 @@ for name in module_map:
 
 str_builder += '\n'
 for name in module_map:
-    str_builder += generateOneModuleMakefile(name, module_map[name]['Package'])
+    deps = module_map[name].get('AdditionDeps')
+    if deps == None:
+        deps = {}
+    str_builder += generateOneModuleMakefile(name, module_map[name]['Package'], deps)
 
 with open('UnitTest.mk', 'w') as f:
     f.write(str_builder)

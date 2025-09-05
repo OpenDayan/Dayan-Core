@@ -6,6 +6,12 @@
         "Package": "fpmath"
     },
     "FP8BF16FusedDPArray": {
-        "Package": "fpmath"
+        "Package": "fpmath",
+        "AdditionDeps": {
+            "csrc/test/FP8BF16FusedDPArrayTestBF16Gen.hpp csrc/test/FP8BF16FusedDPArrayTestCheckGen.hpp": {
+                "deps": "csrc/test/FP8BF16FusedDPArrayTestMatrixGen.py",
+                "cmd" : "python3 csrc/test/FP8BF16FusedDPArrayTestMatrixGen.py"
+            }
+        }
     }
 }

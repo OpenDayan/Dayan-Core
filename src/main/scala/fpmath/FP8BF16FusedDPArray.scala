@@ -23,7 +23,7 @@ debugFP32Output: Boolean = false
 
   // Constant Values
   val G = K / sK
-  val realK = K / tK    // real K Count
+  val realK = K / tK    // real K per MN
   val realSK = sK / tK  // real K Count Per Group
 
   // Input Matrix
@@ -56,25 +56,23 @@ debugFP32Output: Boolean = false
   val s1_scale = RegNext(s0_scale)
   val s2_scale = RegNext(s1_scale)
   val s3_scale = RegNext(s2_scale)
-  val s4_scale = RegNext(s3_scale)
-  val s5_scale = RegNext(s4_scale)
-  val s6_scale = RegNext(s5_scale)
-  val s7_scale = RegNext(s6_scale)
+//  val s4_scale = RegNext(s3_scale)
+//  val s5_scale = RegNext(s4_scale)
+//  val s6_scale = RegNext(s5_scale)
+//  val s7_scale = RegNext(s6_scale)
 
 //  val s1_cin_exp = RegNext(cin_exp)
 //  val s2_cin_exp = RegNext(s1_cin_exp)
 //  val s3_cin_exp = RegNext(s2_cin_exp)
 //  val s4_cin_exp = RegNext(s3_cin_exp)
-  val s4_cin_exp = IO(Input(Vec(M, Vec(N, SInt(wE.W)))))   // Bias == 0
-  val s5_cin_exp = RegNext(s4_cin_exp)
+//  val s5_cin_exp = RegNext(s4_cin_exp)
 
 //  val s1_cin_frac = RegNext(cin_frac)
 //  val s2_cin_frac = RegNext(s1_cin_frac)
 //  val s3_cin_frac = RegNext(s2_cin_frac)
 //  val s4_cin_frac = RegNext(s3_cin_frac)
-  val s4_cin_frac = IO(Input(Vec(M, Vec(N, SInt(wF.W)))))
-  val s5_cin_frac = RegNext(s4_cin_frac)
-  val s6_cin_frac = RegNext(s5_cin_frac)
+//  val s5_cin_frac = RegNext(s4_cin_frac)
+//  val s6_cin_frac = RegNext(s5_cin_frac)
 
   // Control flow
   val valid = IO(Input(Bool()))  // Clock Enable For First Stage
@@ -99,127 +97,113 @@ debugFP32Output: Boolean = false
     mulMatrix(m / tM)(n / tN)(g)(rsk).c_exp_s2(m % tM)(n % tN)
     }))
   // Signed 9 Bit with Bias == 0 [-256, 255]
-  val s2_exp_max = VecInit.tabulate(M, N, G)((m, n, g) => {
+  val s2_exp_max_group = VecInit.tabulate(M, N, G)((m, n, g) => {
     s2_exp(m)(n)(g).reduceTree((l, r) => Mux(l < r, r, l))
+  })
+  val s2_exp_max = VecInit.tabulate(M, N)((m, n) => {
+    VecInit.tabulate(G)(g => s2_exp_max_group(m)(n)(g) + s2_scale(m)(n)(g)).reduceTree((l, r) => Mux(l < r, r, l))
   })
   val s3_exp = RegNext(s2_exp)
   val s3_exp_max = RegNext(s2_exp_max)
   // Unsigned 9 Bit [0, 511]
-  val s3_exp_diff = VecInit.tabulate(M, N, G)((m, n, g) => VecInit.tabulate(realSK)(rsk => {
-    (s3_exp_max(m)(n)(g) - s3_exp(m)(n)(g)(rsk)).asUInt
-  }))
+  val s3_exp_diff = VecInit.tabulate(M, N, realK)((m, n, k) => {
+    (s3_exp_max(m)(n) - s3_exp(m)(n)(k / realSK)(k % realSK) - s3_scale(m)(n)(k / realSK)).asUInt
+  })
 
 //  val s4_exp_max = RegNext(s3_exp_max)
-  val next_s4_exp = VecInit.tabulate(M, N, G)((m, n, g) => {
-    converter.clipAdd(s3_scale(m)(n)(g), s3_exp_max(m)(n)(g), 255.S, -256.S)(8, 0).asSInt
-  })
-  val s4_exp = RegNext(next_s4_exp)
+  val s4_exp = RegNext(s3_exp_max)
   val s4_exp_diff = RegNext(s3_exp_diff)
   // width: wMul, format: S1.(wMul-1)
-  val s4_frac = VecInit.tabulate(M, N, G)((m, n, g) => VecInit.tabulate(realSK)(rsk => {
-    mulMatrix(m / tM)(n / tN)(g)(rsk).c_frac_s4(m % tM)(n % tN)
-  }))
+  val s4_frac = VecInit.tabulate(M, N, realK)((m, n, k) => {
+    mulMatrix(m / tM)(n / tN)(k / realSK)(k % realSK).c_frac_s4(m % tM)(n % tN)
+  })
 
   // Fraction Reduce Network0
-  // wMul -> wShifter+log2Ceil(realSK)
-  // S1.(wMul-1) -> S(1 + log2Ceil(realSK)).(wShifter-1)
-  val reduceCore0 = (0 until M).map(m => (0 until N).map(n => (0 until G).map(g => {
-    val core = Module(new FPFracReduceNetwork(n = realSK, wF = wMul, wI = wShifter, enableStickBit = enableStickBit))
-    core.frac_in := s4_frac(m)(n)(g)
-    core.diff := s4_exp_diff(m)(n)(g)
-    core
-  })))
-
-  val next_s5_exp_max = VecInit.tabulate(M, N)((m, n) => {
-    VecInit.tabulate(G + 1)(i => {
-      var r = SInt()
-      if(i == G) {
-        r = s4_cin_exp(m)(n)
-      } else {
-        r = s4_exp(m)(n)(i)
-      }
-      r
-    }).reduceTree((l, r) => Mux(l < r, r, l))
-  })
-  val s5_exp_max = RegNext(next_s5_exp_max)
-  val s5_exp = RegNext(s4_exp)
-
-  val next_s6_exp_diff = VecInit.tabulate(M, N, G)((m, n, g) => {
-    (s5_exp_max(m)(n) - s5_exp(m)(n)(g))(8, 0).asUInt
-  })
-  val next_s6_cin_diff = VecInit.tabulate(M, N)((m, n) => {
-    (s5_exp_max(m)(n) - s5_cin_exp(m)(n)).asUInt
-  })
-  val s6_cin_diff = RegNext(next_s6_cin_diff)
-  val s6_exp_diff = RegNext(next_s6_exp_diff)
-  val s6_exp = RegNext(s5_exp_max)
-  val s7_exp = RegNext(s6_exp)
-  val s8_exp = RegNext(s7_exp)
-
-  // Two Cycle Reduce(Round0)
-  // S(1 + log2Ceil(realSK)).(wShifter-1)
-  val s6_frac = VecInit.tabulate(M, N, G)((m, n, g) => reduceCore0(m)(n)(g).frac_out)
-
-  // S(1 + log2Ceil(realSK)).(wShifter-1) -> S(1 + log2Ceil(realSK) + log2Ceil(G + 1)).(wShifter-1)
-  require(s6_frac(0)(0)(0).getWidth == (wShifter + log2Ceil(realSK)))
-  val reduceCore1 = (0 until M).map(m => (0 until N).map(n => {
-    val core = Module(new FPFracReduceNetwork(n = G + 1,
-      wF = s6_frac(0)(0)(0).getWidth, wI = s6_frac(0)(0)(0).getWidth, enableStickBit = true))
-    core.frac_in := VecInit.tabulate(G + 1)(i => {
-      var r = SInt()
-      if(i == G) {
-        // wF -> wShifter + log2Ceil(realSK)
-        r = Cat(s6_cin_frac(m)(n), 0.S((wShifter + log2Ceil(realSK) - wF).W)).asSInt
-      } else {
-        r = s6_frac(m)(n)(i)
-      }
-      r
-    })
-    core.diff := VecInit.tabulate(G + 1)(i => {
-      var r = UInt()
-      if(i == G) {
-        r = s6_cin_diff(m)(n)
-      } else {
-        r = s6_exp_diff(m)(n)(i)
-      }
-      r
-    })
+  // wMul -> wShifter+log2Ceil(realK)
+  // S1.(wMul-1) -> S(1 + log2Ceil(realK)).(wShifter-1)
+  val reduceCore0 = (0 until M).map(m => (0 until N).map(n => {
+    val core = Module(new FPFracReduceNetwork(n = realK, wF = wMul, wI = wShifter, enableStickBit = enableStickBit))
+    core.frac_in := VecInit.tabulate(realK)(k =>  s4_frac(m)(n)(k))
+    core.diff := VecInit.tabulate(realK)(k => s4_exp_diff(m)(n)(k))
     core
   }))
+  // reduce start in s4 stage, end in r0 stage, s4 -> r0 -- reduceCoreLatency
+  val rpipe_exp = pipe.genPipe(s4_exp, reduceCore0(0)(0).latency)
 
-  // Two Cycle Reduce
-  // S(1 + log2Ceil(realSK) + log2Ceil(G + 1)).(wShifter-1)
-  val s8_frac = VecInit.tabulate(M, N)((m, n) => reduceCore1(m)(n).frac_out)
+  val r0_exp = rpipe_exp(reduceCore0(0)(0).latency)
+  // S(1 + log2Ceil(realK)).(wShifter-1)
+  val r0_frac = VecInit.tabulate(M, N)((m, n) => reduceCore0(m)(n).frac_out)
 
-  // Output Rounding
-  // CLZ
-  val s8_frac_sign = VecInit.tabulate(M, N)((m, n) => s8_frac(m)(n)(wShifter + log2Ceil(realSK) + log2Ceil(G + 1) - 1).asBool)
-  val s8_frac_abs = VecInit.tabulate(M, N)((m, n) => Mux(s8_frac_sign(m)(n), -s8_frac(m)(n), s8_frac(m)(n)).asUInt)
-  val s8_frac_clz = VecInit.tabulate(M, N)((m, n) => CLZ(s8_frac_abs(m)(n)))
-  val s8_frac_iszero = VecInit.tabulate(M, N)((m, n) => s8_frac(m)(n) === 0.S)
-  //  U(wShifter + log2Ceil(realSK) + log2Ceil(G + 1)) -> U(wF-1)
-  val s8_frac_shifted = VecInit.tabulate(M, N)((m, n) => Cat(0.U(1.W),
-    (s8_frac_abs(m)(n) << s8_frac_clz(m)(n))(wShifter + log2Ceil(realSK) + log2Ceil(G + 1) - 1, (wShifter + log2Ceil(realSK) + log2Ceil(G + 1) - 1) + 1 - (wF - 1))
-  ).asSInt)
+  // Add CIN
+  val r0_cin_exp = IO(Input(Vec(M, Vec(N, SInt(wE.W)))))   // Bias == 0
 
-  val next_s9_frac = VecInit.tabulate(M, N)((m, n) => {
-    Mux(s8_frac_sign(m)(n), -s8_frac_shifted(m)(n), s8_frac_shifted(m)(n))
+  // S1.(wF-1)
+  val r0_cin_frac = IO(Input(Vec(M, Vec(N, SInt(wF.W)))))
+  // Align with CIN
+  val r0_cin_frac_ext = VecInit.tabulate(M, N)((m, n) => {
+    val r = Wire(SInt((wShifter + log2Ceil(realK)).W))
+    r := Cat(r0_cin_frac(m)(n), 0.S((wShifter - wF).W)).asSInt
+    r
+  }
+  )
+  // s9 - s9 => s10
+  val r0_cin_exp_diff = VecInit.tabulate(M, N)((m, n) =>
+    (r0_cin_exp(m)(n) -& r0_exp(m)(n))
+  )
+  val r0_frac_shifted = VecInit.tabulate(M, N)((m, n) => {
+    val shifter = converter.shiftRightSigned(r0_frac(m)(n), r0_cin_exp_diff(m)(n)(8, 0))
+    Mux(r0_cin_exp_diff(m)(n)(9).asBool, r0_frac(m)(n), shifter._1.asSInt)
+  }
+  )
+  val r0_cin_frac_shifted = VecInit.tabulate(M, N)((m, n) => {
+    val shifter = converter.shiftRightSigned(r0_cin_frac_ext(m)(n), (-r0_cin_exp_diff(m)(n))(8, 0))
+    Mux(r0_cin_exp_diff(m)(n)(9).asBool, shifter._1.asSInt, r0_cin_frac_ext(m)(n))
   })
-  val next_s9_exp = VecInit.tabulate(M, N)((m, n) => {
-    val cur_exp = s8_exp(m)(n)
-    Mux(s8_frac_iszero(m)(n), -256.S, converter.clipSub(cur_exp, s8_frac_clz(m)(n).zext - (log2Ceil(realSK) + log2Ceil(G+1) + 1).S, 255.S, -256.S))(8,0).asSInt
+  require(r0_cin_frac_shifted(0)(0).getWidth == r0_frac_shifted(0)(0).getWidth)
+  val next_r1_exp = VecInit.tabulate(M, N)((m, n) =>
+    Mux(r0_cin_exp_diff(m)(n)(9).asBool, r0_exp(m)(n), r0_cin_exp(m)(n))
+  )
+  // S(2 + log2Ceil(realK)).(wShifter-1)
+  val next_r1_frac = VecInit.tabulate(M, N)((m, n) => {
+    r0_frac_shifted(m)(n) +& r0_cin_frac_shifted(m)(n)
   })
+  val next_r1_frac_sgn = VecInit.tabulate(M, N)((m, n) => {
+    next_r1_frac(m)(n)(wShifter + log2Ceil(realK) + 1 - 1).asBool
+  })
+  val next_r1_frac_abs = VecInit.tabulate(M, N)((m, n) => {
+    Mux(next_r1_frac_sgn(m)(n), -next_r1_frac(m)(n), next_r1_frac(m)(n))
+  })
+  val r1_exp = RegNext(next_r1_exp)
+  val r1_frac_sgn = RegNext(next_r1_frac_sgn)
+  val r1_frac_abs = RegNext(next_r1_frac_abs)
 
-  val s9_exp = RegNext(next_s9_exp)
-  val s9_frac = RegNext(next_s9_frac)
+  val r1_frac_clz = VecInit.tabulate(M, N)((m, n) => {
+    CLZ(r1_frac_abs(m)(n).asUInt)
+  })
+  // S(2 + log2Ceil(realK)).(wShifter-1) -> wF-1
+  val next_r2_frac = VecInit.tabulate(M, N)((m, n) => {
+    val shifted = Cat(0.U(1.W),(
+      r1_frac_abs(m)(n) <<
+        r1_frac_clz(m)(n))(wShifter + log2Ceil(realK), (wShifter + log2Ceil(realK)) + 1 - (wF - 1))
+    ).asSInt
+    Mux(r1_frac_sgn(m)(n), -shifted, shifted)
+  })
+  val next_r2_exp = VecInit.tabulate(M, N)((m, n) => {
+    val cur_exp = r1_exp(m)(n)
+    Mux(r1_frac_abs(m)(n) === 0.S, -256.S,
+      converter.clipSub(cur_exp, r1_frac_clz(m)(n).zext - (log2Ceil(realK) + 2).S, 255.S, -256.S)
+    )(8,0).asSInt
+  })
+  val r2_frac = RegNext(next_r2_frac)
+  val r2_exp = RegNext(next_r2_exp)
 
   // Result Interface
   val cout_exp = IO(Output(Vec(M, Vec(N, SInt(wE.W))))) // Bias == 127 - 2 == 125
   val cout_frac = IO(Output(Vec(M, Vec(N, SInt(wF.W)))))
 
   // Output Assembling
-  cout_exp := s9_exp
-  cout_frac := s9_frac
+  cout_exp := r2_exp
+  cout_frac := r2_frac
 
   // Debug Interface
   val fp32Dbg = IO(Output(Vec(M, Vec(N, UInt(32.W)))))

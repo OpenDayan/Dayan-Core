@@ -17,27 +17,28 @@ unsigned int stopFlag = 0;
 
 static inline void mainLoop()
 {
-    static std::queue<std::vector<float>> resultsS4;
+    static std::queue<std::vector<float>> resultsR0;
     static std::queue<std::vector<float>> results;
     // int sel = (unsigned)rand() % 2;
-    int sel = 0;
-    if(sel == 0) {
+    if(1) {
         dut->valid = 1;
         #include "FP8BF16FusedArrayTestBF16Gen.hpp"
     }
     if(0) {
         // CIN Test
-        dut->s4_cin_exp_0_1 = FP32ToSExp(1.5f);
-        dut->s4_cin_frac_0_1 = FP32ToSFrac(1.5f, 25);
+        dut->valid = 1;
+        dut->r0_cin_exp_0_1 = FP32ToSExp(1.5f);
+        dut->r0_cin_frac_0_1 = FP32ToSFrac(1.5f, 25);
         std::vector<float> r(4);
         r[0] = 0.0f;
         r[1] = 1.5f;
         r[2] = 0.0f;
         r[3] = 0.0f;
-        results.push(r);
+        resultsR0.push(r);
     }
     if(0) {
         // Scale Test
+        dut->valid = 1;
         dut->bf16 = 1;
         std::vector<float> r(4);
         dut->a_scale_0_0 = 0;
@@ -45,8 +46,8 @@ static inline void mainLoop()
         dut->a_0_1 = getUpper(FP32ToBF16(1.0));
         dut->b_1_0 = getLower(FP32ToBF16(1.0));
         dut->b_1_1 = getUpper(FP32ToBF16(1.0));
-        dut->a_scale_0_1 = 5;
-        dut->b_scale_1_1 = 3;
+        dut->a_scale_0_1 = 0;
+        dut->b_scale_1_1 = 1;
         dut->a_0_2 = getLower(FP32ToBF16(1.0));
         dut->a_0_3 = getUpper(FP32ToBF16(1.0));
         dut->b_1_2 = getLower(FP32ToBF16(1.0));
@@ -55,10 +56,11 @@ static inline void mainLoop()
         r[1] = 3.0f;
         r[2] = 0.0f;
         r[3] = 0.0f;
-        results.push(r);
+        resultsR0.push(r);
     }
-    if(sel == 1) {
+    if(0) {
         // FP8 Test
+        dut->valid = 1;
         dut->bf16 = 0;
         std::vector<float> r(4);
         dut->a_scale_0_0 = 1;
@@ -72,9 +74,14 @@ static inline void mainLoop()
         r[1] = 0.0f;
         r[2] = 0.0f;
         r[3] = 0.0f;
-        results.push(r);
+        resultsR0.push(r);
     }
-    if(results.size() > 5) {
+    if(resultsR0.size() > 6) {
+        auto r = resultsR0.front();
+        results.push(r);
+        resultsR0.pop();
+    }
+    if(results.size() > 2) {
         auto r = results.front();
         #include "FP8BF16FusedArrayTestCheckGen.hpp"
         results.pop();
