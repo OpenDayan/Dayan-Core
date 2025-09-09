@@ -137,10 +137,15 @@ debugFP32Output: Boolean = false
   val r0_frac = VecInit.tabulate(M, N)((m, n) => reduceCore0(m)(n).frac_out)
 
   // Add CIN
-  val r0_cin_exp = IO(Input(Vec(M, Vec(N, SInt(wE.W)))))   // Bias == 0
+  val r0_cin_fwd = IO(Input(Bool()))                          // Use r2_cout directly as r0_cin
+  val r0_cin_exp_in = IO(Input(Vec(M, Vec(N, SInt(wE.W)))))   // Bias == 0
+  val r0_cin_frac_in = IO(Input(Vec(M, Vec(N, SInt(wF.W)))))  // S1.(wF-1)
 
-  // S1.(wF-1)
-  val r0_cin_frac = IO(Input(Vec(M, Vec(N, SInt(wF.W)))))
+  val cout_exp = IO(Output(Vec(M, Vec(N, SInt(wE.W))))) // Bias == 127 - 2 == 125
+  val cout_frac = IO(Output(Vec(M, Vec(N, SInt(wF.W)))))
+  val r0_cin_exp = Mux(r0_cin_fwd, cout_exp, r0_cin_exp_in)
+  val r0_cin_frac = Mux(r0_cin_fwd, cout_frac, r0_cin_frac_in)
+
   // Align with CIN
   val r0_cin_frac_ext = VecInit.tabulate(M, N)((m, n) => {
     val r = Wire(SInt((wShifter + log2Ceil(realK)).W))
@@ -200,9 +205,6 @@ debugFP32Output: Boolean = false
   val r2_exp = RegNext(next_r2_exp)
 
   // Result Interface
-  val cout_exp = IO(Output(Vec(M, Vec(N, SInt(wE.W))))) // Bias == 127 - 2 == 125
-  val cout_frac = IO(Output(Vec(M, Vec(N, SInt(wF.W)))))
-
   // Output Assembling
   cout_exp := r2_exp
   cout_frac := r2_frac
@@ -228,7 +230,7 @@ debugFP32Output: Boolean = false
 object FP8BF16FusedDPArray extends App {
   ChiselStage.emitSystemVerilog(
     new FP8BF16FusedDPArray((tM, tN, tK) => new U8m2n2k1U4m2n2k2Mul(tM, tN, tK),
-      M = 4, N = 8, K = 128, sK = 32,
+      M = 4, N = 2, K = 32, sK = 32,
       debugFP32Output = true
     ),
     firtoolOpts = Array(

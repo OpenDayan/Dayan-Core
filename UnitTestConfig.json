@@ -13,5 +13,8 @@
                 "cmd" : "python3 csrc/test/FP8BF16FusedDPArrayTestMatrixGen.py"
             }
         }
+    },
+    "DPArrayCtrl": {
+        "Package": "mat"
     }
 }

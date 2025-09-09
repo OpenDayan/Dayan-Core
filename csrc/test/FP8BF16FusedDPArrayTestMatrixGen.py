@@ -37,13 +37,13 @@ dut->b_{n}_{kH} = getUpper(FP32ToBF16(randArray[{i}]));
         for n in range(N):
             if enableCin:
                 strBuilder += "if(resultsR0.size() >= {r0Latency}) {{".format(r0Latency=r0Latency)
-                strBuilder += "dut->r0_cin_exp_{m}_{n} = FP32ToSExp(randArray[{M} * {K} + {N} * {K} + {i}]);\n".format(m = m, n = n, M = M, N = N, K = K, i = m * N + n)
-                strBuilder += "dut->r0_cin_frac_{m}_{n} = FP32ToSFrac(randArray[{M} * {K} + {N} * {K} + {i}], 25);\n".format(m = m, n = n, M = M, N = N, K = K, i = m * N + n)
+                strBuilder += "dut->r0_cin_exp_in_{m}_{n} = FP32ToSExp(randArray[{M} * {K} + {N} * {K} + {i}]);\n".format(m = m, n = n, M = M, N = N, K = K, i = m * N + n)
+                strBuilder += "dut->r0_cin_frac_in_{m}_{n} = FP32ToSFrac(randArray[{M} * {K} + {N} * {K} + {i}], 25);\n".format(m = m, n = n, M = M, N = N, K = K, i = m * N + n)
                 strBuilder += "resultsR0.front()[{i}] += randArray[{M} * {K} + {N} * {K} + {i}];\n".format(m = m, n = n, M = M, N = N, K = K, i = m * N + n)
                 strBuilder += "}"
             else:
-                strBuilder += "dut->r0_cin_exp_{m}_{n} = 0;".format(m = m, n = n)
-                strBuilder += "dut->r0_cin_frac_{m}_{n} = 0;".format(m = m, n = n)
+                strBuilder += "dut->r0_cin_exp_in_{m}_{n} = 0;".format(m = m, n = n)
+                strBuilder += "dut->r0_cin_frac_in_{m}_{n} = 0;".format(m = m, n = n)
             strBuilder += "r[{i}] = ".format(i = m * N + n)
             for k in range(K):
                 strBuilder += "randArray[{a}] * randArray[{b}] * ScaleToFP32(randScale[{sa}] + randScale[{sb}])".format(a = m * K + k, b = M * K + n * K + k, sa = m * K // SK + k // SK, sb = M * K // SK + n * K // SK + k // SK)
@@ -71,8 +71,8 @@ def clog2(x):
     return (x-1).bit_length()
 
 M = 4
-N = 8
-K = 64
+N = 2
+K = 16
 sK = 16 # How many element that Share One Scale
 enableScale = 1
 enableCin = 1

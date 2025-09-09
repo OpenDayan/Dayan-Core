@@ -27,8 +27,8 @@ static inline void mainLoop()
     if(0) {
         // CIN Test
         dut->valid = 1;
-        dut->r0_cin_exp_0_1 = FP32ToSExp(1.5f);
-        dut->r0_cin_frac_0_1 = FP32ToSFrac(1.5f, 25);
+        dut->r0_cin_exp_in_0_1 = FP32ToSExp(1.5f);
+        dut->r0_cin_frac_in_0_1 = FP32ToSFrac(1.5f, 25);
         std::vector<float> r(4);
         r[0] = 0.0f;
         r[1] = 1.5f;
@@ -38,25 +38,25 @@ static inline void mainLoop()
     }
     if(0) {
         // Scale Test
-        dut->valid = 1;
-        dut->bf16 = 1;
-        std::vector<float> r(4);
-        dut->a_scale_0_0 = 0;
-        dut->a_0_0 = getLower(FP32ToBF16(1.0));
-        dut->a_0_1 = getUpper(FP32ToBF16(1.0));
-        dut->b_1_0 = getLower(FP32ToBF16(1.0));
-        dut->b_1_1 = getUpper(FP32ToBF16(1.0));
-        dut->a_scale_0_1 = 0;
-        dut->b_scale_1_1 = 1;
-        dut->a_0_2 = getLower(FP32ToBF16(1.0));
-        dut->a_0_3 = getUpper(FP32ToBF16(1.0));
-        dut->b_1_2 = getLower(FP32ToBF16(1.0));
-        dut->b_1_3 = getUpper(FP32ToBF16(1.0));
-        r[0] = 0.0f;
-        r[1] = 3.0f;
-        r[2] = 0.0f;
-        r[3] = 0.0f;
-        resultsR0.push(r);
+//        dut->valid = 1;
+//        dut->bf16 = 1;
+//        std::vector<float> r(4);
+//        dut->a_scale_0_0 = 0;
+//        dut->a_0_0 = getLower(FP32ToBF16(1.0));
+//        dut->a_0_1 = getUpper(FP32ToBF16(1.0));
+//        dut->b_1_0 = getLower(FP32ToBF16(1.0));
+//        dut->b_1_1 = getUpper(FP32ToBF16(1.0));
+//        dut->a_scale_0_1 = 0;
+//        dut->b_scale_1_1 = 1;
+//        dut->a_0_2 = getLower(FP32ToBF16(1.0));
+//        dut->a_0_3 = getUpper(FP32ToBF16(1.0));
+//        dut->b_1_2 = getLower(FP32ToBF16(1.0));
+//        dut->b_1_3 = getUpper(FP32ToBF16(1.0));
+//        r[0] = 0.0f;
+//        r[1] = 3.0f;
+//        r[2] = 0.0f;
+//        r[3] = 0.0f;
+//        resultsR0.push(r);
     }
     if(0) {
         // FP8 Test
