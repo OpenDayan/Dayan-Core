@@ -49,9 +49,21 @@ class DPArrayCtrl(storageRatio: Int) extends Module{
   val pNisOne = inst_i.bits.pN === 0.U
   val pMisTwo = inst_i.bits.pM === 1.U
   val pNisTwo = inst_i.bits.pN === 1.U
+  val pMisThree = inst_i.bits.pM === 2.U
+  val pNisThree = inst_i.bits.pN === 2.U
 
-  val kShouldStall = RegEnable(pMisOne & pNisOne, inst_i.fire)
-  val kShouldFwd = RegEnable((pMisOne | pNisOne) & (pMisTwo | pNisTwo | (pMisOne & pNisOne)), inst_i.fire)
+  val nextKStallCycle = Wire(UInt(2.W))
+  nextKStallCycle := 0.U
+  when(pMisOne & pNisOne) {
+    nextKStallCycle := 3.U
+  }.elsewhen(pMisOne | pNisOne) {
+    when(pMisTwo | pNisTwo) {
+      nextKStallCycle := 2.U
+    }.elsewhen(pMisThree | pNisThree) {
+      nextKStallCycle := 1.U
+    }
+  }
+  val kStallCycle = RegEnable(nextKStallCycle, inst_i.fire)
 
   val lastInst = Wire(Bool())
   val nextBusy = Wire(Bool())
@@ -68,8 +80,7 @@ class DPArrayCtrl(storageRatio: Int) extends Module{
   val nextK = Wire(UInt(ptrW.W))
   val nextN = Wire(UInt(ptrW.W))
   val nextM = Wire(UInt(ptrW.W))
-  val nextKStall = Wire(Bool())
-  val nextKFwd = Wire(Bool())
+  val nextKStall = Wire(UInt(2.W))
 
   val curK = RegNext(nextK)
   val curN = RegNext(nextN)
@@ -77,27 +88,27 @@ class DPArrayCtrl(storageRatio: Int) extends Module{
   val mSub1Req = busy
   val nSub1Req = RegNext(nextM === 0.U)
   val kSub1Req = RegNext(nextM === 0.U & nextN === 0.U)
-  val taskFinish = RegNext(nextM === 0.U & nextN === 0.U & nextK === 0.U & !nextKStall)
+  val taskFinish = RegNext(nextM === 0.U & nextN === 0.U & nextK === 0.U & nextKStall === 0.U)
   lastInst := taskFinish
 
   val kStall = RegNext(nextKStall)
-  val kFwd = RegNext(nextKFwd)
-  val kSub1Grant = !kStall & kSub1Req
-  val nSub1Grant = (!kStall | !kSub1Req) & nSub1Req
-  val mSub1Grant = (!kStall | !kSub1Req | !nSub1Req) & mSub1Req
+  val kSub1Grant = kStall === 0.U & kSub1Req
+  val nSub1Grant = kStall === 0.U & nSub1Req
+  val mSub1Grant = kStall === 0.U & mSub1Req
 
   when(inst_i.fire) {
     nextK := inst_i.bits.pK
     nextN := inst_i.bits.pN
     nextM := inst_i.bits.pM
-    nextKStall := 0.B
-    nextKFwd := 0.B
+    nextKStall := 0.U
   }.otherwise {
     nextK := curK
     nextM := curM
     nextN := curN
-    nextKFwd := kFwd
-    nextKStall := kShouldStall & (!kStall)
+    nextKStall := kStall
+    when(kStall =/= 0.U) {
+      nextKStall := kStall - 1.U
+    }
     when(mSub1Grant) {
       when(nSub1Req) {nextM := inst.pM}.otherwise {nextM := curM - 1.U}
     }
@@ -105,20 +116,20 @@ class DPArrayCtrl(storageRatio: Int) extends Module{
       when(kSub1Req) {nextN := inst.pN}.otherwise {nextN := curN - 1.U}
     }
     when(kSub1Grant) {
-      nextKFwd := kShouldFwd
+      nextKStall := kStallCycle
       when(!taskFinish) {nextK := curK - 1.U}
     }
   }
 
   // Controlling Interface To Matrix Register Tiles and DPArray
   val matValid = IO(Output(Bool()))
-  val matFwd = IO(Output(Bool()))
+  val bf16 = IO(Output(Bool()))
   val aMatAddr = IO(Output(UInt((ptrW + 1).W)))
   val bMatAddr = IO(Output(UInt((ptrW + 1).W)))
   val cMatAddr = IO(Output(UInt((ptrW + 1).W)))
 
   matValid := busy & !kStall
-  matFwd := kFwd
+  bf16 := inst.bf16
   // M, K
   aMatAddr := Cat(inst.aBank.asUInt, (curM << inst.log2SK) | curK)
   bMatAddr := Cat(inst.bBank.asUInt, (curN << inst.log2SK) | curK)

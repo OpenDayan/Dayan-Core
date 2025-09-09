@@ -16,5 +16,8 @@
     },
     "DPArrayCtrl": {
         "Package": "mat"
+    },
+    "DPArrayStorage": {
+        "Package": "mat"
     }
 }

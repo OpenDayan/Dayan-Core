@@ -137,14 +137,17 @@ debugFP32Output: Boolean = false
   val r0_frac = VecInit.tabulate(M, N)((m, n) => reduceCore0(m)(n).frac_out)
 
   // Add CIN
+  // TODO Note: cin_fwd is NOT USED~
   val r0_cin_fwd = IO(Input(Bool()))                          // Use r2_cout directly as r0_cin
   val r0_cin_exp_in = IO(Input(Vec(M, Vec(N, SInt(wE.W)))))   // Bias == 0
   val r0_cin_frac_in = IO(Input(Vec(M, Vec(N, SInt(wF.W)))))  // S1.(wF-1)
 
   val cout_exp = IO(Output(Vec(M, Vec(N, SInt(wE.W))))) // Bias == 127 - 2 == 125
   val cout_frac = IO(Output(Vec(M, Vec(N, SInt(wF.W)))))
-  val r0_cin_exp = Mux(r0_cin_fwd, cout_exp, r0_cin_exp_in)
-  val r0_cin_frac = Mux(r0_cin_fwd, cout_frac, r0_cin_frac_in)
+//  val r0_cin_exp = Mux(r0_cin_fwd, cout_exp, r0_cin_exp_in)
+//  val r0_cin_frac = Mux(r0_cin_fwd, cout_frac, r0_cin_frac_in)
+  val r0_cin_exp = r0_cin_exp_in
+  val r0_cin_frac = r0_cin_frac_in
 
   // Align with CIN
   val r0_cin_frac_ext = VecInit.tabulate(M, N)((m, n) => {
