@@ -6,7 +6,7 @@ import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
 object DPArrayStorageCmd extends ChiselEnum {
-  val writeA, writeB, writeC, readC = Value
+  val writeA, writeB, writeAScale, writeBScale, writeC, readC = Value
 }
 
 // A: 32 Entry == 1 x RF
@@ -50,14 +50,18 @@ class DPArrayStorage(cM: Int, cN: Int, cK: Int, qK: Int, busWidth: Int, cinLaten
 
   // Core Storage
   // Vec Entry 0 is prepared for mask write.
-  val aMem = Mem(32, Vec(aBeat, Vec(busWidth, UInt(8.W))))
+//  val aMem = Mem(32, Vec(aBeat, Vec(busWidth, UInt(8.W))))
+  val aMem = Mem(32, Vec(aBeat * 2, UInt((busWidth * 4).W)))
   require(cM * cK / qK < busWidth)
   require(cN * cK / qK < busWidth)
-  val aScaleMem = Mem(32, Vec(cM * cK / qK, UInt(8.W)))
-  val bMem = Mem(32, Vec(bBeat, Vec(busWidth, UInt(8.W))))
-  val bScaleMem = Mem(32, Vec(cN * cK / qK, UInt(8.W)))
-  val cMem = (0 until 2).map(_ => Mem(32, Vec(cBeat, Vec(busWidth / 4, UInt(32.W)))))
-
+//  val aScaleMem = Mem(32, Vec(cM * cK / qK, UInt(8.W)))
+  val aScaleMem = Mem(32, UInt((8 * cM * cK / qK).W))
+//  val bMem = Mem(32, Vec(bBeat, Vec(busWidth, UInt(8.W))))
+  val bMem = Mem(32, Vec(bBeat * 2, UInt((busWidth * 4).W)))
+//  val bScaleMem = Mem(32, Vec(cN * cK / qK, UInt(8.W)))
+  val bScaleMem = Mem(32, UInt((8 * cN * cK / qK).W))
+//  val cMem = (0 until 2).map(_ => Mem(32, Vec(cBeat, Vec(busWidth / 4, UInt(32.W)))))
+  val cMem = (0 until 2).map(_ => Mem(32, Vec(cBeat, UInt((busWidth * 8).W))))
   // Delay matFwd and cMatAddr for cinLatency
   val pipeMatValid = pipe.genPipe(matValid, cinLatency + 2)
   val pipeCMatAddr = pipe.genPipe(calcCMatAddr, cinLatency + 2)
@@ -116,16 +120,41 @@ class DPArrayStorage(cM: Int, cN: Int, cK: Int, qK: Int, busWidth: Int, cinLaten
       })
     }
   }
-  val aReadRaw = RegNext(aMem.read(calcAMatAddr(4, 0)))
-  val aScaleReadRaw = RegNext(aScaleMem.read(calcAMatAddr(4, 0)))
-  val bReadRaw = RegNext(bMem.read(calcBMatAddr(4, 0)))
-  val bScaleReadRaw = RegNext(bScaleMem.read(calcBMatAddr(4, 0)))
-  val cReadRaw = VecInit.tabulate(2)(i => RegNext(cMem(i).read(cMatReadAddr(i)))) // No Output Register on C to mitigate latency
+  val aReadRaw = RegNext(aMem.read(calcAMatAddr(4, 0)).asTypeOf(Vec(aBeat, Vec(busWidth, UInt(8.W)))))
+  aMem.write(extMatAddr(4, 0), VecInit.tabulate(aBeat * 2)
+    (i => extMatWData.asUInt(((i % 2) + 1) * busWidth / 2 - 1, (i % 2) * busWidth / 2)),
+    VecInit.tabulate(aBeat * 2)(round =>
+    extMatValid & extMatReqType === DPArrayStorageCmd.writeA & (round / 2).U === extMatBeatPtr
+  ))
 
+  val bReadRaw = RegNext(bMem.read(calcBMatAddr(4, 0)).asTypeOf(Vec(bBeat, Vec(busWidth, UInt(8.W)))))
+  bMem.write(extMatAddr(4, 0), VecInit.tabulate(bBeat * 2)
+    (i => extMatWData.asUInt(((i % 2) + 1) * busWidth / 2 - 1, (i % 2) * busWidth / 2)),
+    VecInit.tabulate(bBeat * 2)(round =>
+    extMatValid & extMatReqType === DPArrayStorageCmd.writeB & (round / 2).U === extMatBeatPtr
+  ))
+
+  val aScaleReadRaw = RegNext(aScaleMem.read(calcAMatAddr(4, 0)).asTypeOf(Vec(cM * cK / qK, UInt(8.W))))
+  when(extMatValid & extMatReqType === DPArrayStorageCmd.writeAScale) {
+    aScaleMem.write(extMatAddr(4, 0), extMatWData.asUInt)
+  }
+
+  val bScaleReadRaw = RegNext(bScaleMem.read(calcBMatAddr(4, 0)).asTypeOf(Vec(cN * cK / qK, UInt(8.W))))
+  when(extMatValid & extMatReqType === DPArrayStorageCmd.writeBScale) {
+    bScaleMem.write(extMatAddr(4, 0), extMatWData.asUInt)
+  }
+
+  val cReadRaw = VecInit.tabulate(2)(i => {
+    RegNext(cMem(i).read(cMatReadAddr(i))).asTypeOf(Vec(cBeat, Vec(busWidth / 4, UInt(32.W))))
+  }) // No Output Register on C to mitigate latency
   val cReadMemView = VecInit.tabulate(2, cBeat, busWidth)((i, round, idx) => {
     cReadRaw(i)(round)(idx / 4)(8 * (idx % 4) + 7, 8 * (idx % 4))
   })
   extMatRData := cReadMemView(s1ExtMatAddr(5))(s1ExtMatBeatPtr)
+  (0 until 2).map(i => {
+    cMem(i).write(cMatWriteAddr(i), VecInit.tabulate(cBeat)(j => cMatWriteData(i).asUInt), cMatWriteMask(i))
+    Nil
+  })
 
   // Internal Write Interface from DPArray
   calcAMatDat := VecInit.tabulate(cM, cK)((m, k) => {
