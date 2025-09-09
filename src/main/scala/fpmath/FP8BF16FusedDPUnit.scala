@@ -181,7 +181,7 @@ object FP8BF16FusedDPUnit extends App {
       "-strip-debug-info",
       "-preserve-aggregate=vec",
       "--split-verilog",
-      "-o=generated/FP8`BF16`FusedDPUnit"
+      "-o=generated/FP8BF16FusedDPUnit"
     )
   )
 }
