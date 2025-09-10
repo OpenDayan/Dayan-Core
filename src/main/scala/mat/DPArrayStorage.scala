@@ -1,9 +1,9 @@
 package mat
 
 import chisel3._
-import utils._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
+import utils._
 
 object DPArrayStorageCmd extends ChiselEnum {
   val writeA, writeB, writeAScale, writeBScale, writeC, readC = Value

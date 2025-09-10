@@ -19,5 +19,8 @@
     },
     "DPArrayStorage": {
         "Package": "mat"
+    },
+    "FakeURAM": {
+        "Package": "uram"
     }
 }
