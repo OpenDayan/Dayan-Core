@@ -7,6 +7,6 @@ import utils._
 import uram._
 
 // Receive MatCtrl Macro-Instruction to Fetch Blocks of A / B Mat From URAM and write To A/B Buffer of DPArray
-class MatABLoad extends Module {
-  
+class MatABCLoad extends Module {
+
 }

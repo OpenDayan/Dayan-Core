@@ -6,7 +6,7 @@ import _root_.circt.stage.ChiselStage
 import utils._
 
 object DPArrayStorageCmd extends ChiselEnum {
-  val writeA, writeB, writeAScale, writeBScale, writeC, readC = Value
+  val writeA, writeB, writeAScale, writeBScale, writeC = Value
 }
 
 // A: 32 Entry == 1 x RF
@@ -84,21 +84,23 @@ class DPArrayStorage(cM: Int, cN: Int, cK: Int, qK: Int, busWidth: Int, cinLaten
 
   // External Read/Write Interface for A/B/C - No stalling
   val extMatValid = IO(Input(Bool()))
-  val extMatAddr = IO(Input(UInt(6.W)))
+  val extMatAddr = IO(Input(UInt(5.W)))
   val extMatReqType = IO(Input(DPArrayStorageCmd()))
   val extMatBeatPtr = IO(Input(UInt(beatPtrW.W)))
   val extMatWData = IO(Input(Vec(busWidth, UInt(8.W))))
+
+  val extMatRAddr = IO(Input(UInt(6.W)))
+  val extMatRBeatPtr = IO(Input(UInt(log2Ceil(cBeat).W)))
   val extMatRData = IO(Output(Vec(busWidth, UInt(8.W)))) // One Cycle After Issue request
 
-  val s1ExtMatAddr = RegNext(extMatAddr)
-  val s1ExtMatReqType = RegNext(extMatReqType)
-  val s1ExtMatBeatPtr = RegNext(extMatBeatPtr)
+  val s1ExtMatRAddr = RegNext(extMatRAddr)
+  val s1ExtMatRBeatPtr = RegNext(extMatRBeatPtr)
 
   val cMatReadAddr = Wire(Vec(2, UInt(5.W)))
   val cMatWriteAddr = Wire(Vec(2, UInt(5.W)))
   val cMatWriteMask = Wire(Vec(2, Vec(cBeat, Bool())))
   val cMatWriteData = Wire(Vec(2, Vec(cBeat, Vec(busWidth / 4, UInt(32.W)))))
-  cMatReadAddr := VecInit.tabulate(2)(i => extMatAddr(4, 0))
+  cMatReadAddr := VecInit.tabulate(2)(i => extMatRAddr(4, 0))
   cMatWriteAddr := VecInit.tabulate(2)(i => extMatAddr(4, 0))
   cMatWriteMask := VecInit.tabulate(2)(i => VecInit.tabulate(cBeat)(round => {
     extMatValid & extMatReqType === DPArrayStorageCmd.writeC & round.U === extMatBeatPtr
@@ -150,7 +152,7 @@ class DPArrayStorage(cM: Int, cN: Int, cK: Int, qK: Int, busWidth: Int, cinLaten
   val cReadMemView = VecInit.tabulate(2, cBeat, busWidth)((i, round, idx) => {
     cReadRaw(i)(round)(idx / 4)(8 * (idx % 4) + 7, 8 * (idx % 4))
   })
-  extMatRData := cReadMemView(s1ExtMatAddr(5))(s1ExtMatBeatPtr)
+  extMatRData := cReadMemView(s1ExtMatRAddr(5))(s1ExtMatRBeatPtr)
   (0 until 2).map(i => {
     cMem(i).write(cMatWriteAddr(i), VecInit.tabulate(cBeat)(j => cMatWriteData(i).asUInt), cMatWriteMask(i))
     Nil

@@ -6,6 +6,6 @@ import _root_.circt.stage.ChiselStage
 import utils._
 import uram._
 
-class MatCLoadStore extends Module{
+class MatCStore extends Module{
 
 }
