@@ -101,10 +101,14 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   // Fork Queue
   val sCompQ4F  = Module(new Queue(Bool(), 2)) // Store Completion for Finish Stage
   val sCompQ4L  = Module(new Queue(Bool(), 2)) // Store Completion for Load Stage(Loading C should not issued before C wb)
+
+  crCompQ.io.enq <> crComp
+  lCompQ.io.enq <> ldComp
+  cwCompQ.io.enq <> cwComp
+
   sCompQ4F.io.enq <> sComp
   sCompQ4L.io.enq.valid := sCompQ4F.io.enq.valid
   sCompQ4L.io.enq.bits := sCompQ4F.io.enq.bits
-
   // Compute Task Queue Should NEVER Stall!
   chisel3.assert(!(cTaskQ.io.enq.valid & !cTaskQ.io.enq.ready))
   // Store Task Queue Should NEVER Stall!
@@ -206,7 +210,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   lCCmd.ctrl := DPArrayStorageCmd.writeC
   lACmd.baseAddr := lTask.aBaseAddr
   lBCmd.baseAddr := lTask.bBaseAddr
-  lBCmd.baseAddr := lTask.cBaseAddr
+  lCCmd.baseAddr := lTask.cBaseAddr
   lACmd.bank := lTask.aBank
   lBCmd.bank := lTask.bBank
   lCCmd.bank := lTask.cBank
