@@ -8,7 +8,7 @@ import uram._
 class MatLoadCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bundle {
   // Compute Mode
   val bank = Bool()
-  val notify = Bool() // Need Completion, Last Load Command In a Sub-Task.
+  val lastLoad = Bool() // Need Completion, Last Load Command In a Sub-Task.
   val ctrl = DPArrayStorageCmd()
   // Storage Shape
   // 0 -> 1, 1 -> 2, 2 -> 4, 3 -> 8, 4 -> 16, 5 -> 32
@@ -25,8 +25,7 @@ class MatLoadCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
 }
 
 // Receive MatCtrl Macro-Instruction to Fetch Blocks of A / B Mat From URAM and write To A/B Buffer of DPArray
-class MatABCLoad(storageRatio: Int = 32) extends Module {
-  val inst_i = IO(Flipped(Decoupled(new MatLoadCommand(storageRatio))))
-  val uram_req = IO(Flipped(Decoupled(new Mat)))
+class MatABCLoad(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Module {
+  val inst_i = IO(Flipped(Decoupled(new MatLoadCommand(storageRatio, mnkWidth, addressWidth))))
 
 }

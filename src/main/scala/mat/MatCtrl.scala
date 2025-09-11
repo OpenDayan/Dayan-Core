@@ -48,6 +48,6 @@ class MatCtrl(cM: Int, cN: Int, cK: Int) extends Module {
 
   // Mat Instruction Spilt logic
 
-  matInst.ready := matInstResp.ready & (isCfgInst | (isMatInst & matInstFinished))
+//  matInst.ready := matInstResp.ready & (isCfgInst | (isMatInst & matInstFinished))
 
 }

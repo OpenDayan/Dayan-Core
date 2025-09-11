@@ -188,8 +188,8 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   // Receive: Spilt Task Request and Compute Read Completion
   // Issuing: Load Command and Compute Request
   val lFinish = Wire(Bool())
-  lTaskQ.io.deq.valid := crCompQ.io.deq.ready & lFinish
-  crCompQ.io.deq.valid := lTaskQ.io.deq.ready & lFinish
+  lTaskQ.io.deq.ready := crCompQ.io.deq.valid & lFinish
+  crCompQ.io.deq.ready := lTaskQ.io.deq.valid & lFinish
   chisel3.assert(lTaskQ.io.deq.fire === crCompQ.io.deq.fire)
   val lTaskFire = lTaskQ.io.deq.fire
   val lTask = RegEnable(lTaskQ.io.deq.bits, lTaskFire)
@@ -210,9 +210,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   lACmd.bank := lTask.aBank
   lBCmd.bank := lTask.bBank
   lCCmd.bank := lTask.cBank
-  lACmd.notify := 0.B
-  lBCmd.notify := !lTask.cLoad
-  lCCmd.notify := lTask.cLoad
+  lACmd.lastLoad := 0.B
+  lBCmd.lastLoad := !lTask.cLoad
+  lCCmd.lastLoad := lTask.cLoad
   lACmd.pMajor := lTask.pM
   lACmd.pMinor := lTask.pK
   lBCmd.pMajor := lTask.pN
@@ -241,16 +241,16 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
 //    when(ldCmd.ready) { // Never Stalling
       when(!lACmdFinish)        { lACmdFinish := 1.B }
         .elsewhen(!lBCmdFinish) { lBCmdFinish := 1.B }
-        .otherwise              { lCCmdFinish := lCCmdFinish | sCompQ4L.io.deq.ready }
+        .otherwise              { lCCmdFinish := lCCmdFinish | sCompQ4L.io.deq.valid }
 //    }
     lCmdLeft := lCmdLeft - ldCmd.fire.asUInt
   }
   // Should not fire unused ldCmd
   chisel3.assert(!(lCmdLeft === 0.U & ldCmd.fire))
-  ldCmd.bits := lCCmd; ldCmd.valid := !lCCmdFinish & sCompQ4L.io.deq.ready
+  ldCmd.bits := lCCmd; ldCmd.valid := !lCCmdFinish & sCompQ4L.io.deq.valid
   when(!lBCmdFinish) { ldCmd.bits := lBCmd; ldCmd.valid := 1.B } // Load B Secondly
   when(!lACmdFinish) { ldCmd.bits := lACmd; ldCmd.valid := 1.B } // Load A First
-  sCompQ4L.io.deq.valid := lBCmdFinish & lBCmdFinish & !lCCmdFinish /* & ldCmd.ready */
+  sCompQ4L.io.deq.ready := lBCmdFinish & lBCmdFinish & !lCCmdFinish /* & ldCmd.ready */
   // No Bubble at all!
   lFinish := lCmdLeft === 0.U | (lCmdLeft === 1.U /* & ldCmd.ready */)
   when(lTaskFire) {
@@ -265,9 +265,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   // Compute Pipeline
   // Receive: Compute Request and Load Completion
   // Issuing: Compute Command, Store Request
-  lCompQ.io.deq.valid := cTaskQ.io.deq.ready // & cReady
-  cTaskQ.io.deq.valid := lCompQ.io.deq.ready // & cReady
-  val cVld = cTaskQ.io.deq.ready & lCompQ.io.deq.ready
+  lCompQ.io.deq.ready := cTaskQ.io.deq.valid // & cReady
+  cTaskQ.io.deq.ready := lCompQ.io.deq.valid // & cReady
+  val cVld = cTaskQ.io.deq.valid & lCompQ.io.deq.valid
   val cTask = cTaskQ.io.deq.bits
   calcCmd.valid := cVld
   calcCmd.bits.bf16 := cTask.bf16
@@ -290,7 +290,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   // Issuing: Finish Command
   cwCompQ.io.deq.ready := sTaskQ.io.deq.valid
   sTaskQ.io.deq.ready := cwCompQ.io.deq.valid
-  val sVld = sTaskQ.io.deq.ready & cwCompQ.io.deq.ready
+  val sVld = sTaskQ.io.deq.valid & cwCompQ.io.deq.valid
   val sTask = sTaskQ.io.deq.bits
   stCmd.valid := sVld
   stCmd.bits.bank := sTask.cBank
