@@ -30,14 +30,8 @@ static inline void mainLoop()
     dut->calcCmd_ready = 1;
     dut->ldCmd_ready = 1;
     dut->stCmd_ready = 1;
-    if(sim_time < 2) {
-        // Init Two Credit for 2-Bank
-        dut->crComp_valid = 1;
-        dut->sComp_valid = 1;
-        dut->cwComp_valid = 1;
-    }
     // Task Input
-    if(sim_time >= 2) {
+    if(sim_time >= 10) {
         dut->task_valid = 1;
         dut->task_bits_bf16 = 1;
         dut->task_bits_aBaseAddr = 0;
@@ -53,7 +47,7 @@ static inline void mainLoop()
     }
     // Delay Simulate
     calcRdDelaySim.push(dut->calcCmd_valid);
-    ldDelaySim.push(dut->ldCmd_valid);
+    ldDelaySim.push(dut->ldCmd_valid & dut->ldCmd_bits_lastLoad);
     stDelaySim.push(dut->stCmd_valid);
     if(calcRdDelaySim.size() > DELAY_CALC_RD) {
         dut->crComp_valid = calcRdDelaySim.front();

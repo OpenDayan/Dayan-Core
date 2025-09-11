@@ -102,12 +102,20 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   val sCompQ4F  = Module(new Queue(Bool(), 2)) // Store Completion for Finish Stage
   val sCompQ4L  = Module(new Queue(Bool(), 2)) // Store Completion for Load Stage(Loading C should not issued before C wb)
 
-  crCompQ.io.enq <> crComp
   lCompQ.io.enq <> ldComp
-  cwCompQ.io.enq <> cwComp
-
   sCompQ4F.io.enq <> sComp
-  sCompQ4L.io.enq.valid := sCompQ4F.io.enq.valid
+
+  val compQInitializer = RegInit(2.U)
+  when(compQInitializer =/= 0.U) {
+    compQInitializer := compQInitializer - 1.U
+  }
+  crCompQ.io.enq.valid := crComp.valid | (compQInitializer =/= 0.U)
+  crCompQ.io.enq.bits := crComp.bits
+  crComp.ready := crCompQ.io.enq.ready
+  cwCompQ.io.enq.valid := cwComp.valid
+  cwCompQ.io.enq.bits := cwComp.bits
+  cwComp.ready := cwCompQ.io.enq.ready
+  sCompQ4L.io.enq.valid := sCompQ4F.io.enq.valid | (compQInitializer =/= 0.U)
   sCompQ4L.io.enq.bits := sCompQ4F.io.enq.bits
   // Compute Task Queue Should NEVER Stall!
   chisel3.assert(!(cTaskQ.io.enq.valid & !cTaskQ.io.enq.ready))
@@ -131,7 +139,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   val spCurPN = getLowBits(spCurN, spTask.log2SubN, 5)
   val spCurPK = getLowBits(spCurK, spTask.log2SubK, 5)
   taskQ.ready := !spTaskBusy | (spLastTask & lTaskQ.io.enq.ready)
-  lTaskQ.io.enq.valid := !spTaskBusy
+  lTaskQ.io.enq.valid := spTaskBusy
   lTaskQ.io.enq.bits.bf16 := spTask.bf16
   lTaskQ.io.enq.bits.aBaseAddr := spTask.aBaseAddr
   lTaskQ.io.enq.bits.bBaseAddr := spTask.bBaseAddr
@@ -296,7 +304,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   sTaskQ.io.deq.ready := cwCompQ.io.deq.valid
   val sVld = sTaskQ.io.deq.valid & cwCompQ.io.deq.valid
   val sTask = sTaskQ.io.deq.bits
-  stCmd.valid := sVld
+  stCmd.valid := sVld & sTask.cStore
   stCmd.bits.bank := sTask.cBank
   stCmd.bits.log2SDimMajor := sTask.log2SubM
   stCmd.bits.log2SDimMinor := sTask.log2SubN
