@@ -40,15 +40,33 @@ static inline void mainLoop()
         dut->task_bits_log2SubM = 2;
         dut->task_bits_log2SubN = 2;
         dut->task_bits_log2SubK = 2;
-        dut->task_bits_persistentMode = 0;
-        dut->task_bits_taskM = 500;
-        dut->task_bits_taskN = 351;
+        dut->task_bits_persistentMode = 0; // A Persistence
+        dut->task_bits_taskM = 40;
+        dut->task_bits_taskN = 70;
         dut->task_bits_taskK = 128;
     }
     // Delay Simulate
     calcRdDelaySim.push(dut->calcCmd_valid);
     ldDelaySim.push(dut->ldCmd_valid & dut->ldCmd_bits_lastLoad);
     stDelaySim.push(dut->stCmd_valid);
+    if(dut->ldCmd_valid && dut->ldCmd_bits_ctrl == 0) {
+        printf("Load A[%d:%d, %d:%d]\n",
+            dut->ldCmd_bits_baseDimMajor, dut->ldCmd_bits_baseDimMajor + dut->ldCmd_bits_pMajor,
+            dut->ldCmd_bits_baseDimMinor, dut->ldCmd_bits_baseDimMinor + dut->ldCmd_bits_pMinor
+    );
+    }
+    if(dut->ldCmd_valid && dut->ldCmd_bits_ctrl == 1) {
+        printf("Load BT[%d:%d, %d:%d]\n",
+            dut->ldCmd_bits_baseDimMajor, dut->ldCmd_bits_baseDimMajor + dut->ldCmd_bits_pMajor,
+            dut->ldCmd_bits_baseDimMinor, dut->ldCmd_bits_baseDimMinor + dut->ldCmd_bits_pMinor
+    );
+    }
+    if(dut->ldCmd_valid && dut->ldCmd_bits_ctrl == 4) {
+        printf("Load C[%d:%d, %d:%d]\n",
+            dut->ldCmd_bits_baseDimMajor, dut->ldCmd_bits_baseDimMajor + dut->ldCmd_bits_pMajor,
+            dut->ldCmd_bits_baseDimMinor, dut->ldCmd_bits_baseDimMinor + dut->ldCmd_bits_pMinor
+    );
+    }
     if(calcRdDelaySim.size() > DELAY_CALC_RD) {
         dut->crComp_valid = calcRdDelaySim.front();
         calcWrDelaySim.push(calcRdDelaySim.front());

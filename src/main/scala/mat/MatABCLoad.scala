@@ -25,7 +25,11 @@ class MatLoadCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: 
 }
 
 // Receive MatCtrl Macro-Instruction to Fetch Blocks of A / B Mat From URAM and write To A/B Buffer of DPArray
-class MatABCLoad(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int) extends Module {
-  val inst_i = IO(Flipped(Decoupled(new MatLoadCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
+class MatABCLoad(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int, busWidth: Int = 256) extends Module {
+  // Note: K Should be align to uram port width, 4B/8B
+  val cmd = IO(Flipped(Decoupled(new MatLoadCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
+  val uramReq = IO(Vec(busWidth / 8, Decoupled(new AdvURAMRReq(addressWidth, 0, 64))))
+  val uramResp = IO(Flipped(Vec(busWidth / 8, Decoupled(new AdvURAMResp(addressWidth, 0, 64)))))
+  val completion = IO(Flipped(Decoupled(Bool())))
 
 }

@@ -16,9 +16,9 @@ class MatTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bundl
   val log2SubN = UInt(log2Ceil(storageRatio).W)
   val log2SubK = UInt(log2Ceil(storageRatio).W)
   val persistentMode = UInt(2.W)
-  // PM0 : M<-N<-K
-  // PM1 : K<-M<-N
-  // PM2 : N<-K<-M
+  // PM0 C Persist : M<-N<-K
+  // PM1 A Persist : K<-M<-N
+  // PM2 B Persist : N<-K<-M
 }
 
 class MatSubTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bundle {
@@ -139,10 +139,13 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val spCurM = Reg(UInt(mnkWidth.W))
   val spCurN = Reg(UInt(mnkWidth.W))
   val spCurK = Reg(UInt(mnkWidth.W))
+  val spCurMp1 = spCurM - 1.U
+  val spCurNp1 = spCurN - 1.U
+  val spCurKp1 = spCurK - 1.U
   val spLastTask = Wire(Bool())
-  val spCurPM = getLowBits(spCurM - 1.U, spTask.log2SubM +& log2CM.U, log2S + log2CM)
-  val spCurPN = getLowBits(spCurN - 1.U, spTask.log2SubN +& log2CN.U, log2S + log2CN)
-  val spCurPK = getLowBits(spCurK - 1.U, spTask.log2SubK +& log2CK.U, log2S + log2CK)
+  val spCurPM = getLowBits(spCurMp1, spTask.log2SubM +& log2CM.U, log2S + log2CM)
+  val spCurPN = getLowBits(spCurNp1, spTask.log2SubN +& log2CN.U, log2S + log2CN)
+  val spCurPK = getLowBits(spCurKp1, spTask.log2SubK +& log2CK.U, log2S + log2CK)
   taskQ.ready := !spTaskBusy | (spLastTask & lTaskQ.io.enq.ready)
   lTaskQ.io.enq.valid := spTaskBusy
   lTaskQ.io.enq.bits.bf16 := spTask.bf16
@@ -150,9 +153,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   lTaskQ.io.enq.bits.bBaseAddr := spTask.bBaseAddr
   lTaskQ.io.enq.bits.cBaseAddr := spTask.cBaseAddr
   lTaskQ.io.enq.bits.lastSubTask := spLastTask
-  lTaskQ.io.enq.bits.subM := (spCurM >> (spTask.log2SubM + log2CM.U)) << (spTask.log2SubM + log2CM.U)
-  lTaskQ.io.enq.bits.subN := (spCurN >> (spTask.log2SubN + log2CN.U)) << (spTask.log2SubN + log2CN.U)
-  lTaskQ.io.enq.bits.subK := (spCurK >> (spTask.log2SubK + log2CK.U)) << (spTask.log2SubK + log2CK.U)
+  lTaskQ.io.enq.bits.subM := (spCurMp1 >> (spTask.log2SubM + log2CM.U)) << (spTask.log2SubM + log2CM.U)
+  lTaskQ.io.enq.bits.subN := (spCurNp1 >> (spTask.log2SubN + log2CN.U)) << (spTask.log2SubN + log2CN.U)
+  lTaskQ.io.enq.bits.subK := (spCurKp1 >> (spTask.log2SubK + log2CK.U)) << (spTask.log2SubK + log2CK.U)
   lTaskQ.io.enq.bits.pM := spCurPM
   lTaskQ.io.enq.bits.pN := spCurPN
   lTaskQ.io.enq.bits.pK := spCurPK
@@ -168,9 +171,10 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val spFirstK = spCurK === spTask.taskK
   val spFirstN = spCurN === spTask.taskN
   val spFirstM = spCurM === spTask.taskM
-  val spCarryK = (spTask.persistentMode === 0.U) | spLastM
-  val spCarryN = (spTask.persistentMode === 1.U) | spLastK
-  val spCarryM = (spTask.persistentMode === 2.U) | spLastN
+  val spCarryK, spCarryM, spCarryN = Wire(Bool())
+  spCarryK := spCPersist | ((spBPersist | (spAPersist & spLastN)) & spLastM)
+  spCarryN := spAPersist | ((spCPersist | (spBPersist & spLastM)) & spLastK)
+  spCarryM := spBPersist | ((spAPersist | (spCPersist & spLastK)) & spLastN)
   spLastTask := spLastM & spLastN & spLastK
   when(taskQ.fire) {
     spTaskBusy := 1.B
@@ -180,15 +184,15 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
     spCurK := taskQ.bits.taskK
   }.elsewhen(lTaskQ.io.enq.ready) {
     spTaskFirst := 0.B
-    spTaskBusy := !spLastTask
+    when(spTaskBusy) { spTaskBusy := !spLastTask }
     when(spCarryK) { when(spLastK) { spCurK := spTask.taskK }.otherwise {
-      spCurK := lTaskQ.io.enq.bits.subK - (1.U << (log2CK.U + spTask.log2SubK)).asUInt
+      spCurK := lTaskQ.io.enq.bits.subK
     }}
     when(spCarryN) { when(spLastN) { spCurN := spTask.taskN }.otherwise {
-      spCurN := lTaskQ.io.enq.bits.subN - (1.U << (log2CN.U + spTask.log2SubN)).asUInt
+      spCurN := lTaskQ.io.enq.bits.subN
     }}
     when(spCarryM) { when(spLastM) { spCurM := spTask.taskM }.otherwise {
-      spCurM := lTaskQ.io.enq.bits.subM - (1.U << (log2CM.U + spTask.log2SubM)).asUInt
+      spCurM := lTaskQ.io.enq.bits.subM
     }}
   }
   lTaskQ.io.enq.bits.loadCnt := 2.U // 2 / 3
@@ -196,8 +200,8 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   when(spFirstK & spCPersist) { lTaskQ.io.enq.bits.loadCnt := 3.U }
   when(spFirstN & spAPersist) { lTaskQ.io.enq.bits.loadCnt := 3.U }
   when(spFirstM & spBPersist) { lTaskQ.io.enq.bits.loadCnt := 3.U }
-  lTaskQ.io.enq.bits.aLoad  := !spAPersist | spFirstM
-  lTaskQ.io.enq.bits.bLoad  := !spBPersist | spFirstN
+  lTaskQ.io.enq.bits.aLoad  := !spAPersist | spFirstN
+  lTaskQ.io.enq.bits.bLoad  := !spBPersist | spFirstM
   lTaskQ.io.enq.bits.cLoad  := !spCPersist | spFirstK
   lTaskQ.io.enq.bits.cStore := !spCPersist | spLastK
   lTaskQ.io.enq.bits.aBank := spABank
@@ -273,9 +277,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   ldCmd.bits := lCCmd; ldCmd.valid := !lCCmdFinish & sCompQ4L.io.deq.valid
   when(!lBCmdFinish) { ldCmd.bits := lBCmd; ldCmd.valid := 1.B } // Load B Secondly
   when(!lACmdFinish) { ldCmd.bits := lACmd; ldCmd.valid := 1.B } // Load A First
-  sCompQ4L.io.deq.ready := lBCmdFinish & lBCmdFinish & !lCCmdFinish /* & ldCmd.ready */
+  sCompQ4L.io.deq.ready := lACmdFinish & lBCmdFinish & !lCCmdFinish /* & ldCmd.ready */
   // No Bubble at all!
-  lFinish := lCmdLeft === 0.U | (lCmdLeft === 1.U /* & ldCmd.ready */)
+  lFinish := lCmdLeft === 0.U | (lCmdLeft === 1.U & ldCmd.valid)
   when(lTaskFire) {
     lTaskValid  := 1.B
   }.elsewhen(lFinish) {
