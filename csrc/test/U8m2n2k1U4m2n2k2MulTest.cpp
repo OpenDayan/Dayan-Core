@@ -160,3 +160,13 @@ int main(int argc, char **argv)
     delete dut;
     exit(EXIT_SUCCESS);
 }
+
+void vl_fatal(const char* filename, int line, const char* func, const char* msg) {
+    std::cerr << "Fatal error occurred at " << filename << ":" << line << " (function: " << func << ") - " << msg << std::endl;
+    stopFlag = 5;
+}
+
+void vl_stop(const char* filename, int line, const char* func) {
+    std::cerr << "stop occurred at " << filename << ":" << line << " (function: " << func << ")" << std::endl;
+    stopFlag = 5;
+}

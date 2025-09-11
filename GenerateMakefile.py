@@ -12,7 +12,7 @@ def generateOneModuleMakefile(moduleName: str, modulePackage: str, AdditionDeps:
         str_builder +='{depName}: {depDep}\n	{depCmd}\n'.format(depName=dep, depDep = AdditionDeps[dep]['deps'], depCmd = AdditionDeps[dep]['cmd'])
     str_builder += '''
 build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
-	verilator -j 0 --assert --trace --trace-structs --trace-fst -CFLAGS -Wno-narrowing --top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f --exe csrc/test/{Name}Test.cpp
+	verilator -j 0 --assert --trace --trace-structs --trace-fst -CFLAGS -DVL_USER_FATAL -CFLAGS -DVL_USER_STOP -CFLAGS -Wno-narrowing --top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f --exe csrc/test/{Name}Test.cpp
 	make -C build/V{Name} -f V{Name}.mk V{Name}
 
 .PHONY: generated/{Name}/filelist.f
@@ -109,6 +109,16 @@ int main(int argc, char **argv)
     m_trace->close();
     delete dut;
     exit(EXIT_SUCCESS);
+}}
+
+void vl_fatal(const char* filename, int line, const char* func, const char* msg) {{
+    std::cerr << "Fatal error occurred at " << filename << ":" << line << " (function: " << func << ") - " << msg << std::endl;
+    stopFlag = 5;
+}}
+
+void vl_stop(const char* filename, int line, const char* func) {{
+    std::cerr << "stop occurred at " << filename << ":" << line << " (function: " << func << ")" << std::endl;
+    stopFlag = 5;
 }}
 '''.format(Name=moduleName)
 
