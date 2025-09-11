@@ -5,7 +5,10 @@ import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
 class MatTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bundle {
-  val baseAddr = UInt(addressWidth.W)
+  val bf16 = Bool()
+  val aBaseAddr = UInt(addressWidth.W)
+  val bBaseAddr = UInt(addressWidth.W)
+  val cBaseAddr = UInt(addressWidth.W)
   val taskM = UInt(mnkWidth.W)
   val taskN = UInt(mnkWidth.W)
   val taskK = UInt(mnkWidth.W)
@@ -13,13 +16,16 @@ class MatTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bundl
   val log2SubN = UInt(log2Ceil(storageRatio).W)
   val log2SubK = UInt(log2Ceil(storageRatio).W)
   val persistentMode = UInt(2.W)
-  // 0 : M<-N<-K
-  // 1 : K<-M<-N
-  // 2 : N<-K<-M
+  // PM0 : M<-N<-K
+  // PM1 : K<-M<-N
+  // PM2 : N<-K<-M
 }
 
 class MatSubTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bundle {
-  val baseAddr = UInt(addressWidth.W)
+  val bf16 = Bool()
+  val aBaseAddr = UInt(addressWidth.W)
+  val bBaseAddr = UInt(addressWidth.W)
+  val cBaseAddr = UInt(addressWidth.W)
   val lastSubTask = Bool()
   val subM = UInt(mnkWidth.W) // 子任务起点
   val subN = UInt(mnkWidth.W)
@@ -51,23 +57,24 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   val task = IO(Flipped(Decoupled(new MatTask(storageRatio, mnkWidth, addressWidth))))
   val ldCmd = IO(Decoupled(new MatLoadCommand(storageRatio, mnkWidth, addressWidth)))
   val calcCmd = IO(Decoupled(new MatDPACommand(storageRatio)))
-  val stCmd = IO(Decoupled(new MatLoadCommand(storageRatio, mnkWidth, addressWidth)))
+  val stCmd = IO(Decoupled(new MatStoreCommand(storageRatio, mnkWidth, addressWidth)))
 
   // load/calc/st Cmd Queue should NEVER Stall!
   chisel3.assert(!(ldCmd.valid & !ldCmd.ready))
   chisel3.assert(!(calcCmd.valid & !calcCmd.ready))
   chisel3.assert(!(stCmd.valid & !stCmd.ready))
 
-  val ldComp = IO(Decoupled(Bool()))
-  val crComp = IO(Decoupled(Bool()))
-  val cwComp = IO(Decoupled(Bool()))
-  val sComp = IO(Decoupled(Bool()))
-
+  val ldComp = IO(Flipped(Decoupled(Bool())))
+  val crComp = IO(Flipped(Decoupled(Bool())))
+  val cwComp = IO(Flipped(Decoupled(Bool())))
+  val sComp = IO(Flipped(Decoupled(Bool())))
+  val fComp = IO(Decoupled(Bool()))
   // ld/cr/cw/s Completion Queue should NEVER Stall!
   chisel3.assert(!(ldComp.valid & !ldComp.ready))
   chisel3.assert(!(crComp.valid & !crComp.ready))
   chisel3.assert(!(cwComp.valid & !cwComp.ready))
   chisel3.assert(!(sComp.valid & !sComp.ready))
+  chisel3.assert(!(fComp.valid & !fComp.ready))
 
   def getLowBits(value: UInt, bitsCnt: UInt, maxWidth: Int): UInt = {
     val mask = (2.U << bitsCnt) - 1.U
@@ -78,7 +85,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   // Input Task Queue
   val taskQ = Queue(task)
   // Split Task Queue
-  val spTaskQ = Module(new Queue(new MatSubTask(storageRatio, mnkWidth, addressWidth), 2)) // Stallable, No Credit Based FC
+  val lTaskQ  = Module(new Queue(new MatSubTask(storageRatio, mnkWidth, addressWidth), 2)) // Stallable, No Credit Based FC
   // Compute Read Completion Queue
   val crCompQ = Module(new Queue(Bool(), 2))
   // Compute Task Queue
@@ -90,10 +97,11 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   // Compute Write Completion Queue
   val cwCompQ = Module(new Queue(Bool(), 2))
   // Finish Command
-  val fTaskQ  = Module(new Queue(Bool(), 2))
+  val fTaskQ  = Module(new Queue(new MatSubTask(storageRatio, mnkWidth, addressWidth), 2))
+  // Fork Queue
   val sCompQ4F  = Module(new Queue(Bool(), 2)) // Store Completion for Finish Stage
   val sCompQ4L  = Module(new Queue(Bool(), 2)) // Store Completion for Load Stage(Loading C should not issued before C wb)
-  sCompQ4L.io.enq <> sComp
+  sCompQ4F.io.enq <> sComp
   sCompQ4L.io.enq.valid := sCompQ4F.io.enq.valid
   sCompQ4L.io.enq.bits := sCompQ4F.io.enq.bits
 
@@ -118,25 +126,28 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   val spCurPM = getLowBits(spCurM, spTask.log2SubM, 5)
   val spCurPN = getLowBits(spCurN, spTask.log2SubN, 5)
   val spCurPK = getLowBits(spCurK, spTask.log2SubK, 5)
-  taskQ.ready := !spTaskBusy | (spLastTask & spTaskQ.io.enq.ready)
-  spTaskQ.io.enq.valid := !spTaskBusy
-  spTaskQ.io.enq.bits.baseAddr := spTask.baseAddr
-  spTaskQ.io.enq.bits.lastSubTask := spLastTask
-  spTaskQ.io.enq.bits.subM := (spCurM >> spTask.log2SubM) << spTask.log2SubM
-  spTaskQ.io.enq.bits.subN := (spCurN >> spTask.log2SubN) << spTask.log2SubN
-  spTaskQ.io.enq.bits.subK := (spCurK >> spTask.log2SubK) << spTask.log2SubK
-  spTaskQ.io.enq.bits.pM := spCurPM - 1.U
-  spTaskQ.io.enq.bits.pN := spCurPN - 1.U
-  spTaskQ.io.enq.bits.pK := spCurPK - 1.U
-  spTaskQ.io.enq.bits.log2SubM := spTask.log2SubM
-  spTaskQ.io.enq.bits.log2SubN := spTask.log2SubN
-  spTaskQ.io.enq.bits.log2SubK := spTask.log2SubK
+  taskQ.ready := !spTaskBusy | (spLastTask & lTaskQ.io.enq.ready)
+  lTaskQ.io.enq.valid := !spTaskBusy
+  lTaskQ.io.enq.bits.bf16 := spTask.bf16
+  lTaskQ.io.enq.bits.aBaseAddr := spTask.aBaseAddr
+  lTaskQ.io.enq.bits.bBaseAddr := spTask.bBaseAddr
+  lTaskQ.io.enq.bits.cBaseAddr := spTask.cBaseAddr
+  lTaskQ.io.enq.bits.lastSubTask := spLastTask
+  lTaskQ.io.enq.bits.subM := (spCurM >> spTask.log2SubM) << spTask.log2SubM
+  lTaskQ.io.enq.bits.subN := (spCurN >> spTask.log2SubN) << spTask.log2SubN
+  lTaskQ.io.enq.bits.subK := (spCurK >> spTask.log2SubK) << spTask.log2SubK
+  lTaskQ.io.enq.bits.pM := spCurPM - 1.U
+  lTaskQ.io.enq.bits.pN := spCurPN - 1.U
+  lTaskQ.io.enq.bits.pK := spCurPK - 1.U
+  lTaskQ.io.enq.bits.log2SubM := spTask.log2SubM
+  lTaskQ.io.enq.bits.log2SubN := spTask.log2SubN
+  lTaskQ.io.enq.bits.log2SubK := spTask.log2SubK
   val spCPersist = spTask.persistentMode === 0.U
   val spAPersist = spTask.persistentMode === 1.U
   val spBPersist = spTask.persistentMode === 2.U
-  val spLastK = spTaskQ.io.enq.bits.subK === 0.U
-  val spLastN = spTaskQ.io.enq.bits.subN === 0.U
-  val spLastM = spTaskQ.io.enq.bits.subM === 0.U
+  val spLastK = lTaskQ.io.enq.bits.subK === 0.U
+  val spLastN = lTaskQ.io.enq.bits.subN === 0.U
+  val spLastM = lTaskQ.io.enq.bits.subM === 0.U
   val spFirstK = spCurK === spTask.taskK
   val spFirstN = spCurN === spTask.taskN
   val spFirstM = spCurM === spTask.taskM
@@ -150,67 +161,98 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
     spCurM := taskQ.bits.taskM
     spCurN := taskQ.bits.taskN
     spCurK := taskQ.bits.taskK
-
-  }.elsewhen(spTaskQ.io.enq.ready) {
+  }.elsewhen(lTaskQ.io.enq.ready) {
     spTaskFirst := 0.B
     spTaskBusy := !spLastTask
     when(spCarryK) { when(spLastK) { spCurK := spTask.taskK }.otherwise { spCurK := spCurK - 1.U } }
     when(spCarryN) { when(spLastN) { spCurN := spTask.taskN }.otherwise { spCurN := spCurN - 1.U } }
     when(spCarryM) { when(spLastM) { spCurM := spTask.taskM }.otherwise { spCurM := spCurM - 1.U } }
   }
-  spTaskQ.io.enq.bits.loadCnt := 2.U // 2 / 3
-  when(spTaskFirst) { spTaskQ.io.enq.bits.loadCnt := 3.U }
-  when(spFirstK & spCPersist) { spTaskQ.io.enq.bits.loadCnt := 3.U }
-  when(spFirstN & spAPersist) { spTaskQ.io.enq.bits.loadCnt := 3.U }
-  when(spFirstM & spBPersist) { spTaskQ.io.enq.bits.loadCnt := 3.U }
-  spTaskQ.io.enq.bits.aLoad  := !spAPersist | spFirstM
-  spTaskQ.io.enq.bits.bLoad  := !spBPersist | spFirstN
-  spTaskQ.io.enq.bits.cLoad  := !spCPersist | spFirstK
-  spTaskQ.io.enq.bits.cStore := !spCPersist | spLastK
-  spTaskQ.io.enq.bits.aBank := spABank
-  spTaskQ.io.enq.bits.bBank := spBBank
-  spTaskQ.io.enq.bits.cBank := spCBank
-  when(spTaskQ.io.enq.bits.aLoad & spTaskQ.io.enq.ready) { spABank := !spABank }
-  when(spTaskQ.io.enq.bits.bLoad & spTaskQ.io.enq.ready) { spBBank := !spBBank }
-  when(spTaskQ.io.enq.bits.cLoad & spTaskQ.io.enq.ready) { spCBank := !spCBank }
+  lTaskQ.io.enq.bits.loadCnt := 2.U // 2 / 3
+  when(spTaskFirst) { lTaskQ.io.enq.bits.loadCnt := 3.U }
+  when(spFirstK & spCPersist) { lTaskQ.io.enq.bits.loadCnt := 3.U }
+  when(spFirstN & spAPersist) { lTaskQ.io.enq.bits.loadCnt := 3.U }
+  when(spFirstM & spBPersist) { lTaskQ.io.enq.bits.loadCnt := 3.U }
+  lTaskQ.io.enq.bits.aLoad  := !spAPersist | spFirstM
+  lTaskQ.io.enq.bits.bLoad  := !spBPersist | spFirstN
+  lTaskQ.io.enq.bits.cLoad  := !spCPersist | spFirstK
+  lTaskQ.io.enq.bits.cStore := !spCPersist | spLastK
+  lTaskQ.io.enq.bits.aBank := spABank
+  lTaskQ.io.enq.bits.bBank := spBBank
+  lTaskQ.io.enq.bits.cBank := spCBank
+  when(lTaskQ.io.enq.bits.aLoad & lTaskQ.io.enq.ready) { spABank := !spABank }
+  when(lTaskQ.io.enq.bits.bLoad & lTaskQ.io.enq.ready) { spBBank := !spBBank }
+  when(lTaskQ.io.enq.bits.cLoad & lTaskQ.io.enq.ready) { spCBank := !spCBank }
 
   // Load Pipeline
   // Receive: Spilt Task Request and Compute Read Completion
   // Issuing: Load Command and Compute Request
   val lFinish = Wire(Bool())
-  spTaskQ.io.deq.valid := crCompQ.io.deq.ready & lFinish
-  crCompQ.io.deq.valid := spTaskQ.io.deq.ready & lFinish
-  chisel3.assert(spTaskQ.io.deq.fire === crCompQ.io.deq.fire)
-  val lTaskFire = spTaskQ.io.deq.fire
+  lTaskQ.io.deq.valid := crCompQ.io.deq.ready & lFinish
+  crCompQ.io.deq.valid := lTaskQ.io.deq.ready & lFinish
+  chisel3.assert(lTaskQ.io.deq.fire === crCompQ.io.deq.fire)
+  val lTaskFire = lTaskQ.io.deq.fire
+  val lTask = RegEnable(lTaskQ.io.deq.bits, lTaskFire)
   val lTaskValid  = RegInit(Bool(), 0.B)
   val lACmdFinish = RegInit(Bool(), 1.B)
   val lBCmdFinish = RegInit(Bool(), 1.B)
   val lCCmdFinish = RegInit(Bool(), 1.B)
-  val lCmdLeft = Reg(UInt(2.W))
+  val lCmdLeft = RegInit(UInt(2.W), 0.U)
   val lACmd = Wire(new MatLoadCommand(storageRatio, mnkWidth, addressWidth))
   val lBCmd = Wire(new MatLoadCommand(storageRatio, mnkWidth, addressWidth))
   val lCCmd = Wire(new MatLoadCommand(storageRatio, mnkWidth, addressWidth))
+  lACmd.ctrl := DPArrayStorageCmd.writeA
+  lBCmd.ctrl := DPArrayStorageCmd.writeB
+  lCCmd.ctrl := DPArrayStorageCmd.writeC
+  lACmd.baseAddr := lTask.aBaseAddr
+  lBCmd.baseAddr := lTask.bBaseAddr
+  lBCmd.baseAddr := lTask.cBaseAddr
+  lACmd.bank := lTask.aBank
+  lBCmd.bank := lTask.bBank
+  lCCmd.bank := lTask.cBank
+  lACmd.notify := 0.B
+  lBCmd.notify := !lTask.cLoad
+  lCCmd.notify := lTask.cLoad
+  lACmd.pMajor := lTask.pM
+  lACmd.pMinor := lTask.pK
+  lBCmd.pMajor := lTask.pN
+  lBCmd.pMinor := lTask.pK
+  lCCmd.pMajor := lTask.pM
+  lCCmd.pMinor := lTask.pN
+  lACmd.baseDimMajor := lTask.subM
+  lACmd.baseDimMinor := lTask.subK
+  lBCmd.baseDimMajor := lTask.subN
+  lBCmd.baseDimMinor := lTask.subK
+  lCCmd.baseDimMajor := lTask.subM
+  lCCmd.baseDimMinor := lTask.subN
+  lACmd.log2SDimMajor := lTask.log2SubM
+  lACmd.log2SDimMinor := lTask.log2SubK
+  lBCmd.log2SDimMajor := lTask.log2SubN
+  lBCmd.log2SDimMinor := lTask.log2SubK
+  lCCmd.log2SDimMajor := lTask.log2SubM
+  lCCmd.log2SDimMinor := lTask.log2SubN
 
   when(lTaskFire) {
-    lACmdFinish := !spTaskQ.io.deq.bits.aLoad
-    lBCmdFinish := !spTaskQ.io.deq.bits.bLoad
-    lCCmdFinish := !spTaskQ.io.deq.bits.cLoad
-    lCmdLeft := spTaskQ.io.deq.bits.loadCnt
+    lACmdFinish := !lTaskQ.io.deq.bits.aLoad
+    lBCmdFinish := !lTaskQ.io.deq.bits.bLoad
+    lCCmdFinish := !lTaskQ.io.deq.bits.cLoad
+    lCmdLeft := lTaskQ.io.deq.bits.loadCnt
   }.otherwise {
-    when(ldCmd.ready) {
-      when(!lCCmdFinish)        { lCCmdFinish := 1.B }
+//    when(ldCmd.ready) { // Never Stalling
+      when(!lACmdFinish)        { lACmdFinish := 1.B }
         .elsewhen(!lBCmdFinish) { lBCmdFinish := 1.B }
-        .otherwise              { lACmdFinish := 1.B }
-      when(lCmdLeft =/= 0.U) { lCmdLeft := lCmdLeft - 1.U}
-    }
+        .otherwise              { lCCmdFinish := lCCmdFinish | sCompQ4L.io.deq.ready }
+//    }
+    lCmdLeft := lCmdLeft - ldCmd.fire.asUInt
   }
   // Should not fire unused ldCmd
   chisel3.assert(!(lCmdLeft === 0.U & ldCmd.fire))
-  ldCmd.bits := lACmd; ldCmd.valid := !lACmdFinish
-  when(!lBCmdFinish) { ldCmd.bits := lBCmd; ldCmd.valid := 1.B }
-  when(!lCCmdFinish) { ldCmd.bits := lCCmd; ldCmd.valid := 1.B }
+  ldCmd.bits := lCCmd; ldCmd.valid := !lCCmdFinish & sCompQ4L.io.deq.ready
+  when(!lBCmdFinish) { ldCmd.bits := lBCmd; ldCmd.valid := 1.B } // Load B Secondly
+  when(!lACmdFinish) { ldCmd.bits := lACmd; ldCmd.valid := 1.B } // Load A First
+  sCompQ4L.io.deq.valid := lBCmdFinish & lBCmdFinish & !lCCmdFinish /* & ldCmd.ready */
   // No Bubble at all!
-  lFinish := lCmdLeft === 0.U | (lCmdLeft === 1.U & ldCmd.ready)
+  lFinish := lCmdLeft === 0.U | (lCmdLeft === 1.U /* & ldCmd.ready */)
   when(lTaskFire) {
     lTaskValid  := 1.B
   }.elsewhen(lFinish) {
@@ -218,26 +260,71 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extend
   }
 
   cTaskQ.io.enq.valid := lTaskValid & lFinish
+  cTaskQ.io.enq.bits := lTask
 
   // Compute Pipeline
   // Receive: Compute Request and Load Completion
   // Issuing: Compute Command, Store Request
-//  val cReady = Wire(Bool())
   lCompQ.io.deq.valid := cTaskQ.io.deq.ready // & cReady
   cTaskQ.io.deq.valid := lCompQ.io.deq.ready // & cReady
   val cVld = cTaskQ.io.deq.ready & lCompQ.io.deq.ready
+  val cTask = cTaskQ.io.deq.bits
   calcCmd.valid := cVld
-//  cReady := calcCmd.ready
+  calcCmd.bits.bf16 := cTask.bf16
+  calcCmd.bits.aBank := cTask.aBank
+  calcCmd.bits.bBank := cTask.bBank
+  calcCmd.bits.cBank := cTask.cBank
+  calcCmd.bits.log2SM := cTask.log2SubM
+  calcCmd.bits.log2SN := cTask.log2SubN
+  calcCmd.bits.log2SK := cTask.log2SubK
+  calcCmd.bits.pM := cTask.pM
+  calcCmd.bits.pN := cTask.pN
+  calcCmd.bits.pK := cTask.pK
+  sTaskQ.io.enq.valid := cVld
+  sTaskQ.io.enq.bits := cTask
+  //  val cReady = Wire(Bool())
+  //  cReady := calcCmd.ready
 
   // Store Pipeline
   // Receive: Store Request and Compute Write Completion
   // Issuing: Finish Command
-  val sReady = Wire(Bool())
   cwCompQ.io.deq.ready := sTaskQ.io.deq.valid
   sTaskQ.io.deq.ready := cwCompQ.io.deq.valid
+  val sVld = sTaskQ.io.deq.ready & cwCompQ.io.deq.ready
+  val sTask = sTaskQ.io.deq.bits
+  stCmd.valid := sVld
+  stCmd.bits.bank := sTask.cBank
+  stCmd.bits.log2SDimMajor := sTask.log2SubM
+  stCmd.bits.log2SDimMinor := sTask.log2SubN
+  stCmd.bits.pMajor := sTask.pM
+  stCmd.bits.pMinor := sTask.pN
+  stCmd.bits.baseAddr := sTask.cBaseAddr
+  stCmd.bits.baseDimMajor := sTask.subM
+  stCmd.bits.baseDimMinor := sTask.subN
+  fTaskQ.io.enq.valid := sVld
+  fTaskQ.io.enq.bits := sTask
 
   // Finish Pipeline
   // Receive: Finish Command, Store Completion
   // Issuing: Finish Completion
+  sCompQ4F.io.deq.ready := fTaskQ.io.deq.valid &  fTaskQ.io.deq.bits.cStore
+  fTaskQ.io.deq.ready := sCompQ4F.io.deq.valid | !fTaskQ.io.deq.bits.cStore
+  fComp.valid := fTaskQ.io.deq.bits.lastSubTask & fTaskQ.io.deq.fire
+  fComp.bits  := 1.B
 
 }
+
+object MatCtrlTaskGen extends App {
+  ChiselStage.emitSystemVerilog(
+    new MatCtrlTaskGen(32, 16, 20),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/MatCtrlTaskGen"
+    )
+  )
+}
+
+

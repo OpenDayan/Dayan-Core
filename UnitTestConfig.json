@@ -22,5 +22,8 @@
     },
     "FakeURAM": {
         "Package": "uram"
+    },
+    "MatCtrlTaskGen": {
+        "Package": "mat"
     }
 }
