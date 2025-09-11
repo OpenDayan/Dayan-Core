@@ -43,7 +43,7 @@ static inline void mainLoop()
         dut->task_bits_persistentMode = 0;
         dut->task_bits_taskM = 500;
         dut->task_bits_taskN = 351;
-        dut->task_bits_taskK = 320;
+        dut->task_bits_taskK = 128;
     }
     // Delay Simulate
     calcRdDelaySim.push(dut->calcCmd_valid);
