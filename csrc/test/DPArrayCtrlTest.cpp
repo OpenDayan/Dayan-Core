@@ -13,7 +13,7 @@ unsigned int stopFlag = 0;
 
 static inline void mainLoop()
 {
-    dut->inst_i_valid = ((rand() % 10) == 0);
+    dut->inst_i_valid = ((rand() % 5) == 0);
     dut->inst_i_bits_log2SM = 2;
     dut->inst_i_bits_log2SN = 2;
     dut->inst_i_bits_log2SK = 2;

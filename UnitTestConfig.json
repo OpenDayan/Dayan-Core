@@ -17,8 +17,8 @@
     "DPArrayCtrl": {
         "Package": "mat"
     },
-    "DPArrayStorage": {
-        "Package": "mat"
+    "TestFPUnpackPack": {
+        "Package": "fpmath"
     },
     "DPArrayBufferAB": {
         "Package": "mat"

@@ -3,8 +3,13 @@ package mat
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
+import fpmath.{FP8BF16FusedDPArray, U8m2n2k1U4m2n2k2Mul}
 import uram._
 import utils._
+
+object DPArrayStorageCmd extends ChiselEnum {
+  val writeA, writeB, writeC = Value
+}
 
 class MatLoadCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int) extends Bundle {
   // Compute Mode
@@ -42,27 +47,34 @@ class MatStoreCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK:
   val baseDimMinor = UInt(mnkWidth.W)
 }
 
-object DPArrayStorageCmd extends ChiselEnum {
-  val writeA, writeB, writeC = Value
-}
-
-class DPArrayStorage(storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int, cM: Int, cN: Int, cK: Int) extends Module {
+class DPArrayTop(storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int, cM: Int, cN: Int, cK: Int, sK: Int) extends Module {
   val cMNK = Array(cM, cN, cK).max
   val ports = busWidth / 8
   // Cmd Interface
   val ldCmd = IO(Flipped(Decoupled(new MatLoadCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
   val stCmd = IO(Flipped(Decoupled(new MatStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
-  // Non-Blocking Cmd Interface
+  // Non-Blocking calculate Macro Cmd Interface
   val calcCmd = IO(Flipped(Decoupled(new DPAMicroCommand(storageRatio))))
   // URAM Interface
   val uramRreq  = IO(Vec(ports, Decoupled(new AdvURAMRReq(addressWidth, 0, 64))))
   val uramRresp = IO(Flipped(Vec(ports, new AdvURAMResp(addressWidth,   0, 64))))
   val uramWreq  = IO(Vec(ports, Decoupled(new AdvURAMWReq(addressWidth, 0, 64))))
+
+  // Non-Blocking calculating array
+  val calcCore = Module(new FP8BF16FusedDPArray((tM, tN, tK) => new U8m2n2k1U4m2n2k2Mul(tM, tN, tK),
+    M = cM, N = cN, K = cK, sK = sK,
+    debugFP32Output = true
+  ))
+
+  // Tensor Buffer
+  val aBuffer = Module(new DPArrayBufferAB(busWidth, 32, cM, cK))
+  val bBuffer = Module(new DPArrayBufferAB(busWidth, 32, cM, cK))
+
 }
 
-object DPArrayStorage extends App {
+object DPArrayTop extends App {
   ChiselStage.emitSystemVerilog(
-    new DPArrayStorage(32, 256, 20, 20, 16, 8, 32),
+    new DPArrayTop(32, 256, 20, 20, 16, 8, 32, 32),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",
