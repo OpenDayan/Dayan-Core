@@ -5,7 +5,7 @@ import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
 // TODO: Known limitation, this module cannot generate Sub-Normal Numbers
-class FPRundingModule(wE: Int, wF: Int, bias: Int) extends Module {
+class FPRoundingModule(wE: Int, wF: Int, bias: Int) extends Module {
   val exp = IO(Input(SInt(wE.W)))
   val frac = IO(Input(UInt(wF.W)))
   val fp = IO(Output(UInt(32.W)))

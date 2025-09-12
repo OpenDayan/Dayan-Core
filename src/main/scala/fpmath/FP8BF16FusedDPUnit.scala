@@ -161,7 +161,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
 
       // For Debugger: Temporarly Align To FP32 for better Debug View
       if(debugFP32Output) {
-        val fp32_view_module = Module(new FPRundingModule(wE, wF, 0))
+        val fp32_view_module = Module(new FPRoundingModule(wE, wF, 0))
         fp32_view_module.exp := raw.exp
         fp32_view_module.frac := raw.frac.asUInt
         fp32Dbg(m)(n) := fp32_view_module.fp

@@ -3,7 +3,7 @@ package mat
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
-import fpmath.FPUnpackModule
+import fpmath.{FPUnpackModule, FPRoundingModule}
 import utils.RF1R1WRamBase
 
 // Memory Wrapper For DPArray Buffer
@@ -83,16 +83,28 @@ class DPArrayBufferC(busWidth: Int, entries: Int, m: Int, n: Int, wE: Int, wF: I
   val cWData   = IO(Input(Vec(m, Vec(n, UInt((wE + wF).W)))))
 
   // Real cData
-  val realCRData = Wire(UInt((m * n * (wE + wF)).W))
+  val realCRData = Wire(Vec(maxBeat, UInt(((m * n / maxBeat) * (wE + wF)).W)))
   val realCWData = Wire(UInt((m * n * (wE + wF)).W))
   cRData := realCRData.asTypeOf(Vec(m, Vec(n, UInt((wE + wF).W))))
   realCWData := cWData.asUInt
 
   // Real extData
+  // Internal Format -> FP32
+  val realExtRData = Wire(Vec(maxBeat, UInt(((m * n / maxBeat) * (wE + wF)).W)))
+  val realExtRDataIFP = realExtRData.asTypeOf(Vec(m * n, UInt((wE + wF).W)))
+  val realExtRDataFP32 = VecInit.tabulate(m * n)(i => {
+    val cvt = Module(new FPRoundingModule(wE, wF, 0))
+    cvt.exp  := realExtRDataIFP(i)(wE + wF - 1, wF)
+    cvt.frac := realExtRDataIFP(i)(     wF - 1,  0)
+    cvt.fp
+  })
+  val s1ExtRBeat = RegNext(extRBeat)
+  extRData := realExtRDataFP32.asTypeOf(Vec(maxBeat, Vec(busWidth, UInt(8.W))))(s1ExtRBeat)
+
   // extWData -> FP32
-  val extWDataFP32 = extWData.asTypeOf(Vec(m * n, UInt(32.W)))
+  val extWDataFP32 = extWData.asTypeOf(Vec(m * n / maxBeat, UInt(32.W)))
   // FP32 -> Internal Format
-  val realExtWData = VecInit.tabulate(m * n)(i => {
+  val realExtWData = VecInit.tabulate(m * n / maxBeat)(i => {
     val cvt = Module(new FPUnpackModule(wE, wF, 0))
     cvt.fp := extWDataFP32(i)
     Cat(cvt.exp, cvt.frac)
@@ -107,42 +119,32 @@ class DPArrayBufferC(busWidth: Int, entries: Int, m: Int, n: Int, wE: Int, wF: I
   val cRBank1 = cRe &  cRAddr(ptrW).asBool
   val cWBank0 = cWe & !cWAddr(ptrW).asBool
   val cWBank1 = cWe &  cWAddr(ptrW).asBool
+  val s1ExtRBank0 = RegNext(extRBank0)
+  val s1CRBank0 = RegNext(extWBank0)
   chisel3.assert(!(extRBank0 & cRBank0))
   chisel3.assert(!(extRBank1 & cRBank1))
   chisel3.assert(!(extWBank0 & cWBank0))
   chisel3.assert(!(extWBank1 & cWBank1))
 
   // Backing Storage Buffer
-  if(maxBeat <= 1) {
-    val backingStorage0 = Module(new RF1R1WRamBase(ptrW, m * n * (wE + wF)))
-    val backingStorage1 = Module(new RF1R1WRamBase(ptrW, m * n * (wE + wF)))
+  for(i <- 0 until maxBeat) {
+    val backingStorage0 = Module(new RF1R1WRamBase(ptrW, (m * n) / maxBeat * (wE + wF)))
+    val backingStorage1 = Module(new RF1R1WRamBase(ptrW, (m * n) / maxBeat * (wE + wF)))
     backingStorage0.io.clk := clock
     backingStorage1.io.clk := clock
     backingStorage0.io.reset := reset
     backingStorage1.io.reset := reset
     backingStorage0.io.raddr := Mux(extRBank0, extRAddr(ptrW - 1, 0), cRAddr(ptrW - 1, 0))
     backingStorage1.io.raddr := Mux(extRBank1, extRAddr(ptrW - 1, 0), cRAddr(ptrW - 1, 0))
-    backingStorage0.io.we := extWBank0 | cWBank0
-    backingStorage1.io.we := extWBank1 | cWBank1
+    backingStorage0.io.we := (extWBank0 & i.U === extWBeat) | cWBank0
+    backingStorage1.io.we := (extWBank1 & i.U === extWBeat) | cWBank1
     backingStorage0.io.waddr := Mux(extWBank0, extWAddr(ptrW - 1, 0), cWAddr(ptrW - 1, 0))
     backingStorage1.io.waddr := Mux(extWBank1, extWAddr(ptrW - 1, 0), cWAddr(ptrW - 1, 0))
-    backingStorage0.io.wdata := Mux(extWBank0, extWData.asUInt(m * n * 8 - 1, 0), cWData.asUInt)
-    realCRData := backingStorage0.io.rdata
-  } else {
-    val tiledRData = Wire(Vec(maxBeat, UInt((busWidth * 8).W)))
-    for(i <- 0 until maxBeat) {
-      val backingStorage = Module(new RF1R1WRamBase(ptrW, busWidth * 8))
-      backingStorage.io.clk := clock
-      backingStorage.io.reset := reset
-      backingStorage.io.raddr := cRAddr
-      tiledRData(i) := backingStorage.io.rdata
-      backingStorage.io.we := extWe & (i.U === extWBeat)
-      backingStorage.io.waddr := extWAddr
-      backingStorage.io.wdata := extWData.asUInt
-    }
-    realCRData := tiledRData.asUInt
+    backingStorage0.io.wdata := Mux(extWBank0, realExtWData.asUInt, cWData.asUInt)
+    backingStorage1.io.wdata := Mux(extWBank1, realExtWData.asUInt, cWData.asUInt)
+    realExtRData(i) := Mux(s1ExtRBank0, backingStorage0.io.rdata, backingStorage1.io.rdata)
+    realCRData(i)   := Mux(s1CRBank0, backingStorage0.io.rdata, backingStorage1.io.rdata)
   }
-
 }
 
 object DPArrayBufferAB extends App {

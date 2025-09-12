@@ -47,18 +47,41 @@ class MatStoreCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK:
   val baseDimMinor = UInt(mnkWidth.W)
 }
 
-class DPArrayTop(storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int, cM: Int, cN: Int, cK: Int, sK: Int) extends Module {
+class DPArrayTop(
+ storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int,
+ cM: Int, cN: Int, cK: Int, sK: Int,
+ wE: Int = 9, wF: Int = 25) extends Module {
   val cMNK = Array(cM, cN, cK).max
+  val maxTileSize = Array(cM * cK, cN * cK, cM * cN * 4).max
+  val maxBeat = maxTileSize / busWidth
   val ports = busWidth / 8
-  // Cmd Interface
+
+  // Load/Store Cmd Interface
   val ldCmd = IO(Flipped(Decoupled(new MatLoadCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
   val stCmd = IO(Flipped(Decoupled(new MatStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
-  // Non-Blocking calculate Macro Cmd Interface
-  val calcCmd = IO(Flipped(Decoupled(new DPAMicroCommand(storageRatio))))
+
+  // Calculate  Cmd Interface
+  val calcCmd = IO(Flipped(Decoupled(new MatDPACommand(storageRatio))))
+
+  // Completion Resp Interface
+  val ldComp = IO(Decoupled(Bool()))
+  val crComp = IO(Decoupled(Bool()))
+  val cwComp = IO(Decoupled(Bool()))
+  val stComp = IO(Decoupled(Bool()))
+
   // URAM Interface
-  val uramRreq  = IO(Vec(ports, Decoupled(new AdvURAMRReq(addressWidth, 0, 64))))
-  val uramRresp = IO(Flipped(Vec(ports, new AdvURAMResp(addressWidth,   0, 64))))
-  val uramWreq  = IO(Vec(ports, Decoupled(new AdvURAMWReq(addressWidth, 0, 64))))
+  val rreq  = IO(Vec(ports, Decoupled(new AdvURAMRReq(addressWidth, 0, 64))))
+  val rresp = IO(Flipped(Vec(ports, Decoupled(new AdvURAMResp(addressWidth,   0, 64)))))
+  val wreq  = IO(Vec(ports, Decoupled(new AdvURAMWReq(addressWidth, 0, 64))))
+
+  // URAM Access MetaInfo Queue
+  class URAMReadMeta extends Bundle {
+    val ctrl = DPArrayStorageCmd()
+    val bank = Bool()
+    val addr = UInt(5.W)
+    val beat = UInt(log2Ceil(maxBeat).W)
+  }
+  val uramAccessMetaQ = Module(new Queue(new URAMReadMeta, 32))
 
   // Non-Blocking calculating array
   val calcCore = Module(new FP8BF16FusedDPArray((tM, tN, tK) => new U8m2n2k1U4m2n2k2Mul(tM, tN, tK),
@@ -69,7 +92,13 @@ class DPArrayTop(storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: 
   // Tensor Buffer
   val aBuffer = Module(new DPArrayBufferAB(busWidth, 32, cM, cK))
   val bBuffer = Module(new DPArrayBufferAB(busWidth, 32, cM, cK))
+  val cBuffer = Module(new DPArrayBufferC (busWidth, 32, cM, cN, wE, wF))
 
+  // Connecting wPort of all buffer to uram
+  val flattenUramRData = VecInit.tabulate(ports)(i => rresp(i).bits.data).asTypeOf(Vec(busWidth, UInt(8.W)))
+  aBuffer.wData    := flattenUramRData
+  bBuffer.wData    := flattenUramRData
+  cBuffer.extWData := flattenUramRData
 }
 
 object DPArrayTop extends App {

@@ -14,7 +14,7 @@
             }
         }
     },
-    "DPArrayCtrl": {
+    "DPArrayCalcTaskSpilt": {
         "Package": "mat"
     },
     "TestFPUnpackPack": {

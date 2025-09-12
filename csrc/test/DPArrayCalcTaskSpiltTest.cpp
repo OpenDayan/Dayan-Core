@@ -2,12 +2,12 @@
 #include <iostream>
 #include <verilated.h>
 #include "verilated_fst_c.h"
-#include "VDPArrayCtrl.h"
+#include "VDPArrayCalcTaskSpilt.h"
 #include <vector>
 #include <queue>
 #define MAX_SIM_TIME 1000
 VerilatedContext *contextp;
-VDPArrayCtrl *dut;
+VDPArrayCalcTaskSpilt *dut;
 unsigned long long sim_time = 0;
 unsigned int stopFlag = 0;
 
@@ -25,11 +25,11 @@ int main(int argc, char **argv)
 {
     contextp = new VerilatedContext;
     contextp->commandArgs(argc, argv);
-    dut = new VDPArrayCtrl;
+    dut = new VDPArrayCalcTaskSpilt;
     Verilated::traceEverOn(true);
     VerilatedFstC *m_trace = new VerilatedFstC;
     dut->trace(m_trace, 99);
-    m_trace->open("wave/VDPArrayCtrl.fst");
+    m_trace->open("wave/VDPArrayCalcTaskSpilt.fst");
     dut->clock = 0;
     dut->reset = 1;
     dut->eval();
@@ -60,9 +60,9 @@ int main(int argc, char **argv)
         }
     }
     if(!stopFlag) {
-        printf("\033[42;32mVerilator: DPArrayCtrl Test PASS!\033[0m\n");
+        printf("\033[42;32mVerilator: DPArrayCalcTaskSpilt Test PASS!\033[0m\n");
     } else {
-        printf("\033[41;32mVerilator: DPArrayCtrl Test FAILED!\033[0m\n");
+        printf("\033[41;32mVerilator: DPArrayCalcTaskSpilt Test FAILED!\033[0m\n");
     }
     m_trace->close();
     delete dut;

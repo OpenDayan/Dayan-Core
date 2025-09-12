@@ -48,7 +48,7 @@ class DPAMicroCommand(storageRatio: Int) extends Bundle {
 // K(pK) N(pN)
 
 // Directly Controlling Module for FP8BF16FusedDPUnit
-class DPArrayCtrl(storageRatio: Int) extends Module{
+class DPArrayCalcTaskSpilt(storageRatio: Int) extends Module{
   val inst_i = IO(Flipped(Decoupled(new MatDPACommand(storageRatio))))
 
   val inst = RegEnable(inst_i.bits, inst_i.fire)
@@ -142,15 +142,15 @@ class DPArrayCtrl(storageRatio: Int) extends Module{
   microCmd.bits.cMatAddr := Cat(inst.cBank.asUInt, (curM << inst.log2SN) | curN)
 }
 
-object DPArrayCtrl extends App {
+object DPArrayCalcTaskSpilt extends App {
   ChiselStage.emitSystemVerilog(
-    new DPArrayCtrl(32),
+    new DPArrayCalcTaskSpilt(32),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",
       "-preserve-aggregate=vec",
       "--split-verilog",
-      "-o=generated/DPArrayCtrl"
+      "-o=generated/DPArrayCalcTaskSpilt"
     )
   )
 }
