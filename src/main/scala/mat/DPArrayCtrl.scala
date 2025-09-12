@@ -100,6 +100,7 @@ class DPArrayCtrl(storageRatio: Int) extends Module{
     nextK := inst_i.bits.pK
     nextN := inst_i.bits.pN
     nextM := inst_i.bits.pM
+    // TODO: Shuld we Stall between Multiple Requests ?
     nextKStall := 0.U
   }.otherwise {
     nextK := curK

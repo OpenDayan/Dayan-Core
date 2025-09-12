@@ -20,6 +20,9 @@
     "DPArrayStorage": {
         "Package": "mat"
     },
+    "DPArrayBufferAB": {
+        "Package": "mat"
+    },
     "FakeURAM": {
         "Package": "uram"
     },

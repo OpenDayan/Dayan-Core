@@ -1,9 +1,6 @@
 //  Xilinx UltraRAM Simple Dual Port.  This code implements
 //  a parameterizable UltraRAM block with 1 Read and 1 write
 //  when addra == addrb, old data will show at doutb
-
-`timescale 1ns/1ns
-
 // Fixed 2 Cycle Latency
 module UltraRAMBase #(
     parameter AWIDTH = 12,   // Address Width
