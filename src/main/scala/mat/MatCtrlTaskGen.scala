@@ -58,7 +58,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val task = IO(Flipped(Decoupled(new MatTask(storageRatio, mnkWidth, addressWidth))))
   val ldCmd = IO(Decoupled(new MatLoadCommand(storageRatio, mnkWidth, addressWidth, cK)))
   val calcCmd = IO(Decoupled(new MatDPACommand(storageRatio)))
-  val stCmd = IO(Decoupled(new MatStoreCommand(storageRatio, mnkWidth, addressWidth)))
+  val stCmd = IO(Decoupled(new MatStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
   val log2CM = log2Ceil(cM)
   val log2CN = log2Ceil(cN)
   val log2CK = log2Ceil(cK)
@@ -182,9 +182,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
     spCurM := taskQ.bits.taskM
     spCurN := taskQ.bits.taskN
     spCurK := taskQ.bits.taskK
-  }.elsewhen(lTaskQ.io.enq.ready) {
+  }.elsewhen(spTaskBusy & lTaskQ.io.enq.ready) {
     spTaskFirst := 0.B
-    when(spTaskBusy) { spTaskBusy := !spLastTask }
+    spTaskBusy := !spLastTask
     when(spCarryK) { when(spLastK) { spCurK := spTask.taskK }.otherwise {
       spCurK := lTaskQ.io.enq.bits.subK
     }}
@@ -207,9 +207,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   lTaskQ.io.enq.bits.aBank := spABank
   lTaskQ.io.enq.bits.bBank := spBBank
   lTaskQ.io.enq.bits.cBank := spCBank
-  when(lTaskQ.io.enq.bits.aLoad & lTaskQ.io.enq.ready) { spABank := !spABank }
-  when(lTaskQ.io.enq.bits.bLoad & lTaskQ.io.enq.ready) { spBBank := !spBBank }
-  when(lTaskQ.io.enq.bits.cLoad & lTaskQ.io.enq.ready) { spCBank := !spCBank }
+  when(lTaskQ.io.enq.bits.aLoad & lTaskQ.io.enq.fire) { spABank := !spABank }
+  when(lTaskQ.io.enq.bits.bLoad & lTaskQ.io.enq.fire) { spBBank := !spBBank }
+  when(lTaskQ.io.enq.bits.cLoad & lTaskQ.io.enq.fire) { spCBank := !spCBank }
 
   // Load Pipeline
   // Receive: Spilt Task Request and Compute Read Completion
@@ -343,7 +343,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
 
 object MatCtrlTaskGen extends App {
   ChiselStage.emitSystemVerilog(
-    new MatCtrlTaskGen(32, 16, 20, 8, 4, 32),
+    new MatCtrlTaskGen(32, 16, 20, 16, 8, 32),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",

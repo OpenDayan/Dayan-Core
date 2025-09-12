@@ -40,7 +40,7 @@ static inline void mainLoop()
         dut->task_bits_log2SubM = 2;
         dut->task_bits_log2SubN = 2;
         dut->task_bits_log2SubK = 2;
-        dut->task_bits_persistentMode = 0; // A Persistence
+        dut->task_bits_persistentMode = 1; // A Persistence
         dut->task_bits_taskM = 40;
         dut->task_bits_taskN = 70;
         dut->task_bits_taskK = 128;
@@ -50,22 +50,40 @@ static inline void mainLoop()
     ldDelaySim.push(dut->ldCmd_valid & dut->ldCmd_bits_lastLoad);
     stDelaySim.push(dut->stCmd_valid);
     if(dut->ldCmd_valid && dut->ldCmd_bits_ctrl == 0) {
-        printf("Load A[%d:%d, %d:%d]\n",
+        printf("Load A%d[%d:%d, %d:%d]\n", dut->ldCmd_bits_bank,
             dut->ldCmd_bits_baseDimMajor, dut->ldCmd_bits_baseDimMajor + dut->ldCmd_bits_pMajor,
             dut->ldCmd_bits_baseDimMinor, dut->ldCmd_bits_baseDimMinor + dut->ldCmd_bits_pMinor
     );
     }
     if(dut->ldCmd_valid && dut->ldCmd_bits_ctrl == 1) {
-        printf("Load BT[%d:%d, %d:%d]\n",
+        printf("Load BT%d[%d:%d, %d:%d]\n", dut->ldCmd_bits_bank,
             dut->ldCmd_bits_baseDimMajor, dut->ldCmd_bits_baseDimMajor + dut->ldCmd_bits_pMajor,
             dut->ldCmd_bits_baseDimMinor, dut->ldCmd_bits_baseDimMinor + dut->ldCmd_bits_pMinor
     );
     }
     if(dut->ldCmd_valid && dut->ldCmd_bits_ctrl == 4) {
-        printf("Load C[%d:%d, %d:%d]\n",
+        printf("Load C%d[%d:%d, %d:%d]\n", dut->ldCmd_bits_bank,
             dut->ldCmd_bits_baseDimMajor, dut->ldCmd_bits_baseDimMajor + dut->ldCmd_bits_pMajor,
             dut->ldCmd_bits_baseDimMinor, dut->ldCmd_bits_baseDimMinor + dut->ldCmd_bits_pMinor
     );
+    }
+    if(dut->stCmd_valid) {
+        printf("Store C%d[%d:%d, %d:%d]\n", dut->stCmd_bits_bank,
+            dut->stCmd_bits_baseDimMajor, dut->stCmd_bits_baseDimMajor + dut->stCmd_bits_pMajor,
+            dut->stCmd_bits_baseDimMinor, dut->stCmd_bits_baseDimMinor + dut->stCmd_bits_pMinor
+        );
+    }
+    if(dut->calcCmd_valid) {
+        int M = 16 * (1 + dut->calcCmd_bits_pM);
+        int N = 8  * (1 + dut->calcCmd_bits_pN);
+        int K = 32 * (1 + dut->calcCmd_bits_pK);
+        printf("Calc C%d[%d,%d] += A%d[%d,%d] x BT%d[%d,%d] \n",
+            dut->calcCmd_bits_cBank, M, N,
+            dut->calcCmd_bits_aBank, M, K,
+            dut->calcCmd_bits_bBank, N, K);
+    }
+    if(dut->fComp_valid) {
+        printf("Finish One Round Computation.\n");
     }
     if(calcRdDelaySim.size() > DELAY_CALC_RD) {
         dut->crComp_valid = calcRdDelaySim.front();
@@ -74,14 +92,17 @@ static inline void mainLoop()
     }
     if(calcWrDelaySim.size() > DELAY_CALC_WR) {
         dut->cwComp_valid = calcWrDelaySim.front();
+        if(dut->cwComp_valid) printf("Calc Completion.\n");
         calcWrDelaySim.pop();
     }
     if(ldDelaySim.size() > DELAY_LD) {
         dut->ldComp_valid = ldDelaySim.front();
+        if(dut->ldComp_valid) printf("Load Completion.\n");
         ldDelaySim.pop();
     }
     if(stDelaySim.size() > DELAY_ST) {
         dut->sComp_valid = stDelaySim.front();
+        if(dut->sComp_valid) printf("Store Completion.\n");
         stDelaySim.pop();
     }
 }
