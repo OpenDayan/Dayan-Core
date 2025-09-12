@@ -26,6 +26,13 @@ class MatDPACommand(storageRatio: Int) extends Bundle {
   val pK = UInt(log2Ceil(storageRatio).W) // pK <= sK
 }
 
+class DPAMicroCommand(storageRatio: Int) extends Bundle {
+  val bf16 = Bool()
+  val aMatAddr = UInt((1+log2Ceil(storageRatio)).W)
+  val bMatAddr = UInt((1+log2Ceil(storageRatio)).W)
+  val cMatAddr = UInt((1+log2Ceil(storageRatio)).W)
+}
+
 // Mat RAM Shape -> Address
 /*
 *       DIM0
@@ -70,9 +77,10 @@ class DPArrayCtrl(storageRatio: Int) extends Module{
   val busy = RegNext(nextBusy)
   inst_i.ready := !busy | lastInst // Allowing Fully Pipeline Micro Instruction Handling
 
+  nextBusy := busy
   when(inst_i.fire) {
     nextBusy := 1.B
-  }.otherwise {
+  }.elsewhen(busy) {
     nextBusy := !lastInst
   }
 
@@ -95,21 +103,24 @@ class DPArrayCtrl(storageRatio: Int) extends Module{
   val kSub1Grant = kStall === 0.U & kSub1Req
   val nSub1Grant = kStall === 0.U & nSub1Req
   val mSub1Grant = kStall === 0.U & mSub1Req
-
+  
+  nextKStall := kStall
+  when(kStall =/= 0.U) {
+    nextKStall := kStall - 1.U
+  }
+  when(kSub1Grant & busy) {
+    nextKStall := kStallCycle
+  }
   when(inst_i.fire) {
     nextK := inst_i.bits.pK
     nextN := inst_i.bits.pN
     nextM := inst_i.bits.pM
     // TODO: Shuld we Stall between Multiple Requests ?
-    nextKStall := 0.U
+    // nextKStall := 0.U
   }.otherwise {
     nextK := curK
     nextM := curM
     nextN := curN
-    nextKStall := kStall
-    when(kStall =/= 0.U) {
-      nextKStall := kStall - 1.U
-    }
     when(mSub1Grant) {
       when(nSub1Req) {nextM := inst.pM}.otherwise {nextM := curM - 1.U}
     }
@@ -117,24 +128,18 @@ class DPArrayCtrl(storageRatio: Int) extends Module{
       when(kSub1Req) {nextN := inst.pN}.otherwise {nextN := curN - 1.U}
     }
     when(kSub1Grant) {
-      nextKStall := kStallCycle
       when(!taskFinish) {nextK := curK - 1.U}
     }
   }
 
   // Controlling Interface To Matrix Register Tiles and DPArray
-  val matValid = IO(Output(Bool()))
-  val bf16 = IO(Output(Bool()))
-  val aMatAddr = IO(Output(UInt((ptrW + 1).W)))
-  val bMatAddr = IO(Output(UInt((ptrW + 1).W)))
-  val cMatAddr = IO(Output(UInt((ptrW + 1).W)))
+  val microCmd = IO(Decoupled(new DPAMicroCommand(storageRatio)))
 
-  matValid := busy & !kStall
-  bf16 := inst.bf16
-  // M, K
-  aMatAddr := Cat(inst.aBank.asUInt, (curM << inst.log2SK) | curK)
-  bMatAddr := Cat(inst.bBank.asUInt, (curN << inst.log2SK) | curK)
-  cMatAddr := Cat(inst.cBank.asUInt, (curM << inst.log2SN) | curN)
+  microCmd.valid := busy & !kStall
+  microCmd.bits.bf16 := inst.bf16
+  microCmd.bits.aMatAddr := Cat(inst.aBank.asUInt, (curM << inst.log2SK) | curK)
+  microCmd.bits.bMatAddr := Cat(inst.bBank.asUInt, (curN << inst.log2SK) | curK)
+  microCmd.bits.cMatAddr := Cat(inst.cBank.asUInt, (curM << inst.log2SN) | curN)
 }
 
 object DPArrayCtrl extends App {

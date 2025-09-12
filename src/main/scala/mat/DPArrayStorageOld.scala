@@ -21,7 +21,7 @@ import utils._
 // Fraction: Signed 25 bits
 // Value = 2^(Exp) * (Fraction / 2^(wF-1)
 // Output of C will Convert to standard FP32 type
-class DPArrayStorage(cM: Int, cN: Int, cK: Int, qK: Int, busWidth: Int, cinLatency: Int, wE: Int = 9, wF: Int = 25) extends Module {
+class DPArrayStorageOld(cM: Int, cN: Int, cK: Int, qK: Int, busWidth: Int, cinLatency: Int, wE: Int = 9, wF: Int = 25) extends Module {
 
   val matValid = IO(Input(Bool()))
   val calcAMatAddr = IO(Input(UInt(6.W)))
@@ -133,12 +133,12 @@ class DPArrayStorage(cM: Int, cN: Int, cK: Int, qK: Int, busWidth: Int, cinLaten
   ))
 
   val aScaleReadRaw = RegNext(aScaleMem.read(calcAMatAddr(4, 0)).asTypeOf(Vec(cM * cK / qK, UInt(8.W))))
-  when(extMatValid & extMatReqType === DPArrayStorageCmd.writeAScale) {
+  when(extMatValid & extMatReqType === DPArrayStorageCmd.writeA) {
     aScaleMem.write(extMatAddr(4, 0), extMatWData.asUInt)
   }
 
   val bScaleReadRaw = RegNext(bScaleMem.read(calcBMatAddr(4, 0)).asTypeOf(Vec(cN * cK / qK, UInt(8.W))))
-  when(extMatValid & extMatReqType === DPArrayStorageCmd.writeBScale) {
+  when(extMatValid & extMatReqType === DPArrayStorageCmd.writeB) {
     bScaleMem.write(extMatAddr(4, 0), extMatWData.asUInt)
   }
 
@@ -181,17 +181,4 @@ class DPArrayStorage(cM: Int, cN: Int, cK: Int, qK: Int, busWidth: Int, cinLaten
     val idxLo = idx % (busWidth / 4)
     cReadRaw(r1CMatAddr(5))(idxHi)(idxLo)
   })
-}
-
-object DPArrayStorage extends App {
-  ChiselStage.emitSystemVerilog(
-    new DPArrayStorage(16, 8, 32, 32, 256, 6),
-    firtoolOpts = Array(
-      "-disable-all-randomization",
-      "-strip-debug-info",
-      "-preserve-aggregate=vec",
-      "--split-verilog",
-      "-o=generated/DPArrayStorage"
-    )
-  )
 }

@@ -3,6 +3,7 @@ package mat
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
+import uram._
 import utils._
 
 class MatLoadCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int) extends Bundle {
@@ -41,11 +42,34 @@ class MatStoreCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK:
   val baseDimMinor = UInt(mnkWidth.W)
 }
 
-
 object DPArrayStorageCmd extends ChiselEnum {
-  val writeA, writeB, writeAScale, writeBScale, writeC = Value
+  val writeA, writeB, writeC = Value
 }
 
-class DPArrayStorage {
+class DPArrayStorage(storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int, cM: Int, cN: Int, cK: Int) extends Module {
+  val cMNK = Array(cM, cN, cK).max
+  val ports = busWidth / 8
+  // Cmd Interface
+  val ldCmd = IO(Flipped(Decoupled(new MatLoadCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
+  val stCmd = IO(Flipped(Decoupled(new MatStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
+  // Non-Blocking Cmd Interface
+  val calcCmd = IO(Flipped(Decoupled(new DPAMicroCommand(storageRatio))))
   // URAM Interface
+  val uramRreq  = IO(Vec(ports, Decoupled(new AdvURAMRReq(addressWidth, 0, 64))))
+  val uramRresp = IO(Flipped(Vec(ports, new AdvURAMResp(addressWidth,   0, 64))))
+  val uramWreq  = IO(Vec(ports, Decoupled(new AdvURAMWReq(addressWidth, 0, 64))))
 }
+
+object DPArrayStorage extends App {
+  ChiselStage.emitSystemVerilog(
+    new DPArrayStorage(32, 256, 20, 20, 16, 8, 32),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/DPArrayStorage"
+    )
+  )
+}
+
