@@ -9,9 +9,10 @@ import utils.DPIRamBase
 // Latency is Flex-Variable
 // Using DPI Connecting to Verilator Main Machine
 class FakeURAM(ports: Int, addrWidth: Int, idWidth: Int, dataWidth: Int) extends Module {
-  val rreq_i = IO(Flipped(Vec(ports, Decoupled(new AdvURAMRReq(addrWidth, idWidth, dataWidth)))))
+  val rreq_i = IO(Flipped(Vec(ports, Decoupled(new AdvURAMReq(addrWidth, idWidth, dataWidth)))))
   val resp_o = IO(Vec(ports, new AdvURAMResp(addrWidth, idWidth, dataWidth)))
-  val wreq_i = IO(Flipped(Vec(ports, Decoupled(new AdvURAMWReq(addrWidth, idWidth, dataWidth)))))
+  val wreq_i = IO(Flipped(Vec(ports, Decoupled(new AdvURAMReq(addrWidth, idWidth, dataWidth)))))
+  val wdata_i = IO(Input(Vec(ports, UInt(dataWidth.W))))
 
   val resp = Wire(Vec(ports, new AdvURAMResp(addrWidth, idWidth, dataWidth)))
   val dpi_cores = (0 until ports).map(i => {
@@ -25,7 +26,7 @@ class FakeURAM(ports: Int, addrWidth: Int, idWidth: Int, dataWidth: Int) extends
     core.io.we := wreq_i(i).valid
     wreq_i(i).ready := 1.B
     core.io.waddr := wreq_i(i).bits.address
-    core.io.wdata := wreq_i(i).bits.data
+    core.io.wdata := wdata_i(i)
 
     // rdata is one beat after re.
     val dReq = RegNext(rreq_i(i).bits)

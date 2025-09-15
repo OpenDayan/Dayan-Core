@@ -4,29 +4,7 @@ import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
-// Note: `storageRatio` Marks the biggest storageRatio in design.
-// StorageRatio form:
-// A: 16 >= MK 8 2
-// B: 16 >= NK 4 2
-// C: 32 >= MN 8 4
-class MatDPACommand(storageRatio: Int) extends Bundle {
-  // Compute Mode
-  val bf16 = Bool()
-  val aBank = Bool()
-  val bBank = Bool()
-  val cBank = Bool()
-  // Storage Shape
-  // 0 -> 1, 1 -> 2, 2 -> 4, 3 -> 8, 4 -> 16, 5 -> 32
-  val log2SM = UInt(log2Ceil(1+log2Ceil(storageRatio)).W)
-  val log2SN = UInt(log2Ceil(1+log2Ceil(storageRatio)).W)
-  val log2SK = UInt(log2Ceil(1+log2Ceil(storageRatio)).W)
-  // Problem Shape
-  val pM = UInt(log2Ceil(storageRatio).W) // pM <= sM
-  val pN = UInt(log2Ceil(storageRatio).W) // pN <= sN
-  val pK = UInt(log2Ceil(storageRatio).W) // pK <= sK
-}
-
-class DPAMicroCommand(storageRatio: Int) extends Bundle {
+class DPACalcMicroCommand(storageRatio: Int) extends Bundle {
   val bf16 = Bool()
   val aMatAddr = UInt((1+log2Ceil(storageRatio)).W)
   val bMatAddr = UInt((1+log2Ceil(storageRatio)).W)
@@ -49,15 +27,15 @@ class DPAMicroCommand(storageRatio: Int) extends Bundle {
 
 // Directly Controlling Module for FP8BF16FusedDPUnit
 class DPArrayCalcTaskSpilt(storageRatio: Int) extends Module{
-  val inst_i = IO(Flipped(Decoupled(new MatDPACommand(storageRatio))))
+  val cmdIn = IO(Flipped(Decoupled(new MatCalcCommand(storageRatio))))
 
-  val inst = RegEnable(inst_i.bits, inst_i.fire)
-  val pMisOne = inst_i.bits.pM === 0.U
-  val pNisOne = inst_i.bits.pN === 0.U
-  val pMisTwo = inst_i.bits.pM === 1.U
-  val pNisTwo = inst_i.bits.pN === 1.U
-  val pMisThree = inst_i.bits.pM === 2.U
-  val pNisThree = inst_i.bits.pN === 2.U
+  val cmd = RegEnable(cmdIn.bits, cmdIn.fire)
+  val pMisOne = cmdIn.bits.pM === 0.U
+  val pNisOne = cmdIn.bits.pN === 0.U
+  val pMisTwo = cmdIn.bits.pM === 1.U
+  val pNisTwo = cmdIn.bits.pN === 1.U
+  val pMisThree = cmdIn.bits.pM === 2.U
+  val pNisThree = cmdIn.bits.pN === 2.U
 
   val nextKStallCycle = Wire(UInt(2.W))
   nextKStallCycle := 0.U
@@ -70,15 +48,15 @@ class DPArrayCalcTaskSpilt(storageRatio: Int) extends Module{
       nextKStallCycle := 1.U
     }
   }
-  val kStallCycle = RegEnable(nextKStallCycle, inst_i.fire)
+  val kStallCycle = RegEnable(nextKStallCycle, cmdIn.fire)
 
   val lastInst = Wire(Bool())
   val nextBusy = Wire(Bool())
   val busy = RegNext(nextBusy)
-  inst_i.ready := !busy | lastInst // Allowing Fully Pipeline Micro Instruction Handling
+  cmdIn.ready := !busy | lastInst // Allowing Fully Pipeline Micro Instruction Handling
 
   nextBusy := busy
-  when(inst_i.fire) {
+  when(cmdIn.fire) {
     nextBusy := 1.B
   }.elsewhen(busy) {
     nextBusy := !lastInst
@@ -111,10 +89,10 @@ class DPArrayCalcTaskSpilt(storageRatio: Int) extends Module{
   when(kSub1Grant & busy) {
     nextKStall := kStallCycle
   }
-  when(inst_i.fire) {
-    nextK := inst_i.bits.pK
-    nextN := inst_i.bits.pN
-    nextM := inst_i.bits.pM
+  when(cmdIn.fire) {
+    nextK := cmdIn.bits.pK
+    nextN := cmdIn.bits.pN
+    nextM := cmdIn.bits.pM
     // TODO: Shuld we Stall between Multiple Requests ?
     // nextKStall := 0.U
   }.otherwise {
@@ -122,10 +100,10 @@ class DPArrayCalcTaskSpilt(storageRatio: Int) extends Module{
     nextM := curM
     nextN := curN
     when(mSub1Grant) {
-      when(nSub1Req) {nextM := inst.pM}.otherwise {nextM := curM - 1.U}
+      when(nSub1Req) {nextM := cmd.pM}.otherwise {nextM := curM - 1.U}
     }
     when(nSub1Grant) {
-      when(kSub1Req) {nextN := inst.pN}.otherwise {nextN := curN - 1.U}
+      when(kSub1Req) {nextN := cmd.pN}.otherwise {nextN := curN - 1.U}
     }
     when(kSub1Grant) {
       when(!taskFinish) {nextK := curK - 1.U}
@@ -133,13 +111,13 @@ class DPArrayCalcTaskSpilt(storageRatio: Int) extends Module{
   }
 
   // Controlling Interface To Matrix Register Tiles and DPArray
-  val microCmd = IO(Decoupled(new DPAMicroCommand(storageRatio)))
+  val cmdOut = IO(Decoupled(new DPACalcMicroCommand(storageRatio)))
 
-  microCmd.valid := busy & !kStall
-  microCmd.bits.bf16 := inst.bf16
-  microCmd.bits.aMatAddr := Cat(inst.aBank.asUInt, (curM << inst.log2SK) | curK)
-  microCmd.bits.bMatAddr := Cat(inst.bBank.asUInt, (curN << inst.log2SK) | curK)
-  microCmd.bits.cMatAddr := Cat(inst.cBank.asUInt, (curM << inst.log2SN) | curN)
+  cmdOut.valid := busy & !kStall
+  cmdOut.bits.bf16 := cmd.bf16
+  cmdOut.bits.aMatAddr := Cat(cmd.aBank.asUInt, (curM << cmd.log2SK) | curK)
+  cmdOut.bits.bMatAddr := Cat(cmd.bBank.asUInt, (curN << cmd.log2SK) | curK)
+  cmdOut.bits.cMatAddr := Cat(cmd.cBank.asUInt, (curM << cmd.log2SN) | curN)
 }
 
 object DPArrayCalcTaskSpilt extends App {

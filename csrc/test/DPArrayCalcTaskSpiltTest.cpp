@@ -13,13 +13,13 @@ unsigned int stopFlag = 0;
 
 static inline void mainLoop()
 {
-    dut->inst_i_valid = ((rand() % 5) == 0);
-    dut->inst_i_bits_log2SM = 2;
-    dut->inst_i_bits_log2SN = 2;
-    dut->inst_i_bits_log2SK = 2;
-    dut->inst_i_bits_pM = 0;
-    dut->inst_i_bits_pN = 0;
-    dut->inst_i_bits_pK = 0;
+    dut->cmdIn_valid = ((rand() % 5) == 0);
+    dut->cmdIn_bits_log2SM = 2;
+    dut->cmdIn_bits_log2SN = 2;
+    dut->cmdIn_bits_log2SK = 2;
+    dut->cmdIn_bits_pM = 0;
+    dut->cmdIn_bits_pN = 0;
+    dut->cmdIn_bits_pK = 0;
 }
 int main(int argc, char **argv)
 {

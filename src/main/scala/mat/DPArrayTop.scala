@@ -11,6 +11,29 @@ object DPArrayStorageCmd extends ChiselEnum {
   val writeA, writeB, writeC = Value
 }
 
+// Note: `storageRatio` Marks the biggest storageRatio in design.
+// StorageRatio form:
+// A: 16 >= MK 8 2
+// B: 16 >= NK 4 2
+// C: 32 >= MN 8 4
+class MatCalcCommand(storageRatio: Int) extends Bundle {
+  // Compute Mode
+  val bf16 = Bool()
+  val aBank = Bool()
+  val bBank = Bool()
+  val cBank = Bool()
+  // Storage Shape
+  // 0 -> 1, 1 -> 2, 2 -> 4, 3 -> 8, 4 -> 16, 5 -> 32
+  val log2SM = UInt(log2Ceil(1+log2Ceil(storageRatio)).W)
+  val log2SN = UInt(log2Ceil(1+log2Ceil(storageRatio)).W)
+  val log2SK = UInt(log2Ceil(1+log2Ceil(storageRatio)).W)
+  // Problem Shape
+  val pM = UInt(log2Ceil(storageRatio).W) // pM <= sM
+  val pN = UInt(log2Ceil(storageRatio).W) // pN <= sN
+  val pK = UInt(log2Ceil(storageRatio).W) // pK <= sK
+}
+
+
 class MatLoadCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int) extends Bundle {
   // Compute Mode
   val bank = Bool()
@@ -61,7 +84,7 @@ class DPArrayTop(
   val stCmd = IO(Flipped(Decoupled(new MatStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
 
   // Calculate  Cmd Interface
-  val calcCmd = IO(Flipped(Decoupled(new MatDPACommand(storageRatio))))
+  val calcCmd = IO(Flipped(Decoupled(new MatCalcCommand(storageRatio))))
 
   // Completion Resp Interface
   val ldComp = IO(Decoupled(Bool()))
@@ -70,9 +93,9 @@ class DPArrayTop(
   val stComp = IO(Decoupled(Bool()))
 
   // URAM Interface
-  val rreq  = IO(Vec(ports, Decoupled(new AdvURAMRReq(addressWidth, 0, 64))))
+  val rreq  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
   val rresp = IO(Flipped(Vec(ports, Decoupled(new AdvURAMResp(addressWidth,   0, 64)))))
-  val wreq  = IO(Vec(ports, Decoupled(new AdvURAMWReq(addressWidth, 0, 64))))
+  val wreq  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
 
   // URAM Access MetaInfo Queue
   class URAMReadMeta extends Bundle {

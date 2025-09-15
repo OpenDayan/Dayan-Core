@@ -20,7 +20,7 @@ class MatInst extends Bundle {
 class MatCtrl(cM: Int, cN: Int, cK: Int) extends Module {
   val matInst = IO(Flipped(Decoupled(new MatInst)))
   val matInstResp = IO(Decoupled(UInt(64.W)))
-  val dpaCmd = IO(Decoupled(new MatDPACommand(32)))
+  val dpaCmd = IO(Decoupled(new MatCalcCommand(32)))
 
   // Internal Configure Register
   // Note: problemK Should Align to cK

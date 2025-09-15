@@ -57,7 +57,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   require(cK >= cM & cK >= cN) // MatLoadCommand.wMNK Should be the Max(cM, cN, cK)
   val task = IO(Flipped(Decoupled(new MatTask(storageRatio, mnkWidth, addressWidth))))
   val ldCmd = IO(Decoupled(new MatLoadCommand(storageRatio, mnkWidth, addressWidth, cK)))
-  val calcCmd = IO(Decoupled(new MatDPACommand(storageRatio)))
+  val calcCmd = IO(Decoupled(new MatCalcCommand(storageRatio)))
   val stCmd = IO(Decoupled(new MatStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
   val log2CM = log2Ceil(cM)
   val log2CN = log2Ceil(cN)

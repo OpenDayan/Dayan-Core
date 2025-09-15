@@ -13,13 +13,8 @@ import utils.UltraRAM
 
 // Interface Define of AdvURAM
 // Use ID To track Comming Port or other out-stading Informations.
-class AdvURAMRReq(addrWidth: Int, idWidth: Int, dataWidth: Int) extends Bundle {
+class AdvURAMReq(addrWidth: Int, idWidth: Int, dataWidth: Int) extends Bundle {
   val address = UInt(addrWidth.W)
-  val id = UInt(idWidth.W)
-}
-class AdvURAMWReq(addrWidth: Int, idWidth: Int, dataWidth: Int) extends Bundle {
-  val address = UInt(addrWidth.W)
-  val data    = UInt(dataWidth.W)
   val id = UInt(idWidth.W)
 }
 

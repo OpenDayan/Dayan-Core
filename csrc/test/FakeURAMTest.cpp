@@ -48,7 +48,7 @@ static inline void mainLoop()
     static int i = 0;
     dut->wreq_i_0_valid = 1;
     dut->wreq_i_0_bits_address = i + 2;
-    dut->wreq_i_0_bits_data = i;
+    dut->wdata_i_0 = i;
     dut->rreq_i_0_valid = 1;
     dut->rreq_i_0_bits_address = i;
     dut->rreq_i_1_valid = 1;
