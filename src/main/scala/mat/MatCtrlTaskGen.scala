@@ -78,13 +78,13 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val ldComp = IO(Flipped(Decoupled(Bool())))
   val crComp = IO(Flipped(Decoupled(Bool())))
   val cwComp = IO(Flipped(Decoupled(Bool())))
-  val sComp = IO(Flipped(Decoupled(Bool())))
+  val stComp = IO(Flipped(Decoupled(Bool())))
   val fComp = IO(Decoupled(Bool()))
   // ld/cr/cw/s Completion Queue should NEVER Stall!
   chisel3.assert(!(ldComp.valid & !ldComp.ready))
   chisel3.assert(!(crComp.valid & !crComp.ready))
   chisel3.assert(!(cwComp.valid & !cwComp.ready))
-  chisel3.assert(!(sComp.valid & !sComp.ready))
+  chisel3.assert(!(stComp.valid & !stComp.ready))
   chisel3.assert(!(fComp.valid & !fComp.ready))
 
   def getLowBits(value: UInt, bitsCnt: UInt, maxWidth: Int): UInt = {
@@ -114,7 +114,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val sCompQ4L  = Module(new Queue(Bool(), 2)) // Store Completion for Load Stage(Loading C should not issued before C wb)
 
   lCompQ.io.enq <> ldComp
-  sCompQ4F.io.enq <> sComp
+  sCompQ4F.io.enq <> stComp
 
   val compQInitializer = RegInit(2.U)
   when(compQInitializer =/= 0.U) {

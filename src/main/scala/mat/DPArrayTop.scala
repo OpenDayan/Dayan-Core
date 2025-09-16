@@ -79,9 +79,9 @@ class DPArrayTop(
 
   // URAM Interface
   val rreq0  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-  val rresp0 = IO(Flipped(Vec(ports, Decoupled(new AdvURAMResp(addressWidth,   0, 64)))))
+  val rresp0 = IO(Flipped(Vec(ports, new AdvURAMResp(addressWidth,   0, 64))))
   val rreq1  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-  val rresp1 = IO(Flipped(Vec(ports, Decoupled(new AdvURAMResp(addressWidth,   0, 64)))))
+  val rresp1 = IO(Flipped(Vec(ports, new AdvURAMResp(addressWidth,   0, 64))))
   val wreq  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
   val wdata = IO(Output(Vec(ports, UInt(64.W))))
 
@@ -134,8 +134,8 @@ class DPArrayTop(
   cBuffer.cWe := calcCMatValidPipe(calcCore.r0Latency + 2)
 
   // Connecting wPort / rPort of all buffer to uram
-  val flattenUramRData0 = VecInit.tabulate(ports)(i => rresp0(i).bits.data).asTypeOf(Vec(busWidth, UInt(8.W)))
-  val flattenUramRData1 = VecInit.tabulate(ports)(i => rresp1(i).bits.data).asTypeOf(Vec(busWidth, UInt(8.W)))
+  val flattenUramRData0 = VecInit.tabulate(ports)(i => rresp0(i).data).asTypeOf(Vec(busWidth, UInt(8.W)))
+  val flattenUramRData1 = VecInit.tabulate(ports)(i => rresp1(i).data).asTypeOf(Vec(busWidth, UInt(8.W)))
   aBuffer.wData    := flattenUramRData0
   bBuffer.wData    := flattenUramRData0
   cBuffer.extWData := flattenUramRData1
@@ -185,7 +185,6 @@ class DPArrayTop(
     rreq0(i).valid := abLoadTaskSpilter.cmdURAM.valid &
       (abLoadTaskSpilter.cmdURAM.bits.pMajor >= fixedMN.U) &
       (abLoadTaskSpilter.cmdURAM.bits.pMinor >= fixedK.U)
-    rresp0(i).ready := 1.B
   })
   // TODO: Check synchronized URAM
   abLoadTaskSpilter.cmdURAM.ready := rreq0(0).ready
@@ -215,7 +214,6 @@ class DPArrayTop(
     rreq1(i).valid := cLoadTaskSpilter.cmdURAM.valid &
       (cLoadTaskSpilter.cmdURAM.bits.pMajor >= fixedM.U) &
       (cLoadTaskSpilter.cmdURAM.bits.pMinor >= fixedN.U)
-    rresp1(i).ready := 1.B
   })
   cLoadTaskSpilter.cmdURAM.ready := rreq1(0).ready
   cLoadTaskSpilter.cmdBuffer.ready := rresp1(0).valid
