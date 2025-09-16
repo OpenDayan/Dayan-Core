@@ -23,6 +23,9 @@
     "DPArrayBufferAB": {
         "Package": "mat"
     },
+    "DPArrayBufferC": {
+        "Package": "mat"
+    },
     "FakeURAM": {
         "Package": "uram"
     },

@@ -65,21 +65,21 @@ class DPArrayBufferC(busWidth: Int, entries: Int, m: Int, n: Int, wE: Int, wF: I
   require(busWidth * maxBeat == (m * n * 4))
   // If busWidth > mn * k, means this is a Scale buffer;
   val extWe    = IO(Input(Bool()))
-  val extWAddr = IO(Input(UInt(ptrW.W)))
+  val extWAddr = IO(Input(UInt((ptrW + 1).W)))
   val extWBeat = IO(Input(UInt(beatW.W)))
   val extWData = IO(Input(Vec(busWidth, UInt(8.W))))
 
   val extRe    = IO(Input(Bool()))
-  val extRAddr = IO(Input(UInt(ptrW.W)))
+  val extRAddr = IO(Input(UInt((ptrW + 1).W)))
   val extRBeat = IO(Input(UInt(beatW.W)))
   val extRData = IO(Output(Vec(busWidth, UInt(8.W))))
 
   val cRe      = IO(Input(Bool()))
-  val cRAddr   = IO(Input(UInt(ptrW.W)))
+  val cRAddr   = IO(Input(UInt((ptrW + 1).W)))
   val cRData   = IO(Output(Vec(m, Vec(n, UInt((wE + wF).W)))))
 
   val cWe      = IO(Input(Bool()))
-  val cWAddr   = IO(Input(UInt(ptrW.W)))
+  val cWAddr   = IO(Input(UInt((ptrW + 1).W)))
   val cWData   = IO(Input(Vec(m, Vec(n, UInt((wE + wF).W)))))
 
   // Real cData
@@ -94,7 +94,7 @@ class DPArrayBufferC(busWidth: Int, entries: Int, m: Int, n: Int, wE: Int, wF: I
   val realExtRDataIFP = realExtRData.asTypeOf(Vec(m * n, UInt((wE + wF).W)))
   val realExtRDataFP32 = VecInit.tabulate(m * n)(i => {
     val cvt = Module(new FPRoundingModule(wE, wF, 0))
-    cvt.exp  := realExtRDataIFP(i)(wE + wF - 1, wF)
+    cvt.exp  := realExtRDataIFP(i)(wE + wF - 1, wF).asSInt
     cvt.frac := realExtRDataIFP(i)(     wF - 1,  0)
     cvt.fp
   })
@@ -107,7 +107,7 @@ class DPArrayBufferC(busWidth: Int, entries: Int, m: Int, n: Int, wE: Int, wF: I
   val realExtWData = VecInit.tabulate(m * n / maxBeat)(i => {
     val cvt = Module(new FPUnpackModule(wE, wF, 0))
     cvt.fp := extWDataFP32(i)
-    Cat(cvt.exp, cvt.frac)
+    Cat(cvt.exp, cvt.frac).asUInt
   })
 
   // Bank Selection Logic
@@ -156,6 +156,19 @@ object DPArrayBufferAB extends App {
       "-preserve-aggregate=vec",
       "--split-verilog",
       "-o=generated/DPArrayBufferAB"
+    )
+  )
+}
+
+object DPArrayBufferC extends App {
+  ChiselStage.emitSystemVerilog(
+    new DPArrayBufferC(256, 32, 16, 32, 9, 25),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/DPArrayBufferC"
     )
   )
 }

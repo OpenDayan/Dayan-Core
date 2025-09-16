@@ -56,9 +56,9 @@ class MatSubTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bu
 class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: Int, cN: Int, cK: Int) extends Module {
   require(cK >= cM & cK >= cN) // MatLoadCommand.wMNK Should be the Max(cM, cN, cK)
   val task = IO(Flipped(Decoupled(new MatTask(storageRatio, mnkWidth, addressWidth))))
-  val ldCmd = IO(Decoupled(new MatLoadCommand(storageRatio, mnkWidth, addressWidth, cK)))
+  val ldCmd = IO(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
   val calcCmd = IO(Decoupled(new MatCalcCommand(storageRatio)))
-  val stCmd = IO(Decoupled(new MatStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
+  val stCmd = IO(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
   val log2CM = log2Ceil(cM)
   val log2CN = log2Ceil(cN)
   val log2CK = log2Ceil(cK)
@@ -225,9 +225,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val lBCmdFinish = RegInit(Bool(), 1.B)
   val lCCmdFinish = RegInit(Bool(), 1.B)
   val lCmdLeft = RegInit(UInt(2.W), 0.U)
-  val lACmd = Wire(new MatLoadCommand(storageRatio, mnkWidth, addressWidth, cK))
-  val lBCmd = Wire(new MatLoadCommand(storageRatio, mnkWidth, addressWidth, cK))
-  val lCCmd = Wire(new MatLoadCommand(storageRatio, mnkWidth, addressWidth, cK))
+  val lACmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
+  val lBCmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
+  val lCCmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
   lACmd.ctrl := DPArrayStorageCmd.writeA
   lBCmd.ctrl := DPArrayStorageCmd.writeB
   lCCmd.ctrl := DPArrayStorageCmd.writeC
@@ -321,6 +321,8 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val sTask = sTaskQ.io.deq.bits
   stCmd.valid := sVld & sTask.cStore
   stCmd.bits.bank := sTask.cBank
+  stCmd.bits.lastLoad := 0.B
+  stCmd.bits.ctrl := DPArrayStorageCmd.writeC
   stCmd.bits.log2SDimMajor := sTask.log2SubM
   stCmd.bits.log2SDimMinor := sTask.log2SubN
   stCmd.bits.pMajor := sTask.pM

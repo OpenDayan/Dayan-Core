@@ -2,6 +2,7 @@ package mat
 
 import chisel3._
 import chisel3.util._
+import utils.pipe
 import _root_.circt.stage.ChiselStage
 
 class DPACalcMicroCommand(storageRatio: Int) extends Bundle {
@@ -26,7 +27,7 @@ class DPACalcMicroCommand(storageRatio: Int) extends Bundle {
 // K(pK) N(pN)
 
 // Directly Controlling Module for FP8BF16FusedDPUnit
-class DPArrayCalcTaskSpilt(storageRatio: Int) extends Module{
+class DPArrayCalcTaskSpilt(storageRatio: Int, cwLatency: Int) extends Module{
   val cmdIn = IO(Flipped(Decoupled(new MatCalcCommand(storageRatio))))
 
   val cmd = RegEnable(cmdIn.bits, cmdIn.fire)
@@ -118,11 +119,21 @@ class DPArrayCalcTaskSpilt(storageRatio: Int) extends Module{
   cmdOut.bits.aMatAddr := Cat(cmd.aBank.asUInt, (curM << cmd.log2SK) | curK)
   cmdOut.bits.bMatAddr := Cat(cmd.bBank.asUInt, (curN << cmd.log2SK) | curK)
   cmdOut.bits.cMatAddr := Cat(cmd.cBank.asUInt, (curM << cmd.log2SN) | curN)
+
+  // Completion Interface To Top Controller
+  val crComp = IO(Decoupled(Bool()))
+  val cwComp = IO(Decoupled(Bool()))
+  crComp.bits := 0.B
+  crComp.valid := busy & lastInst
+
+  val waitPipe = pipe.genPipe(busy & lastInst, cwLatency)
+  cwComp.bits := 0.B
+  cwComp.valid := waitPipe(cwLatency)
 }
 
 object DPArrayCalcTaskSpilt extends App {
   ChiselStage.emitSystemVerilog(
-    new DPArrayCalcTaskSpilt(32),
+    new DPArrayCalcTaskSpilt(32, 9),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",
