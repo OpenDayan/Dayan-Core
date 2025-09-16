@@ -22,7 +22,7 @@ static inline void mainLoop()
     dut->cmdIn_bits_lastLoadAB = 1;
     dut->cmdIn_bits_log2SDimMajor = 2;
     dut->cmdIn_bits_log2SDimMinor = 2;
-    dut->cmdIn_bits_pMajor = 63;
+    dut->cmdIn_bits_pMajor = 51;
     dut->cmdIn_bits_pMinor = 127;
     dut->cmdIn_bits_waitLoadC = 0;
 

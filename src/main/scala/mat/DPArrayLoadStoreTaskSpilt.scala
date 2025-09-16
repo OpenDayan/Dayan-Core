@@ -59,19 +59,13 @@ class DPArrayLoadStoreBeatHandler(
   val cmdBuffer = IO(Decoupled(new DPALoadStoreMicroCommand(storageRatio, maxBeat)))
   val cmdURAM = IO(Decoupled(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth, addressWidth, cMNK)))
 
-  val curBeatSize = if(abTask) {
-    Mux(cmdIn.bits.isBLoad, ((cN * cK / busWidth) - 1).U, ((cM * cK / busWidth) - 1).U)
-  } else {
-    ((cM * cN * 4 / busWidth) - 1).U
-  }
-
   val cmdQ = Queue(cmdIn)
 
   val cmd = RegEnable(cmdQ.bits, cmdQ.fire)
   val valid = RegInit(0.B)
   val firstBeat = Reg(Bool())
   val curLog2MajorSliceSize = if(abTask) {
-    Mux(cmdIn.bits.isBLoad, log2Ceil(cN / (cN * cK / busWidth)).U, log2Ceil(cM / (cM * cK / busWidth)).U)
+    Mux(cmdQ.bits.isBLoad, log2Ceil(cN / (cN * cK / busWidth)).U, log2Ceil(cM / (cM * cK / busWidth)).U)
   } else {
     log2Ceil(cM / (cM * cN * 4 / busWidth)).U
   }
@@ -83,7 +77,7 @@ class DPArrayLoadStoreBeatHandler(
   when(cmdQ.fire) {
     valid := 1.B
     firstBeat := 1.B
-    curBeat := cmdIn.bits.pMajor >> curLog2MajorSliceSize
+    curBeat := cmdQ.bits.pMajor >> curLog2MajorSliceSize
   }.elsewhen(bothReady) {
     curBeat := curBeat - 1.B
     firstBeat := 0.B
@@ -103,18 +97,18 @@ class DPArrayLoadStoreBeatHandler(
   when(firstBeat) {
     if(abTask) {
       cmdURAM.bits.pMajor := Mux(cmd.isBLoad,
-        cmd.pMajor(log2Ceil(cN) - 1 , 0),
-        cmd.pMajor(log2Ceil(cM) - 1 , 0))
+        cmd.pMajor(log2Ceil(cN / (cN * cK / busWidth)) - 1 , 0),
+        cmd.pMajor(log2Ceil(cM / (cM * cK / busWidth)) - 1 , 0))
     } else {
-      cmdURAM.bits.pMajor := cmd.pMajor(log2Ceil(cM) - 1 , 0)
+      cmdURAM.bits.pMajor := cmd.pMajor(log2Ceil(cM / (cM * cN * 4 / busWidth)) - 1 , 0)
     }
   }.otherwise {
     if(abTask) {
     cmdURAM.bits.pMajor := Mux(cmd.isBLoad,
-      (cN - 1).U,
-      (cM - 1).U)
+      (cN / (cN * cK / busWidth) - 1).U,
+      (cM / (cM * cK / busWidth) - 1).U)
     } else {
-      cmdURAM.bits.pMajor := (cM - 1).U
+      cmdURAM.bits.pMajor := (cM / (cM * cN * 4 / busWidth) - 1).U
     }
   }
 
