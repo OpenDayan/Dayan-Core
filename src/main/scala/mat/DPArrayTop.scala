@@ -283,7 +283,7 @@ object DPArrayTop extends App {
       "-strip-debug-info",
       "-preserve-aggregate=vec",
       "--split-verilog",
-      "-o=generated/DPArrayStorage"
+      "-o=generated/DPArrayTop"
     )
   )
 }
