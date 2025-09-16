@@ -9,7 +9,9 @@ class DPALoadStoreInnerCommand(storageRatio: Int, mnkWidth: Int, addressWidth: I
   val bank = Bool()
   val isBLoad = Bool()
   val lastLoad = Bool()
+  val waitLoadC = Bool()
   val baseUramAddr = UInt(addressWidth.W)
+  val majorStride  = UInt(addressWidth.W)
   val baseDimMajor = UInt(mnkWidth.W)
   val baseDimMinor = UInt(mnkWidth.W)
   val pMajor = UInt(log2Ceil(cMNK).W) // pM <= sM
@@ -19,12 +21,15 @@ class DPALoadStoreInnerCommand(storageRatio: Int, mnkWidth: Int, addressWidth: I
 
 class DPALoadStoreMicroCommand(storageRatio: Int, maxBeat: Int) extends Bundle {
   val bank = Bool()
+  val isBLoad = Bool()
   val beat = UInt(log2Ceil(maxBeat).W)
   val lastLoad = Bool()
+  val waitLoadC = Bool()
   val bufferAddr = UInt(log2Ceil(storageRatio).W)
 }
 class DPALoadStoreURAMMicroCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int) extends Bundle {
   val baseUramAddr = UInt(addressWidth.W)
+  val majorStride  = UInt(addressWidth.W)
   val baseDimMajor = UInt(mnkWidth.W)
   val baseDimMinor = UInt(mnkWidth.W)
   val pMajor = UInt(log2Ceil(cMNK).W) // pM <= sM
@@ -85,11 +90,14 @@ class DPArrayLoadStoreBeatHandler(
 
   cmdBuffer.valid := valid & cmdURAM.ready
   cmdBuffer.bits.bank := cmd.bank
+  cmdBuffer.bits.isBLoad := cmd.isBLoad
   cmdBuffer.bits.beat := curBeat
   cmdBuffer.bits.lastLoad := cmd.lastLoad & finish
+  cmdBuffer.bits.waitLoadC := cmd.waitLoadC
   cmdBuffer.bits.bufferAddr := cmd.bufferAddr
   cmdURAM.valid := valid & cmdBuffer.ready
   cmdURAM.bits.baseUramAddr := cmd.baseUramAddr
+  cmdURAM.bits.majorStride  := cmd.majorStride
   cmdURAM.bits.baseDimMajor := cmd.baseDimMajor + (curBeat << curLog2MajorSliceSize)
   cmdURAM.bits.baseDimMinor := cmd.baseDimMinor
   cmdURAM.bits.pMinor := cmd.pMinor
@@ -143,9 +151,11 @@ class DPArrayLoadStoreTaskSpilt(
   cmdIn.ready := !valid | (beatSpilt.cmdIn.ready & last)
 
   beatSpilt.cmdIn.bits.bank := cmd.bank
-  beatSpilt.cmdIn.bits.isBLoad := cmd.ctrl === DPArrayStorageCmd.writeB
+  beatSpilt.cmdIn.bits.isBLoad := cmd.ctrl === DPArrayStorageCmd.loadB
   beatSpilt.cmdIn.bits.lastLoad := (cmd.lastLoadAB | cTask.B) & last
+  beatSpilt.cmdIn.bits.waitLoadC := cmd.waitLoadC
   beatSpilt.cmdIn.bits.baseUramAddr := cmd.baseAddr
+  beatSpilt.cmdIn.bits.majorStride := cmd.majorStride
   beatSpilt.cmdIn.bits.baseDimMajor := cmd.baseDimMajor + curMajor
   beatSpilt.cmdIn.bits.baseDimMinor := cmd.baseDimMinor + curMinor
   beatSpilt.cmdIn.bits.pMajor := curMajorLeft
@@ -157,7 +167,7 @@ class DPArrayLoadStoreTaskSpilt(
     beatSpilt.cmdIn.bits.pMinor := (cK - 1).U
     beatSpilt.cmdIn.bits.bufferAddr :=
       curMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cK)) |
-        Mux(cmd.ctrl === DPArrayStorageCmd.writeA,
+        Mux(cmd.ctrl === DPArrayStorageCmd.loadA,
         (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cM)) << cmd.log2SDimMajor).asUInt,
         (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cN)) << cmd.log2SDimMajor).asUInt)
   }
@@ -165,11 +175,11 @@ class DPArrayLoadStoreTaskSpilt(
   when(cmdIn.fire) {
     valid := 1.B
     if(abTask) {
-      curMajor := Mux(cmdIn.bits.ctrl === DPArrayStorageCmd.writeA,
+      curMajor := Mux(cmdIn.bits.ctrl === DPArrayStorageCmd.loadA,
         Cat(cmdIn.bits.pMajor(log2Ceil(storageRatio * cMNK) - 1 , log2Ceil(cM)), 0.U(log2Ceil(cM).W)),
         Cat(cmdIn.bits.pMajor(log2Ceil(storageRatio * cMNK) - 1 , log2Ceil(cN)), 0.U(log2Ceil(cN).W))
       )
-      curMajorLeft := Mux(cmdIn.bits.ctrl === DPArrayStorageCmd.writeA,
+      curMajorLeft := Mux(cmdIn.bits.ctrl === DPArrayStorageCmd.loadA,
         cmdIn.bits.pMajor(log2Ceil(cM) - 1 , 0),
         cmdIn.bits.pMajor(log2Ceil(cN) - 1 , 0)
       )
@@ -182,9 +192,9 @@ class DPArrayLoadStoreTaskSpilt(
   }.elsewhen(beatSpilt.cmdIn.fire) {
     when(lastMinor) {
       if(abTask) {
-        curMajor := curMajor - Mux(cmd.ctrl === DPArrayStorageCmd.writeA, cM.U, cN.U)
+        curMajor := curMajor - Mux(cmd.ctrl === DPArrayStorageCmd.loadA, cM.U, cN.U)
         curMinor := Cat(cmd.pMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cK)), 0.U(log2Ceil(cK).W))
-        curMajorLeft := Mux(cmd.ctrl === DPArrayStorageCmd.writeA, (cM - 1).U, (cN - 1).U)
+        curMajorLeft := Mux(cmd.ctrl === DPArrayStorageCmd.loadA, (cM - 1).U, (cN - 1).U)
       } else {
         curMajor := curMajor - cM.U
         curMinor := Cat(cmd.pMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cN)), 0.U(log2Ceil(cN).W))

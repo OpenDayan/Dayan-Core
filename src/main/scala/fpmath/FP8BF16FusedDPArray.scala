@@ -130,6 +130,7 @@ debugFP32Output: Boolean = false
     core
   }))
   // reduce start in s4 stage, end in r0 stage, s4 -> r0 -- reduceCoreLatency
+  val r0Latency = 4 + reduceCore0(0)(0).latency
   val rpipe_exp = pipe.genPipe(s4_exp, reduceCore0(0)(0).latency)
 
   val r0_exp = rpipe_exp(reduceCore0(0)(0).latency)
@@ -138,7 +139,7 @@ debugFP32Output: Boolean = false
 
   // Add CIN
   // TODO Note: cin_fwd is NOT USED~
-  val r0_cin_fwd = IO(Input(Bool()))                          // Use r2_cout directly as r0_cin
+//  val r0_cin_fwd = IO(Input(Bool()))                          // Use r2_cout directly as r0_cin
   val r0_cin_exp_in = IO(Input(Vec(M, Vec(N, SInt(wE.W)))))   // Bias == 0
   val r0_cin_frac_in = IO(Input(Vec(M, Vec(N, SInt(wF.W)))))  // S1.(wF-1)
 

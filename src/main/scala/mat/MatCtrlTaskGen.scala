@@ -7,8 +7,11 @@ import _root_.circt.stage.ChiselStage
 class MatTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bundle {
   val bf16 = Bool()
   val aBaseAddr = UInt(addressWidth.W)
+  val aStride   = UInt(addressWidth.W)
   val bBaseAddr = UInt(addressWidth.W)
+  val bStride   = UInt(addressWidth.W)
   val cBaseAddr = UInt(addressWidth.W)
+  val cStride   = UInt(addressWidth.W)
   val taskM = UInt(mnkWidth.W)
   val taskN = UInt(mnkWidth.W)
   val taskK = UInt(mnkWidth.W)
@@ -24,8 +27,11 @@ class MatTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bundl
 class MatSubTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bundle {
   val bf16 = Bool()
   val aBaseAddr = UInt(addressWidth.W)
+  val aStride   = UInt(addressWidth.W)
   val bBaseAddr = UInt(addressWidth.W)
+  val bStride   = UInt(addressWidth.W)
   val cBaseAddr = UInt(addressWidth.W)
+  val cStride   = UInt(addressWidth.W)
   val lastSubTask = Bool()
   val subM = UInt(mnkWidth.W) // 子任务起点
   val subN = UInt(mnkWidth.W)
@@ -150,8 +156,11 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   lTaskQ.io.enq.valid := spTaskBusy
   lTaskQ.io.enq.bits.bf16 := spTask.bf16
   lTaskQ.io.enq.bits.aBaseAddr := spTask.aBaseAddr
+  lTaskQ.io.enq.bits.aStride   := spTask.aStride
   lTaskQ.io.enq.bits.bBaseAddr := spTask.bBaseAddr
+  lTaskQ.io.enq.bits.bStride   := spTask.bStride
   lTaskQ.io.enq.bits.cBaseAddr := spTask.cBaseAddr
+  lTaskQ.io.enq.bits.cStride   := spTask.cStride
   lTaskQ.io.enq.bits.lastSubTask := spLastTask
   lTaskQ.io.enq.bits.subM := (spCurMp1 >> (spTask.log2SubM + log2CM.U)) << (spTask.log2SubM + log2CM.U)
   lTaskQ.io.enq.bits.subN := (spCurNp1 >> (spTask.log2SubN + log2CN.U)) << (spTask.log2SubN + log2CN.U)
@@ -228,12 +237,15 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val lACmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
   val lBCmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
   val lCCmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
-  lACmd.ctrl := DPArrayStorageCmd.writeA
-  lBCmd.ctrl := DPArrayStorageCmd.writeB
-  lCCmd.ctrl := DPArrayStorageCmd.writeC
+  lACmd.ctrl := DPArrayStorageCmd.loadA
+  lBCmd.ctrl := DPArrayStorageCmd.loadB
+  lCCmd.ctrl := DPArrayStorageCmd.loadC
   lACmd.baseAddr := lTask.aBaseAddr
+  lACmd.majorStride := lTask.aStride
   lBCmd.baseAddr := lTask.bBaseAddr
+  lBCmd.majorStride := lTask.bStride
   lCCmd.baseAddr := lTask.cBaseAddr
+  lCCmd.majorStride := lTask.cStride
   lACmd.bank := lTask.aBank
   lBCmd.bank := lTask.bBank
   lCCmd.bank := lTask.cBank
@@ -326,12 +338,13 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   stCmd.bits.bank := sTask.cBank
   stCmd.bits.lastLoadAB := 0.B
   stCmd.bits.waitLoadC := 0.B
-  stCmd.bits.ctrl := DPArrayStorageCmd.writeC
+  stCmd.bits.ctrl := DPArrayStorageCmd.loadC
   stCmd.bits.log2SDimMajor := sTask.log2SubM
   stCmd.bits.log2SDimMinor := sTask.log2SubN
   stCmd.bits.pMajor := sTask.pM
   stCmd.bits.pMinor := sTask.pN
-  stCmd.bits.baseAddr := sTask.cBaseAddr
+  stCmd.bits.baseAddr     := sTask.cBaseAddr
+  stCmd.bits.majorStride  := sTask.cStride
   stCmd.bits.baseDimMajor := sTask.subM
   stCmd.bits.baseDimMinor := sTask.subN
   fTaskQ.io.enq.valid := sVld

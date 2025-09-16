@@ -34,5 +34,8 @@
     },
     "DPArrayLoadStoreTaskSpilt": {
         "Package": "mat"
+    },
+    "DPArrayTop": {
+        "Package": "mat"
     }
 }

@@ -99,7 +99,7 @@ class DPArrayStorageOld(cM: Int, cN: Int, cK: Int, qK: Int, busWidth: Int, cinLa
   cMatReadAddr := VecInit.tabulate(2)(i => extMatRAddr(4, 0))
   cMatWriteAddr := VecInit.tabulate(2)(i => extMatAddr(4, 0))
   cMatWriteMask := VecInit.tabulate(2)(i => VecInit.tabulate(cBeat)(round => {
-    extMatValid & extMatReqType === DPArrayStorageCmd.writeC & round.U === extMatBeatPtr
+    extMatValid & extMatReqType === DPArrayStorageCmd.loadC & round.U === extMatBeatPtr
   }))
   cMatWriteData := VecInit.tabulate(2)(i => VecInit.tabulate(cBeat)(j => VecInit.tabulate(busWidth / 4)(k =>
     Cat(extMatWData(4 * k + 3),extMatWData(4 * k + 2),extMatWData(4 * k + 1),extMatWData(4 * k + 0)))))
@@ -122,23 +122,23 @@ class DPArrayStorageOld(cM: Int, cN: Int, cK: Int, qK: Int, busWidth: Int, cinLa
   aMem.write(extMatAddr(4, 0), VecInit.tabulate(aBeat * 2)
     (i => extMatWData.asUInt(((i % 2) + 1) * busWidth / 2 - 1, (i % 2) * busWidth / 2)),
     VecInit.tabulate(aBeat * 2)(round =>
-    extMatValid & extMatReqType === DPArrayStorageCmd.writeA & (round / 2).U === extMatBeatPtr
+    extMatValid & extMatReqType === DPArrayStorageCmd.loadA & (round / 2).U === extMatBeatPtr
   ))
 
   val bReadRaw = RegNext(bMem.read(calcBMatAddr(4, 0)).asTypeOf(Vec(bBeat, Vec(busWidth, UInt(8.W)))))
   bMem.write(extMatAddr(4, 0), VecInit.tabulate(bBeat * 2)
     (i => extMatWData.asUInt(((i % 2) + 1) * busWidth / 2 - 1, (i % 2) * busWidth / 2)),
     VecInit.tabulate(bBeat * 2)(round =>
-    extMatValid & extMatReqType === DPArrayStorageCmd.writeB & (round / 2).U === extMatBeatPtr
+    extMatValid & extMatReqType === DPArrayStorageCmd.loadB & (round / 2).U === extMatBeatPtr
   ))
 
   val aScaleReadRaw = RegNext(aScaleMem.read(calcAMatAddr(4, 0)).asTypeOf(Vec(cM * cK / qK, UInt(8.W))))
-  when(extMatValid & extMatReqType === DPArrayStorageCmd.writeA) {
+  when(extMatValid & extMatReqType === DPArrayStorageCmd.loadA) {
     aScaleMem.write(extMatAddr(4, 0), extMatWData.asUInt)
   }
 
   val bScaleReadRaw = RegNext(bScaleMem.read(calcBMatAddr(4, 0)).asTypeOf(Vec(cN * cK / qK, UInt(8.W))))
-  when(extMatValid & extMatReqType === DPArrayStorageCmd.writeB) {
+  when(extMatValid & extMatReqType === DPArrayStorageCmd.loadB) {
     bScaleMem.write(extMatAddr(4, 0), extMatWData.asUInt)
   }
 
