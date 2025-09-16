@@ -31,5 +31,8 @@
     },
     "MatCtrlTaskGen": {
         "Package": "mat"
+    },
+    "DPArrayLoadStoreTaskSpilt": {
+        "Package": "mat"
     }
 }

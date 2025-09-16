@@ -47,7 +47,7 @@ static inline void mainLoop()
     }
     // Delay Simulate
     calcRdDelaySim.push(dut->calcCmd_valid);
-    ldDelaySim.push(dut->ldCmd_valid & dut->ldCmd_bits_lastLoad);
+    ldDelaySim.push(dut->ldCmd_valid && ((dut->ldCmd_bits_lastLoadAB && !dut->ldCmd_bits_waitLoadC) | (dut->ldCmd_bits_ctrl == 2)));
     stDelaySim.push(dut->stCmd_valid);
     if(dut->ldCmd_valid && dut->ldCmd_bits_ctrl == 0) {
         printf("Load A%d[%d:%d, %d:%d]\n", dut->ldCmd_bits_bank,
@@ -61,7 +61,7 @@ static inline void mainLoop()
             dut->ldCmd_bits_baseDimMinor, dut->ldCmd_bits_baseDimMinor + dut->ldCmd_bits_pMinor
     );
     }
-    if(dut->ldCmd_valid && dut->ldCmd_bits_ctrl == 4) {
+    if(dut->ldCmd_valid && dut->ldCmd_bits_ctrl == 2) {
         printf("Load C%d[%d:%d, %d:%d]\n", dut->ldCmd_bits_bank,
             dut->ldCmd_bits_baseDimMajor, dut->ldCmd_bits_baseDimMajor + dut->ldCmd_bits_pMajor,
             dut->ldCmd_bits_baseDimMinor, dut->ldCmd_bits_baseDimMinor + dut->ldCmd_bits_pMinor

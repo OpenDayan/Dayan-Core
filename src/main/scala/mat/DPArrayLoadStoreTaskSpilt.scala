@@ -5,15 +5,30 @@ import chisel3.util._
 import _root_.circt.stage.ChiselStage
 import uram.AdvURAMReq
 
-class DPALoadStoreInnerCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMajor: Int, cMinor: Int) extends Bundle {
+class DPALoadStoreInnerCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int) extends Bundle {
   val bank = Bool()
+  val isBLoad = Bool()
   val lastLoad = Bool()
   val baseUramAddr = UInt(addressWidth.W)
   val baseDimMajor = UInt(mnkWidth.W)
   val baseDimMinor = UInt(mnkWidth.W)
-  val pMajor = UInt(log2Ceil(cMajor).W) // pM <= sM
-  val pMinor = UInt(log2Ceil(cMinor).W) // pN <= sN
+  val pMajor = UInt(log2Ceil(cMNK).W) // pM <= sM
+  val pMinor = UInt(log2Ceil(cMNK).W) // pN <= sN
   val bufferAddr = UInt(log2Ceil(storageRatio).W)
+}
+
+class DPALoadStoreMicroCommand(storageRatio: Int, maxBeat: Int) extends Bundle {
+  val bank = Bool()
+  val beat = UInt(log2Ceil(maxBeat).W)
+  val lastLoad = Bool()
+  val bufferAddr = UInt(log2Ceil(storageRatio).W)
+}
+class DPALoadStoreURAMMicroCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int) extends Bundle {
+  val baseUramAddr = UInt(addressWidth.W)
+  val baseDimMajor = UInt(mnkWidth.W)
+  val baseDimMinor = UInt(mnkWidth.W)
+  val pMajor = UInt(log2Ceil(cMNK).W) // pM <= sM
+  val pMinor = UInt(log2Ceil(cMNK).W) // pN <= sN
 }
 
 // Mat RAM Shape -> Address
@@ -29,94 +44,179 @@ class DPALoadStoreInnerCommand(storageRatio: Int, mnkWidth: Int, addressWidth: I
 */
 
 // cMajor == 32, cMinor == 8 / 16
-
-class DPArrayLoadStoreTaskSpilt(
+class DPArrayLoadStoreBeatHandler(
   storageRatio: Int, busWidth: Int, mnkWidth: Int,
-  addressWidth: Int, cMNK: Int, cMajor: Int, cMinor: Int,
-  storeTask: Boolean
-) extends Module {
-  val ports = busWidth / 8
-  val cmdIn = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
-
-  // URAM Request Interface
-  val uramReq = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-
-  // cmdOut to DPArrayBuffer
-  val cmdOut = IO(Decoupled(new DPALoadStoreInnerCommand(storageRatio, mnkWidth, addressWidth, cMajor, cMinor)))
-
-  val cmd = RegEnable(cmdIn.bits, cmdIn.fire)
-  val cmdValid = RegInit(0.B)
-
-  // Aligned Major/Minor Shift
-  val alignMajor = Reg(UInt(log2Ceil(storageRatio).W))
-  val alignMinor = Reg(UInt(log2Ceil(storageRatio).W))
-  val minorLeft = Reg(UInt(log2Ceil(ma).W))
-  val lastAlignMajor = alignMajor === 0.U
-  val lastAlignMinor = alignMinor === 0.U
-  val cmdNextFinish = lastAlignMinor & lastAlignMajor & cmdOut.ready
-  cmdIn.ready := cmdNextFinish | !cmdValid
-
-  when(cmdIn.fire) {
-    cmdValid := 1.B
-  }.elsewhen(cmdNextFinish) {
-    cmdValid := 0.B
+  addressWidth: Int, cMNK: Int, cM: Int, cN: Int, cK: Int,
+  abTask: Boolean, cTask: Boolean, storeTask: Boolean) extends Module {
+  val maxTileSize = if(abTask) {
+    math.max(cM, cN) * cK
+  } else {
+    cM * cN * 4
   }
+  val maxBeat = maxTileSize / busWidth
+  require(maxBeat * busWidth == maxTileSize)
+  val cmdIn = IO(Flipped(Decoupled(new DPALoadStoreInnerCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
+  val cmdBuffer = IO(Decoupled(new DPALoadStoreMicroCommand(storageRatio, maxBeat)))
+  val cmdURAM = IO(Decoupled(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth, addressWidth, cMNK)))
 
-  // pMajor must be Already Aligned to cMajor
-  chisel3.assert(cmdIn.bits.pMajor(log2Ceil(cMajor) - 1, 0) === (cMajor - 1).U)
-  when(cmdIn.fire) {
-    alignMajor := cmdIn.bits.pMajor(log2Ceil(storageRatio * cMajor) - 1, log2Ceil(cMajor))
-    alignMinor := cmdIn.bits.pMinor(log2Ceil(storageRatio * cMinor) - 1, log2Ceil(cMinor))
-    minorLeft  := cmdIn.bits.pMinor(log2Ceil(cMinor) - 1, 0)
-  }.elsewhen(cmdOut.fire) {
-    when(lastAlignMajor) {
-      alignMajor := cmdIn.bits.pMajor(log2Ceil(storageRatio * cMajor) - 1, log2Ceil(cMajor))
-      alignMinor := alignMinor(log2Ceil(storageRatio * cMinor) - 1, log2Ceil(cMinor)) - 1.U
-      minorLeft  := (cMinor - 1).U
-    }.otherwise {
-      alignMajor := alignMajor(log2Ceil(storageRatio * cMajor) - 1, log2Ceil(cMajor)) - 1.U
-    }
+  val curBeatSize = if(abTask) {
+    Mux(cmdIn.bits.isBLoad, ((cN * cK / busWidth) - 1).U, ((cM * cK / busWidth) - 1).U)
+  } else {
+    ((cM * cN * 4 / busWidth) - 1).U
   }
-
-  cmdOut.valid := cmdValid
-  cmdOut.bits.bank := cmd.bank
-  cmdOut.bits.baseUramAddr := cmd.baseAddr
-  cmdOut.bits.baseDimMajor := Cat(alignMajor, 0.U(log2Ceil(cMajor).W)) + cmd.baseDimMajor
-  cmdOut.bits.baseDimMinor := Cat(alignMinor, 0.U(log2Ceil(cMinor).W)) + cmd.baseDimMinor
-  cmdOut.bits.pMajor := (cMajor - 1).U
-  cmdOut.bits.pMinor := minorLeft
-  cmdOut.bits.bufferAddr := alignMajor | (alignMinor << cmd.log2SDimMajor).asUInt
-
-}
-
-class DPALoadStoreMicroCommand(storageRatio: Int) extends Bundle {
-  val bank = Bool()
-  val lastLoad = Bool()
-  val bufferAddr = UInt(log2Ceil(storageRatio).W)
-}
-
-class DPArrayLoadStoreExec(
-  storageRatio: Int, busWidth: Int, mnkWidth: Int,
-  addressWidth: Int, cMNK: Int, cMajor: Int, cMinor: Int,
-  storeTask: Boolean) extends Module {
-  val ports = busWidth / 8
-  val elemWidth = if(storeTask) 4 else 1
-  val cmdIn = IO(Flipped(Decoupled(new DPALoadStoreInnerCommand(storageRatio, mnkWidth, addressWidth, cMajor, cMinor))))
 
   val cmdQ = Queue(cmdIn)
 
-  // URAM Address Computation Logic
-  val uramAddr = VecInit.tabulate(cMinor, cMajor / elemWidth)((minor, major) => {
-
-  })
-
-  // URAM Request Interface
-  val uramReq = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-
-  if(storeTask) {
-
+  val cmd = RegEnable(cmdQ.bits, cmdQ.fire)
+  val valid = RegInit(0.B)
+  val firstBeat = Reg(Bool())
+  val curLog2MajorSliceSize = if(abTask) {
+    Mux(cmdIn.bits.isBLoad, log2Ceil(cN / (cN * cK / busWidth)).U, log2Ceil(cM / (cM * cK / busWidth)).U)
   } else {
+    log2Ceil(cM / (cM * cN * 4 / busWidth)).U
+  }
+  val curBeat = Reg(UInt(log2Ceil(maxBeat).W))
+  val finish = curBeat === 0.U
+  val bothReady = cmdBuffer.ready & cmdURAM.ready
+  cmdQ.ready := (bothReady & finish) | !valid
 
+  when(cmdQ.fire) {
+    valid := 1.B
+    firstBeat := 1.B
+    curBeat := cmdIn.bits.pMajor >> curLog2MajorSliceSize
+  }.elsewhen(bothReady) {
+    curBeat := curBeat - 1.B
+    firstBeat := 0.B
   }
 
+  cmdBuffer.valid := valid & cmdURAM.ready
+  cmdBuffer.bits.bank := cmd.bank
+  cmdBuffer.bits.beat := curBeat
+  cmdBuffer.bits.lastLoad := cmd.lastLoad & finish
+  cmdBuffer.bits.bufferAddr := cmd.bufferAddr
+  cmdURAM.valid := valid & cmdBuffer.ready
+  cmdURAM.bits.baseUramAddr := cmd.baseUramAddr
+  cmdURAM.bits.baseDimMajor := cmd.baseDimMajor + (curBeat << curLog2MajorSliceSize)
+  cmdURAM.bits.baseDimMinor := cmd.baseDimMinor
+  cmdURAM.bits.pMinor := cmd.pMinor
+
+  when(firstBeat) {
+    if(abTask) {
+      cmdURAM.bits.pMajor := Mux(cmd.isBLoad,
+        cmd.pMajor(log2Ceil(cN) - 1 , 0),
+        cmd.pMajor(log2Ceil(cM) - 1 , 0))
+    } else {
+      cmdURAM.bits.pMajor := cmd.pMajor(log2Ceil(cM) - 1 , 0)
+    }
+  }.otherwise {
+    if(abTask) {
+    cmdURAM.bits.pMajor := Mux(cmd.isBLoad,
+      (cN - 1).U,
+      (cM - 1).U)
+    } else {
+      cmdURAM.bits.pMajor := (cM - 1).U
+    }
+  }
+
+}
+
+class DPArrayLoadStoreTaskSpilt(
+  storageRatio: Int, busWidth: Int, mnkWidth: Int,
+  addressWidth: Int, cMNK: Int, cM: Int, cN: Int, cK: Int,
+  abTask: Boolean, cTask: Boolean, storeTask: Boolean
+) extends Module {
+  val cmdIn = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
+  val valid = RegInit(0.B)
+  val cmd = RegEnable(cmdIn.bits, cmdIn.fire)
+  val beatSpilt = Module(new DPArrayLoadStoreBeatHandler(
+    storageRatio, busWidth, mnkWidth, addressWidth, cMNK, cM, cN, cK, abTask, cTask, storeTask))
+
+  val cmdBuffer = IO(Decoupled(new DPALoadStoreMicroCommand(storageRatio, beatSpilt.maxBeat)))
+  val cmdURAM = IO(Decoupled(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth, addressWidth, cMNK)))
+
+  cmdBuffer :<>= beatSpilt.cmdBuffer
+  cmdURAM :<>= beatSpilt.cmdURAM
+
+  val curMajor = Reg(UInt(log2Ceil(storageRatio * cMNK).W)) // Element Count
+  val curMajorLeft = Reg(UInt(log2Ceil(cMNK).W))
+  val curMinor = Reg(UInt(log2Ceil(storageRatio * cMNK).W)) // Element Count
+  val lastMajor = curMajor === 0.U
+  val lastMinor = curMinor === 0.U
+  val last = lastMajor & lastMinor
+
+  beatSpilt.cmdIn.valid := valid
+
+  cmdIn.ready := !valid | (beatSpilt.cmdIn.ready & last)
+
+  beatSpilt.cmdIn.bits.bank := cmd.bank
+  beatSpilt.cmdIn.bits.isBLoad := cmd.ctrl === DPArrayStorageCmd.writeB
+  beatSpilt.cmdIn.bits.lastLoad := (cmd.lastLoadAB | cTask.B) & last
+  beatSpilt.cmdIn.bits.baseUramAddr := cmd.baseAddr
+  beatSpilt.cmdIn.bits.baseDimMajor := cmd.baseDimMajor + curMajor
+  beatSpilt.cmdIn.bits.baseDimMinor := cmd.baseDimMinor + curMinor
+  beatSpilt.cmdIn.bits.pMajor := curMajorLeft
+  if(cTask) {
+    beatSpilt.cmdIn.bits.pMinor := (cN - 1).U
+    beatSpilt.cmdIn.bits.bufferAddr := curMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cN)) |
+      (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cM)) << cmd.log2SDimMajor).asUInt
+  } else {
+    beatSpilt.cmdIn.bits.pMinor := (cK - 1).U
+    beatSpilt.cmdIn.bits.bufferAddr :=
+      curMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cK)) |
+        Mux(cmd.ctrl === DPArrayStorageCmd.writeA,
+        (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cM)) << cmd.log2SDimMajor).asUInt,
+        (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cN)) << cmd.log2SDimMajor).asUInt)
+  }
+
+  when(cmdIn.fire) {
+    valid := 1.B
+    if(abTask) {
+      curMajor := Mux(cmdIn.bits.ctrl === DPArrayStorageCmd.writeA,
+        Cat(cmdIn.bits.pMajor(log2Ceil(storageRatio * cMNK) - 1 , log2Ceil(cM)), 0.U(log2Ceil(cM).W)),
+        Cat(cmdIn.bits.pMajor(log2Ceil(storageRatio * cMNK) - 1 , log2Ceil(cN)), 0.U(log2Ceil(cN).W))
+      )
+      curMajorLeft := Mux(cmdIn.bits.ctrl === DPArrayStorageCmd.writeA,
+        cmdIn.bits.pMajor(log2Ceil(cM) - 1 , 0),
+        cmdIn.bits.pMajor(log2Ceil(cN) - 1 , 0)
+      )
+      curMinor := Cat(cmdIn.bits.pMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cK)), 0.U(log2Ceil(cK).W))
+    } else {
+      curMajor := Cat(cmdIn.bits.pMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cM)), 0.U(log2Ceil(cM).W))
+      curMajorLeft := cmdIn.bits.pMajor(log2Ceil(cM) - 1 , 0)
+      curMinor := Cat(cmdIn.bits.pMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cN)), 0.U(log2Ceil(cN).W))
+    }
+  }.elsewhen(beatSpilt.cmdIn.fire) {
+    when(lastMinor) {
+      if(abTask) {
+        curMajor := curMajor - Mux(cmd.ctrl === DPArrayStorageCmd.writeA, cM.U, cN.U)
+        curMinor := Cat(cmd.pMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cK)), 0.U(log2Ceil(cK).W))
+        curMajorLeft := Mux(cmd.ctrl === DPArrayStorageCmd.writeA, (cM - 1).U, (cN - 1).U)
+      } else {
+        curMajor := curMajor - cM.U
+        curMinor := Cat(cmd.pMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cN)), 0.U(log2Ceil(cN).W))
+        curMajorLeft := (cM - 1).U
+      }
+    }.otherwise {
+      if(abTask) {
+        curMinor := curMinor - cK.U
+      } else {
+        curMinor := curMinor - cN.U
+      }
+    }
+  }
+}
+
+object DPArrayLoadStoreTaskSpilt extends App {
+  ChiselStage.emitSystemVerilog(
+    new DPArrayLoadStoreTaskSpilt(
+      32, 256, 12, 20, 32, 16, 8, 32, true, false, false
+    ),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/DPArrayLoadStoreTaskSpilt"
+    )
+  )
 }

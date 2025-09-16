@@ -237,9 +237,12 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   lACmd.bank := lTask.aBank
   lBCmd.bank := lTask.bBank
   lCCmd.bank := lTask.cBank
-  lACmd.lastLoad := 0.B
-  lBCmd.lastLoad := !lTask.cLoad
-  lCCmd.lastLoad := lTask.cLoad
+  lACmd.lastLoadAB := !lTask.bLoad
+  lACmd.waitLoadC := lTask.cLoad
+  lBCmd.lastLoadAB := 1.B
+  lBCmd.waitLoadC := lTask.cLoad
+  lCCmd.lastLoadAB := 0.B
+  lCCmd.waitLoadC := 0.B
   lACmd.pMajor := lTask.pM
   lACmd.pMinor := lTask.pK
   lBCmd.pMajor := lTask.pN
@@ -321,7 +324,8 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val sTask = sTaskQ.io.deq.bits
   stCmd.valid := sVld & sTask.cStore
   stCmd.bits.bank := sTask.cBank
-  stCmd.bits.lastLoad := 0.B
+  stCmd.bits.lastLoadAB := 0.B
+  stCmd.bits.waitLoadC := 0.B
   stCmd.bits.ctrl := DPArrayStorageCmd.writeC
   stCmd.bits.log2SDimMajor := sTask.log2SubM
   stCmd.bits.log2SDimMinor := sTask.log2SubN

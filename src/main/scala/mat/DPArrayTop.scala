@@ -37,15 +37,16 @@ class MatCalcCommand(storageRatio: Int) extends Bundle {
 class MatLoadStoreCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int) extends Bundle {
   // Compute Mode
   val bank = Bool()
-  val lastLoad = Bool() // Need Completion, Last Load Command In a Sub-Task.
+  val lastLoadAB = Bool()  // Need Completion, Last Load Command In A/B
+  val waitLoadC  = Bool()  // Completion need to wait C Completion or not
   val ctrl = DPArrayStorageCmd()
   // Storage Shape
   // 0 -> 1, 1 -> 2, 2 -> 4, 3 -> 8, 4 -> 16, 5 -> 32
   val log2SDimMajor = UInt(log2Ceil(1+log2Ceil(storageRatio)).W)
   val log2SDimMinor = UInt(log2Ceil(1+log2Ceil(storageRatio)).W)
   // Problem Shape
-  val pMajor = UInt(log2Ceil(storageRatio * cMNK).W) // pM <= sM
-  val pMinor = UInt(log2Ceil(storageRatio * cMNK).W) // pN <= sN
+  val pMajor = UInt(log2Ceil(storageRatio * cMNK).W) // pM / pN
+  val pMinor = UInt(log2Ceil(storageRatio * cMNK).W) //      pK
 
   // Address Information
   val baseAddr = UInt(addressWidth.W)
