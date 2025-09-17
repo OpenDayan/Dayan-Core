@@ -130,7 +130,7 @@ debugFP32Output: Boolean = false
     core
   }))
   // reduce start in s4 stage, end in r0 stage, s4 -> r0 -- reduceCoreLatency
-  val r0Latency = 4 + reduceCore0(0)(0).latency
+  val r0Latency = 2 + 4 + reduceCore0(0)(0).latency
   val rpipe_exp = pipe.genPipe(s4_exp, reduceCore0(0)(0).latency)
 
   val r0_exp = rpipe_exp(reduceCore0(0)(0).latency)

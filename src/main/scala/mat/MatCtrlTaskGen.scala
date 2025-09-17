@@ -223,6 +223,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   // Load Pipeline
   // Receive: Spilt Task Request and Compute Read Completion
   // Issuing: Load Command and Compute Request
+  // TODO: Spilt LoadAB and LoadC
   val lFinish = Wire(Bool())
   lTaskQ.io.deq.ready := crCompQ.io.deq.valid & lFinish
   crCompQ.io.deq.ready := lTaskQ.io.deq.valid & lFinish
@@ -280,11 +281,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
     lCCmdFinish := !lTaskQ.io.deq.bits.cLoad
     lCmdLeft := lTaskQ.io.deq.bits.loadCnt
   }.otherwise {
-//    when(ldCmd.ready) { // Never Stalling
       when(!lACmdFinish)        { lACmdFinish := 1.B }
         .elsewhen(!lBCmdFinish) { lBCmdFinish := 1.B }
         .otherwise              { lCCmdFinish := lCCmdFinish | sCompQ4L.io.deq.valid }
-//    }
     lCmdLeft := lCmdLeft - ldCmd.fire.asUInt
   }
   // Should not fire unused ldCmd

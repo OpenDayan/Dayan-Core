@@ -180,7 +180,7 @@ class DPArrayTop(
     val mn = fixedMN.U + abLoadTaskSpilter.cmdURAM.bits.baseDimMajor // 对应行起始
     val k =  fixedK.U + abLoadTaskSpilter.cmdURAM.bits.baseDimMinor  // 对应列起始
     // 对应偏移
-    val addr = mn * abLoadTaskSpilter.cmdURAM.bits.majorStride + k
+    val addr = mn * abLoadTaskSpilter.cmdURAM.bits.majorStride + k + abLoadTaskSpilter.cmdURAM.bits.baseUramAddr
     // Swizzling 逻辑
     // 开始连线
     rreq0(i).bits.id := 0.U
@@ -207,7 +207,7 @@ class DPArrayTop(
     val m = fixedM.U + cLoadTaskSpilter.cmdURAM.bits.baseDimMajor // 对应行起始
     val n = fixedN.U + cLoadTaskSpilter.cmdURAM.bits.baseDimMinor // 对应列起始
     // 对应偏移
-    val addr = m * cLoadTaskSpilter.cmdURAM.bits.majorStride + n
+    val addr = m * cLoadTaskSpilter.cmdURAM.bits.majorStride + n + cLoadTaskSpilter.cmdURAM.bits.baseUramAddr
     // Swizzling 逻辑
     // 开始连线
     rreq1(i).bits.id := 0.U
@@ -229,7 +229,7 @@ class DPArrayTop(
     val m = fixedM.U + cStoreURAMReq.bits.baseDimMajor // 对应行起始
     val n = fixedN.U + cStoreURAMReq.bits.baseDimMinor // 对应列起始
     // 对应偏移
-    val addr = m * cStoreURAMReq.bits.majorStride + n
+    val addr = m * cStoreURAMReq.bits.majorStride + n + cStoreURAMReq.bits.baseUramAddr
     // Swizzling 逻辑
     // 开始连线
     wreq(i).bits.id := 0.U

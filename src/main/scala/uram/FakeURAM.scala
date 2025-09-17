@@ -22,10 +22,10 @@ class FakeURAM(ports: Int, addrWidth: Int, idWidth: Int, dataWidth: Int) extends
     core.io.id := i.U
     core.io.re := rreq_i(i).valid
     rreq_i(i).ready := 1.B
-    core.io.raddr := rreq_i(i).bits.address
+    core.io.raddr := rreq_i(i).bits.address >> 3
     core.io.we := wreq_i(i).valid
     wreq_i(i).ready := 1.B
-    core.io.waddr := wreq_i(i).bits.address
+    core.io.waddr := wreq_i(i).bits.address >> 3
     core.io.wdata := wdata_i(i)
 
     // rdata is one beat after re.

@@ -5,7 +5,8 @@
 #include "VMatTestTop.h"
 #include <vector>
 #include <queue>
-#define MAX_SIM_TIME 1000
+#include "fputils.hpp"
+#define MAX_SIM_TIME 50000
 VerilatedContext *contextp;
 VMatTestTop *dut;
 unsigned long long sim_time = 0;
@@ -13,10 +14,13 @@ unsigned int stopFlag = 0;
 
 #define MAXID 2
 
+#define STRIDE 128
+long int uram[1024 * 1024 / 8]; // 1024KBytes URAM
+static char* uramBase = (char*)&uram;
+
 extern "C" long long DPIRamProvider(int id, int raddr, char re, int waddr, char we, long long int wdata)
 {
     // printf("ID: [%d] Call DPI-C Interface to Fetch Data!\n", id);
-    static long int uram[1024 * 1024 / 8]; // 1024KBytes URAM
     static int maxCycle = 0;
     static int cycle[MAXID];
     static int Lwaddr[MAXID];
@@ -39,6 +43,50 @@ extern "C" long long DPIRamProvider(int id, int raddr, char re, int waddr, char 
     return re ? uram[raddr] : 0;
 }
 
+static inline float getMatrixElemFP8(int base, int major, int minor)
+{
+    uint8_t ret;
+    ret = uramBase[major * STRIDE + minor + base];
+    return FP8ToFP32<4>(ret);
+}
+
+static inline void setMatrixElemFP8(int base, int major, int minor, float v)
+{
+    uint8_t vfp8 = FP32ToFP8<4>(v);
+    uramBase[major * STRIDE + minor + base] = vfp8;
+}
+
+static inline float getMatrixElemFP32(int base, int major, int minor)
+{
+    float* addr = (float*)(major * STRIDE + minor * 4 + base + uramBase);
+    return *addr;
+}
+
+static inline void setMatrixElemFP32(int base, int major, int minor, float v)
+{
+
+    float* addr = (float*)(major * STRIDE + minor * 4 + base + uramBase);
+    *addr = v;
+}
+
+static inline void initMatrix()
+{
+    setMatrixElemFP8(0xA000, 0, 0, 1.0f);
+    setMatrixElemFP8(0xA000, 0, 1, 2.0f);
+    setMatrixElemFP8(0xA000, 0, 2, 3.0f);
+    setMatrixElemFP8(0xB000, 0, 0, 1.0f);
+    setMatrixElemFP8(0xB000, 0, 1, 2.0f);
+    setMatrixElemFP8(0xB000, 0, 2, 3.0f);
+}
+
+static inline void checkMatrix()
+{
+    printf("A[0, 0] = %f\n", getMatrixElemFP8 (0xA000, 0, 0));
+    printf("B[0, 0] = %f\n", getMatrixElemFP8 (0xB000, 0, 0));
+    printf("C[0, 0] = %f\n", getMatrixElemFP32(0xC000, 0, 0));
+}
+
+
 static inline void mainLoop()
 {
     dut->matInst_valid = 1;
@@ -56,20 +104,20 @@ static inline void mainLoop()
         dut->matInst_bits_instWord = (0b0000000 << 25) | (2 << 15);
     } else if(sim_time == 3) {
         // strideA
-        dut->matInst_bits_dst = 128;
+        dut->matInst_bits_dst = STRIDE;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (3 << 15);
     } else if(sim_time == 4) {
         // strideB
-        dut->matInst_bits_dst = 128;
+        dut->matInst_bits_dst = STRIDE;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (4 << 15);
     } else if(sim_time == 5) {
         // strideC
-        dut->matInst_bits_dst = 128;
+        dut->matInst_bits_dst = STRIDE;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (5 << 15);
     } else {
-        dut->matInst_bits_src0 = 0xA0000;
-        dut->matInst_bits_src1 = 0xB0000;
-        dut->matInst_bits_dst = 0xC0000;
+        dut->matInst_bits_src0 = 0xA000;
+        dut->matInst_bits_src1 = 0xB000;
+        dut->matInst_bits_dst  = 0xC000;
         dut->matInst_bits_instWord = (0b0001000 << 25) | (5 << 15);
     }
 }
@@ -95,6 +143,7 @@ int main(int argc, char **argv)
         contextp->timeInc(1);
     }
     dut->reset = 0;
+    initMatrix();
     while (sim_time < MAX_SIM_TIME)
     {
         dut->clock ^= 1;
@@ -111,6 +160,7 @@ int main(int argc, char **argv)
             if((--stopFlag) == 1) break;
         }
     }
+    checkMatrix();
     if(!stopFlag) {
         printf("\033[42;32mVerilator: MatTestTop Test PASS!\033[0m\n");
     } else {

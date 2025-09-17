@@ -47,16 +47,16 @@ static inline void mainLoop()
 {
     static int i = 0;
     dut->wreq_i_0_valid = 1;
-    dut->wreq_i_0_bits_address = i + 2;
+    dut->wreq_i_0_bits_address = (i + 2) << 3;
     dut->wdata_i_0 = i;
     dut->rreq_i_0_valid = 1;
-    dut->rreq_i_0_bits_address = i;
+    dut->rreq_i_0_bits_address = (i + 0) << 3;
     dut->rreq_i_1_valid = 1;
-    dut->rreq_i_1_bits_address = i + 1;
+    dut->rreq_i_1_bits_address = (i + 1) << 3;
     dut->rreq_i_2_valid = 1;
-    dut->rreq_i_2_bits_address = i + 2;
+    dut->rreq_i_2_bits_address = (i + 2) << 3;
     dut->rreq_i_3_valid = 1;
-    dut->rreq_i_3_bits_address = i + 3;
+    dut->rreq_i_3_bits_address = (i + 3) << 3;
     i++;
 }
 int main(int argc, char **argv)
