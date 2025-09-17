@@ -71,9 +71,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val log2S = log2Ceil(storageRatio)
 
   // load/calc/st Cmd Queue should NEVER Stall!
-  chisel3.assert(!(ldCmd.valid & !ldCmd.ready))
-  chisel3.assert(!(calcCmd.valid & !calcCmd.ready))
-  chisel3.assert(!(stCmd.valid & !stCmd.ready))
+  chisel3.assert(!(ldCmd.valid & !ldCmd.ready), "ldCmd OverFlow!")
+  chisel3.assert(!(calcCmd.valid & !calcCmd.ready), "calcCmd OverFlow!")
+  chisel3.assert(!(stCmd.valid & !stCmd.ready), "stCmd OverFlow!")
 
   val ldComp = IO(Flipped(Decoupled(Bool())))
   val crComp = IO(Flipped(Decoupled(Bool())))
@@ -81,11 +81,11 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val stComp = IO(Flipped(Decoupled(Bool())))
   val fComp = IO(Decoupled(Bool()))
   // ld/cr/cw/s Completion Queue should NEVER Stall!
-  chisel3.assert(!(ldComp.valid & !ldComp.ready))
-  chisel3.assert(!(crComp.valid & !crComp.ready))
-  chisel3.assert(!(cwComp.valid & !cwComp.ready))
-  chisel3.assert(!(stComp.valid & !stComp.ready))
-  chisel3.assert(!(fComp.valid & !fComp.ready))
+  chisel3.assert(!(ldComp.valid & !ldComp.ready), "ldComp OverFlow!")
+  chisel3.assert(!(crComp.valid & !crComp.ready), "crComp OverFlow!")
+  chisel3.assert(!(cwComp.valid & !cwComp.ready), "cwComp OverFlow!")
+  chisel3.assert(!(stComp.valid & !stComp.ready), "stComp OverFlow!")
+  chisel3.assert(!(fComp.valid & !fComp.ready), "fComp OverFlow!")
 
   def getLowBits(value: UInt, bitsCnt: UInt, maxWidth: Int): UInt = {
     val mask = (1.U((maxWidth + 1).W) << bitsCnt) - 1.U
@@ -138,9 +138,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   // Issuing: Split Task Queue
   val spTaskBusy = RegInit(Bool(), 0.B)
   val spTaskFirst = Reg(Bool())
-  val spABank = RegInit(Bool(), 0.B)
-  val spBBank = RegInit(Bool(), 0.B)
-  val spCBank = RegInit(Bool(), 0.B)
+  val spABank = RegInit(Bool(), 1.B)
+  val spBBank = RegInit(Bool(), 1.B)
+  val spCBank = RegInit(Bool(), 1.B)
   val spTask = RegEnable(taskQ.bits, taskQ.fire)
   val spCurM = Reg(UInt(mnkWidth.W))
   val spCurN = Reg(UInt(mnkWidth.W))
@@ -213,9 +213,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   lTaskQ.io.enq.bits.bLoad  := !spBPersist | spFirstM
   lTaskQ.io.enq.bits.cLoad  := !spCPersist | spFirstK
   lTaskQ.io.enq.bits.cStore := !spCPersist | spLastK
-  lTaskQ.io.enq.bits.aBank := spABank
-  lTaskQ.io.enq.bits.bBank := spBBank
-  lTaskQ.io.enq.bits.cBank := spCBank
+  lTaskQ.io.enq.bits.aBank := Mux(lTaskQ.io.enq.bits.aLoad, !spABank, spABank)
+  lTaskQ.io.enq.bits.bBank := Mux(lTaskQ.io.enq.bits.bLoad, !spBBank, spBBank)
+  lTaskQ.io.enq.bits.cBank := Mux(lTaskQ.io.enq.bits.cLoad, !spCBank, spCBank)
   when(lTaskQ.io.enq.bits.aLoad & lTaskQ.io.enq.fire) { spABank := !spABank }
   when(lTaskQ.io.enq.bits.bLoad & lTaskQ.io.enq.fire) { spBBank := !spBBank }
   when(lTaskQ.io.enq.bits.cLoad & lTaskQ.io.enq.fire) { spCBank := !spCBank }

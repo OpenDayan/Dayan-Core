@@ -27,7 +27,10 @@ class DPACalcMicroCommand(storageRatio: Int) extends Bundle {
 // K(pK) N(pN)
 
 // Directly Controlling Module for FP8BF16FusedDPUnit
-class DPArrayCalcTaskSpilt(storageRatio: Int, cwLatency: Int) extends Module{
+class DPArrayCalcTaskSpilt(
+  storageRatio: Int, cwLatency: Int,
+  aBankSft: Int, bBankSft: Int, cBankSft: Int
+) extends Module{
   val cmdIn = IO(Flipped(Decoupled(new MatCalcCommand(storageRatio))))
 
   val cmd = RegEnable(cmdIn.bits, cmdIn.fire)
@@ -116,9 +119,9 @@ class DPArrayCalcTaskSpilt(storageRatio: Int, cwLatency: Int) extends Module{
 
   cmdOut.valid := busy & !kStall
   cmdOut.bits.bf16 := cmd.bf16
-  cmdOut.bits.aMatAddr := Cat(cmd.aBank.asUInt, (curM << cmd.log2SK) | curK)
-  cmdOut.bits.bMatAddr := Cat(cmd.bBank.asUInt, (curN << cmd.log2SK) | curK)
-  cmdOut.bits.cMatAddr := Cat(cmd.cBank.asUInt, (curM << cmd.log2SN) | curN)
+  cmdOut.bits.aMatAddr := (cmd.aBank.asUInt << aBankSft) | (curM << cmd.log2SK) | curK
+  cmdOut.bits.bMatAddr := (cmd.bBank.asUInt << bBankSft) | (curN << cmd.log2SK) | curK
+  cmdOut.bits.cMatAddr := (cmd.cBank.asUInt << cBankSft) | (curM << cmd.log2SN) | curN
 
   // Completion Interface To Top Controller
   val crComp = IO(Decoupled(Bool()))
@@ -133,7 +136,7 @@ class DPArrayCalcTaskSpilt(storageRatio: Int, cwLatency: Int) extends Module{
 
 object DPArrayCalcTaskSpilt extends App {
   ChiselStage.emitSystemVerilog(
-    new DPArrayCalcTaskSpilt(32, 9),
+    new DPArrayCalcTaskSpilt(32, 9, 4, 4, 5),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",

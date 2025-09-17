@@ -96,8 +96,11 @@ class DPArrayTop(
   val bBuffer = Module(new DPArrayBufferAB(busWidth, 32, cN, cK))
   val cBuffer = Module(new DPArrayBufferC (busWidth, 32, cM, cN, wE, wF))
 
+  val abBankSft = log2Ceil(storageRatio / 2)
+  val cBankSft  = log2Ceil(storageRatio)
   // DPArray Calculating Task Spilt
-  val calcTaskSpilt = Module(new DPArrayCalcTaskSpilt(storageRatio, calcCore.r0Latency))
+  val calcTaskSpilt = Module(new DPArrayCalcTaskSpilt(storageRatio, calcCore.r0Latency,
+    abBankSft, abBankSft, cBankSft))
 
   calcTaskSpilt.cmdIn :<>= calcCmd
   crComp :<>= calcTaskSpilt.crComp
@@ -146,17 +149,17 @@ class DPArrayTop(
   // A / B Load Task Spilt Unit
   val abLoadTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = true, cTask = false, storeTask = false
+    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = true, cTask = false, storeTask = false, abBankSft
   ))
   // C Load Task Spilt Unit
   val cLoadTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = false, cTask = true, storeTask = false
+    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = false, cTask = true, storeTask = false, cBankSft
   ))
   // C Store Task Spilt Unit
   val cStoreTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = false, cTask = true, storeTask = true
+    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = false, cTask = true, storeTask = true, cBankSft
   ))
   abLoadTaskSpilter.cmdIn.valid := ldCmd.valid & ldCmd.bits.ctrl =/= DPArrayStorageCmd.loadC
   cLoadTaskSpilter.cmdIn.valid := ldCmd.valid & ldCmd.bits.ctrl === DPArrayStorageCmd.loadC
@@ -189,12 +192,10 @@ class DPArrayTop(
   // TODO: Check synchronized URAM
   abLoadTaskSpilter.cmdURAM.ready := rreq0(0).ready
   abLoadTaskSpilter.cmdBuffer.ready := rresp0(0).valid
-  aBuffer.wAddr := Cat(abLoadTaskSpilter.cmdBuffer.bits.bank,
-    abLoadTaskSpilter.cmdBuffer.bits.bufferAddr(log2Ceil(storageRatio) - 2 , 0)).asUInt
+  aBuffer.wAddr := abLoadTaskSpilter.cmdBuffer.bits.bufferAddr
   aBuffer.wBeat := abLoadTaskSpilter.cmdBuffer.bits.beat
   aBuffer.we := abLoadTaskSpilter.cmdBuffer.valid & !abLoadTaskSpilter.cmdBuffer.bits.isBLoad & rresp0(0).valid
-  bBuffer.wAddr := Cat(abLoadTaskSpilter.cmdBuffer.bits.bank,
-    abLoadTaskSpilter.cmdBuffer.bits.bufferAddr(log2Ceil(storageRatio) - 2 , 0)).asUInt
+  bBuffer.wAddr := abLoadTaskSpilter.cmdBuffer.bits.bufferAddr
   bBuffer.wBeat := abLoadTaskSpilter.cmdBuffer.bits.beat
   bBuffer.we := abLoadTaskSpilter.cmdBuffer.valid &  abLoadTaskSpilter.cmdBuffer.bits.isBLoad & rresp0(0).valid
 
@@ -217,8 +218,7 @@ class DPArrayTop(
   })
   cLoadTaskSpilter.cmdURAM.ready := rreq1(0).ready
   cLoadTaskSpilter.cmdBuffer.ready := rresp1(0).valid
-  cBuffer.extWAddr := Cat(cLoadTaskSpilter.cmdBuffer.bits.bank,
-    cLoadTaskSpilter.cmdBuffer.bits.bufferAddr(log2Ceil(storageRatio) - 1 , 0)).asUInt
+  cBuffer.extWAddr := cLoadTaskSpilter.cmdBuffer.bits.bufferAddr
   cBuffer.extWBeat := cLoadTaskSpilter.cmdBuffer.bits.beat
   cBuffer.extWe    := cLoadTaskSpilter.cmdBuffer.valid & !cLoadTaskSpilter.cmdBuffer.bits.isBLoad & rresp0(0).valid
 
@@ -269,7 +269,7 @@ class DPArrayTop(
   ldComp.bits := 0.B
 
   // store Completion Handling
-  stComp.valid := wreq(0).ready & s2LastLoad
+  stComp.valid := wreq(0).ready & s2LastLoad & s2Valid
   stComp.bits := 0.B
 }
 

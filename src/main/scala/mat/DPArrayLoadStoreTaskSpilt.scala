@@ -16,16 +16,15 @@ class DPALoadStoreInnerCommand(storageRatio: Int, mnkWidth: Int, addressWidth: I
   val baseDimMinor = UInt(mnkWidth.W)
   val pMajor = UInt(log2Ceil(cMNK).W) // pM <= sM
   val pMinor = UInt(log2Ceil(cMNK).W) // pN <= sN
-  val bufferAddr = UInt(log2Ceil(storageRatio).W)
+  val bufferAddr = UInt((1 + log2Ceil(storageRatio)).W)
 }
 
 class DPALoadStoreMicroCommand(storageRatio: Int, maxBeat: Int) extends Bundle {
-  val bank = Bool()
   val isBLoad = Bool()
   val beat = UInt(log2Ceil(maxBeat).W)
   val lastLoad = Bool()
   val waitLoadC = Bool()
-  val bufferAddr = UInt(log2Ceil(storageRatio).W)
+  val bufferAddr = UInt((1+log2Ceil(storageRatio)).W)
 }
 class DPALoadStoreURAMMicroCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int) extends Bundle {
   val baseUramAddr = UInt(addressWidth.W)
@@ -83,13 +82,14 @@ class DPArrayLoadStoreBeatHandler(
     valid := 1.B
     firstBeat := 1.B
     curBeat := cmdQ.bits.pMajor >> curLog2MajorSliceSize
-  }.elsewhen(bothReady) {
+  }.elsewhen(valid & bothReady) {
+    valid := !finish
     curBeat := curBeat - 1.B
     firstBeat := 0.B
   }
 
   cmdBuffer.valid := valid & cmdURAM.ready
-  cmdBuffer.bits.bank := cmd.bank
+//  cmdBuffer.bits.bank := cmd.bank
   cmdBuffer.bits.isBLoad := cmd.isBLoad
   cmdBuffer.bits.beat := curBeat
   cmdBuffer.bits.lastLoad := cmd.lastLoad & finish
@@ -125,7 +125,7 @@ class DPArrayLoadStoreBeatHandler(
 class DPArrayLoadStoreTaskSpilt(
   storageRatio: Int, busWidth: Int, mnkWidth: Int,
   addressWidth: Int, cMNK: Int, cM: Int, cN: Int, cK: Int,
-  abTask: Boolean, cTask: Boolean, storeTask: Boolean
+  abTask: Boolean, cTask: Boolean, storeTask: Boolean, bankSft: Int
 ) extends Module {
   val cmdIn = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
   val valid = RegInit(0.B)
@@ -136,8 +136,8 @@ class DPArrayLoadStoreTaskSpilt(
   val cmdBuffer = IO(Decoupled(new DPALoadStoreMicroCommand(storageRatio, beatSpilt.maxBeat)))
   val cmdURAM = IO(Decoupled(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth, addressWidth, cMNK)))
 
-  cmdBuffer :<>= beatSpilt.cmdBuffer
-  cmdURAM :<>= beatSpilt.cmdURAM
+  cmdBuffer :<>= Queue(beatSpilt.cmdBuffer, 4)
+  cmdURAM :<>= Queue(beatSpilt.cmdURAM)
 
   val curMajor = Reg(UInt(log2Ceil(storageRatio * cMNK).W)) // Element Count
   val curMajorLeft = Reg(UInt(log2Ceil(cMNK).W))
@@ -161,11 +161,14 @@ class DPArrayLoadStoreTaskSpilt(
   beatSpilt.cmdIn.bits.pMajor := curMajorLeft
   if(cTask) {
     beatSpilt.cmdIn.bits.pMinor := (cN - 1).U
-    beatSpilt.cmdIn.bits.bufferAddr := curMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cN)) |
+    beatSpilt.cmdIn.bits.bufferAddr :=
+      (cmd.bank.asUInt << bankSft) |
+      curMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cN)) |
       (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cM)) << cmd.log2SDimMajor).asUInt
   } else {
     beatSpilt.cmdIn.bits.pMinor := (cK - 1).U
     beatSpilt.cmdIn.bits.bufferAddr :=
+      (cmd.bank.asUInt << bankSft) |
       curMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cK)) |
         Mux(cmd.ctrl === DPArrayStorageCmd.loadA,
         (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cM)) << cmd.log2SDimMajor).asUInt,
@@ -190,6 +193,7 @@ class DPArrayLoadStoreTaskSpilt(
       curMinor := Cat(cmdIn.bits.pMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cN)), 0.U(log2Ceil(cN).W))
     }
   }.elsewhen(beatSpilt.cmdIn.fire) {
+    valid := !last
     when(lastMinor) {
       if(abTask) {
         curMajor := curMajor - Mux(cmd.ctrl === DPArrayStorageCmd.loadA, cM.U, cN.U)
@@ -213,7 +217,7 @@ class DPArrayLoadStoreTaskSpilt(
 object DPArrayLoadStoreTaskSpilt extends App {
   ChiselStage.emitSystemVerilog(
     new DPArrayLoadStoreTaskSpilt(
-      32, 256, 12, 20, 32, 16, 8, 32, true, false, false
+      32, 256, 12, 20, 32, 16, 8, 32, true, false, false, 4
     ),
     firtoolOpts = Array(
       "-disable-all-randomization",
