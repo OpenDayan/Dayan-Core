@@ -140,8 +140,10 @@ class DPArrayBufferC(busWidth: Int, entries: Int, m: Int, n: Int, wE: Int, wF: I
     backingStorage1.io.we := (extWBank1 & i.U === extWBeat) | cWBank1
     backingStorage0.io.waddr := Mux(extWBank0, extWAddr(ptrW - 1, 0), cWAddr(ptrW - 1, 0))
     backingStorage1.io.waddr := Mux(extWBank1, extWAddr(ptrW - 1, 0), cWAddr(ptrW - 1, 0))
-    backingStorage0.io.wdata := Mux(extWBank0, realExtWData.asUInt, cWData.asUInt)
-    backingStorage1.io.wdata := Mux(extWBank1, realExtWData.asUInt, cWData.asUInt)
+    backingStorage0.io.wdata := Mux(extWBank0, realExtWData.asUInt,
+      cWData.asTypeOf(Vec(maxBeat, UInt((m * n / maxBeat * (wE + wF)).W)))(i))
+    backingStorage1.io.wdata := Mux(extWBank1, realExtWData.asUInt,
+      cWData.asTypeOf(Vec(maxBeat, UInt((m * n / maxBeat * (wE + wF)).W)))(i))
     realExtRData(i) := Mux(s1ExtRBank0, backingStorage0.io.rdata, backingStorage1.io.rdata)
     realCRData(i)   := Mux(s1CRBank0, backingStorage0.io.rdata, backingStorage1.io.rdata)
   }
