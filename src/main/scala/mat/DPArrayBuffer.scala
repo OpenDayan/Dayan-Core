@@ -120,7 +120,7 @@ class DPArrayBufferC(busWidth: Int, entries: Int, m: Int, n: Int, wE: Int, wF: I
   val cWBank0 = cWe & !cWAddr(ptrW).asBool
   val cWBank1 = cWe &  cWAddr(ptrW).asBool
   val s1ExtRBank0 = RegNext(extRBank0)
-  val s1CRBank0 = RegNext(extWBank0)
+  val s1CRBank0 = RegNext(cRBank0)
   chisel3.assert(!(extRBank0 & cRBank0))
   chisel3.assert(!(extRBank1 & cRBank1))
   chisel3.assert(!(extWBank0 & cWBank0))

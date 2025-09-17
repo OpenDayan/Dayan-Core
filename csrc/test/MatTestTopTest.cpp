@@ -79,8 +79,10 @@ static inline void initMatrix()
     setMatrixElemFP8(0xB000, 0, 2, 3.0f);
 }
 
+static int finishCount = 0;
 static inline void checkMatrix()
 {
+    printf("Get Finish Pulse:%d\n", finishCount);
     printf("A[0, 0] = %f\n", getMatrixElemFP8 (0xA000, 0, 0));
     printf("B[0, 0] = %f\n", getMatrixElemFP8 (0xB000, 0, 0));
     printf("C[0, 0] = %f\n", getMatrixElemFP32(0xC000, 0, 0));
@@ -119,6 +121,7 @@ static inline void mainLoop()
         dut->matInst_bits_src1 = 0xB000;
         dut->matInst_bits_dst  = 0xC000;
         dut->matInst_bits_instWord = (0b0001000 << 25) | (5 << 15);
+        finishCount += dut->finish;
     }
 }
 int main(int argc, char **argv)

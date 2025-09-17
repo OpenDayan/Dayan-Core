@@ -106,8 +106,8 @@ class DPArrayTop(
   crComp :<>= calcTaskSpilt.crComp
   cwComp :<>= calcTaskSpilt.cwComp
 
-  val calcCMatAddrPipe = pipe.genPipe(calcTaskSpilt.cmdOut.bits.cMatAddr, calcCore.r0Latency + 2)
-  val calcCMatValidPipe = pipe.genPipe(calcTaskSpilt.cmdOut.valid, calcCore.r0Latency + 2)
+  val calcCMatAddrPipe = pipe.genPipe(calcTaskSpilt.cmdOut.bits.cMatAddr, calcCore.r0Latency + 3)
+  val calcCMatValidPipe = pipe.genPipe(calcTaskSpilt.cmdOut.valid, calcCore.r0Latency + 3)
 
   calcTaskSpilt.cmdOut.ready := 1.B
   aBuffer.rAddr := calcTaskSpilt.cmdOut.bits.aMatAddr
@@ -133,8 +133,8 @@ class DPArrayTop(
   cBuffer.cWData := VecInit.tabulate(cM, cN)((m, n) => {
     Cat(calcCore.cout_exp(m)(n), calcCore.cout_frac(m)(n))
   })
-  cBuffer.cWAddr := calcCMatAddrPipe(calcCore.r0Latency + 2)
-  cBuffer.cWe := calcCMatValidPipe(calcCore.r0Latency + 2)
+  cBuffer.cWAddr := calcCMatAddrPipe(calcCore.r0Latency + 3)
+  cBuffer.cWe := calcCMatValidPipe(calcCore.r0Latency + 3)
 
   // Connecting wPort / rPort of all buffer to uram
   val flattenUramRData0 = VecInit.tabulate(ports)(i => rresp0(i).data).asTypeOf(Vec(busWidth, UInt(8.W)))
