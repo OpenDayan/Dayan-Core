@@ -76,7 +76,7 @@ class MatTop(
   matSpilt.task.bits.cStride := strideC
   matSpilt.task.bits.taskM := problemM
   matSpilt.task.bits.taskN := problemN
-  matSpilt.task.bits.taskK := problemK
+  matSpilt.task.bits.taskK := problemK << matSpilt.task.bits.bf16 // Scaled K if BF16
   matSpilt.task.bits.log2SubM := sM
   matSpilt.task.bits.log2SubN := sN
   matSpilt.task.bits.log2SubK := sK
