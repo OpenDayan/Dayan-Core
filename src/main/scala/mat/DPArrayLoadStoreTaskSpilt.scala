@@ -164,15 +164,15 @@ class DPArrayLoadStoreTaskSpilt(
     beatSpilt.cmdIn.bits.bufferAddr :=
       (cmd.bank.asUInt << bankSft) |
       curMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cN)) |
-      (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cM)) << cmd.log2SDimMajor).asUInt
+      (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cM)) << cmd.log2SDimMinor).asUInt
   } else {
     beatSpilt.cmdIn.bits.pMinor := (cK - 1).U
     beatSpilt.cmdIn.bits.bufferAddr :=
       (cmd.bank.asUInt << bankSft) |
       curMinor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cK)) |
         Mux(cmd.ctrl === DPArrayStorageCmd.loadA,
-        (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cM)) << cmd.log2SDimMajor).asUInt,
-        (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cN)) << cmd.log2SDimMajor).asUInt)
+        (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cM)) << cmd.log2SDimMinor).asUInt,
+        (curMajor(log2Ceil(storageRatio * cMNK) - 1, log2Ceil(cN)) << cmd.log2SDimMinor).asUInt)
   }
 
   when(cmdIn.fire) {
