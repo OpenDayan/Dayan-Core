@@ -62,7 +62,8 @@ class MatSubTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bu
 class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: Int, cN: Int, cK: Int) extends Module {
   require(cK >= cM & cK >= cN) // MatLoadCommand.wMNK Should be the Max(cM, cN, cK)
   val task = IO(Flipped(Decoupled(new MatTask(storageRatio, mnkWidth, addressWidth))))
-  val ldCmd = IO(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
+  val ldABCmd = IO(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
+  val ldCCmd = IO(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
   val calcCmd = IO(Decoupled(new MatCalcCommand(storageRatio)))
   val stCmd = IO(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
   val log2CM = log2Ceil(cM)
@@ -71,9 +72,10 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val log2S = log2Ceil(storageRatio)
 
   // load/calc/st Cmd Queue should NEVER Stall!
-  chisel3.assert(!(ldCmd.valid & !ldCmd.ready), "ldCmd OverFlow!")
+  chisel3.assert(!(ldABCmd.valid & !ldABCmd.ready), "ldABCmd OverFlow!")
+  chisel3.assert(!(ldCCmd.valid  & !ldCCmd.ready),  "ldCCmd OverFlow!")
   chisel3.assert(!(calcCmd.valid & !calcCmd.ready), "calcCmd OverFlow!")
-  chisel3.assert(!(stCmd.valid & !stCmd.ready), "stCmd OverFlow!")
+  chisel3.assert(!(stCmd.valid   & !stCmd.ready), "stCmd OverFlow!")
 
   val ldComp = IO(Flipped(Decoupled(Bool())))
   val crComp = IO(Flipped(Decoupled(Bool())))
@@ -278,19 +280,20 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
     lCCmdFinish := !lTaskQ.io.deq.bits.cLoad
     lCmdLeft := lTaskQ.io.deq.bits.loadCnt
   }.otherwise {
-      when(!lACmdFinish)        { lACmdFinish := 1.B }
-        .elsewhen(!lBCmdFinish) { lBCmdFinish := 1.B }
-        .otherwise              { lCCmdFinish := lCCmdFinish | sCompQ4L.io.deq.valid }
-    lCmdLeft := lCmdLeft - ldCmd.fire.asUInt
+    when(!lACmdFinish)          { lACmdFinish := 1.B }
+      .otherwise                { lBCmdFinish := 1.B }
+    when(sCompQ4L.io.deq.valid) { lCCmdFinish := 1.B }
+    lCmdLeft := lCmdLeft - ldABCmd.fire.asUInt - ldCCmd.fire.asUInt
   }
   // Should not fire unused ldCmd
-  chisel3.assert(!(lCmdLeft === 0.U & ldCmd.fire))
-  ldCmd.bits := lCCmd; ldCmd.valid := !lCCmdFinish & sCompQ4L.io.deq.valid
-  when(!lBCmdFinish) { ldCmd.bits := lBCmd; ldCmd.valid := 1.B } // Load B Secondly
-  when(!lACmdFinish) { ldCmd.bits := lACmd; ldCmd.valid := 1.B } // Load A First
-  sCompQ4L.io.deq.ready := lACmdFinish & lBCmdFinish & !lCCmdFinish /* & ldCmd.ready */
+  chisel3.assert(!(lCmdLeft === 0.U & ldABCmd.fire))
+  chisel3.assert(!(lCmdLeft === 0.U & ldCCmd.fire))
+  ldCCmd.bits := lCCmd; ldCCmd.valid := !lCCmdFinish & sCompQ4L.io.deq.valid
+  ldABCmd.bits := lBCmd; ldABCmd.valid := !(lACmdFinish & lBCmdFinish)
+  when(!lACmdFinish) { ldABCmd.bits := lACmd; ldABCmd.valid := 1.B }
+  sCompQ4L.io.deq.ready := !lCCmdFinish /* & ldCmd.ready */
   // No Bubble at all!
-  lFinish := lCmdLeft === 0.U | (lCmdLeft === 1.U & ldCmd.valid)
+  lFinish := lCmdLeft === 0.U | (lCmdLeft === 1.U & (ldABCmd.valid | ldCCmd.valid))
   when(lTaskFire) {
     lTaskValid  := 1.B
   }.elsewhen(lFinish) {

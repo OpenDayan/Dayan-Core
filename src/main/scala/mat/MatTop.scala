@@ -88,7 +88,8 @@ class MatTop(
     cM = cM, cN = cN, cK = cK, sK = kPerScale, wE = wE, wF = wF
   ))
 
-  dpa.ldCmd <> Queue(matSpilt.ldCmd, 8)
+  dpa.ldABCmd <> Queue(matSpilt.ldABCmd, 8)
+  dpa.ldCCmd <> Queue(matSpilt.ldCCmd, 8)
   dpa.stCmd <> Queue(matSpilt.stCmd, 2)
   dpa.calcCmd <> Queue(matSpilt.calcCmd, 2)
 

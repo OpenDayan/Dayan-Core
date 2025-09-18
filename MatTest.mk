@@ -7,5 +7,5 @@ build/VMatTestTopFast/VMatTestTop: generated/MatTestTop/filelist.f build/VMatTes
 
 validate_VMatTestTopFast:
 	make -C build/VMatTestTopFast -f VMatTestTop.mk VMatTestTop
-	./build/VMatTestTopFast/VMatTestTop 32 10 8 -1
+	./build/VMatTestTopFast/VMatTestTop 64 64 128 -1
 	surver wave/VMatTestTopFast.fst --port 4000 --token 00000000

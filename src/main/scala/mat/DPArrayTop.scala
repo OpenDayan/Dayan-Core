@@ -65,7 +65,8 @@ class DPArrayTop(
   val ports = busWidth / 8
 
   // Load/Store Cmd Interface
-  val ldCmd = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
+  val ldABCmd = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
+  val ldCCmd = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
   val stCmd = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
 
   // Calculate  Cmd Interface
@@ -161,12 +162,8 @@ class DPArrayTop(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
     cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = false, cTask = true, storeTask = true, cBankSft
   ))
-  abLoadTaskSpilter.cmdIn.valid := ldCmd.valid & ldCmd.bits.ctrl =/= DPArrayStorageCmd.loadC
-  cLoadTaskSpilter.cmdIn.valid := ldCmd.valid & ldCmd.bits.ctrl === DPArrayStorageCmd.loadC
-  ldCmd.ready := Mux(ldCmd.bits.ctrl === DPArrayStorageCmd.loadC,
-    cLoadTaskSpilter.cmdIn.ready, abLoadTaskSpilter.cmdIn.ready)
-  abLoadTaskSpilter.cmdIn.bits  := ldCmd.bits
-  cLoadTaskSpilter.cmdIn.bits   := ldCmd.bits
+  abLoadTaskSpilter.cmdIn :<>= ldABCmd
+  cLoadTaskSpilter.cmdIn  :<>= ldCCmd
   cStoreTaskSpilter.cmdIn :<>= stCmd
   val cStoreURAMReq = Queue(cStoreTaskSpilter.cmdURAM)
 
