@@ -149,8 +149,8 @@ class MatTestTop(
 object MatTestTop extends App {
   ChiselStage.emitSystemVerilog(
     new MatTestTop(storageRatio = 32,
-      busWidth = 16, mnkWidth = 20, addressWidth = 32,
-      cM = 4, cN = 2, cK = 8, kPerScale = 8),
+      busWidth = 256, mnkWidth = 20, addressWidth = 32,
+      cM = 16, cN = 8, cK = 32, kPerScale = 32),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",

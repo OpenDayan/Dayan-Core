@@ -6,6 +6,9 @@ test_run_dir/*
 /*.sv
 wave
 UnitTest.mk
+MatTest.mk
+reports
+reports.*.csv
 *.bgn
 *.bit
 *.bld
