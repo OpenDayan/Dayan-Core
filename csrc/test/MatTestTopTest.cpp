@@ -150,7 +150,7 @@ static int handleCCompare(int m, int n, float ref) {
         pass = diffAbs / refAbs <= MAX_ERROR;
     }
     if(!pass) {
-        printf("URAM Addr: %x\n", CAddr + (m * N + n) * 4);
+        printf("URAM Addr: 0x%x\n", CAddr + (m * N + n) * 4);
         printf("Error in M%d N%d, ref: %f, dut: %f\n", m, n, ref, dut);
     }
     return 0;

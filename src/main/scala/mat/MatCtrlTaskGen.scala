@@ -145,13 +145,10 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val spCurM = Reg(UInt(mnkWidth.W))
   val spCurN = Reg(UInt(mnkWidth.W))
   val spCurK = Reg(UInt(mnkWidth.W))
-  val spCurMp1 = spCurM - 1.U
-  val spCurNp1 = spCurN - 1.U
-  val spCurKp1 = spCurK - 1.U
   val spLastTask = Wire(Bool())
-  val spCurPM = getLowBits(spCurMp1, spTask.log2SubM +& log2CM.U, log2S + log2CM)
-  val spCurPN = getLowBits(spCurNp1, spTask.log2SubN +& log2CN.U, log2S + log2CN)
-  val spCurPK = getLowBits(spCurKp1, spTask.log2SubK +& log2CK.U, log2S + log2CK)
+  val spCurPM = getLowBits(spCurM, spTask.log2SubM +& log2CM.U, log2S + log2CM)
+  val spCurPN = getLowBits(spCurN, spTask.log2SubN +& log2CN.U, log2S + log2CN)
+  val spCurPK = getLowBits(spCurK, spTask.log2SubK +& log2CK.U, log2S + log2CK)
   taskQ.ready := !spTaskBusy | (spLastTask & lTaskQ.io.enq.ready)
   lTaskQ.io.enq.valid := spTaskBusy
   lTaskQ.io.enq.bits.bf16 := spTask.bf16
@@ -162,9 +159,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   lTaskQ.io.enq.bits.cBaseAddr := spTask.cBaseAddr
   lTaskQ.io.enq.bits.cStride   := spTask.cStride
   lTaskQ.io.enq.bits.lastSubTask := spLastTask
-  lTaskQ.io.enq.bits.subM := (spCurMp1 >> (spTask.log2SubM + log2CM.U)) << (spTask.log2SubM + log2CM.U)
-  lTaskQ.io.enq.bits.subN := (spCurNp1 >> (spTask.log2SubN + log2CN.U)) << (spTask.log2SubN + log2CN.U)
-  lTaskQ.io.enq.bits.subK := (spCurKp1 >> (spTask.log2SubK + log2CK.U)) << (spTask.log2SubK + log2CK.U)
+  lTaskQ.io.enq.bits.subM := (spCurM >> (spTask.log2SubM + log2CM.U)) << (spTask.log2SubM + log2CM.U)
+  lTaskQ.io.enq.bits.subN := (spCurN >> (spTask.log2SubN + log2CN.U)) << (spTask.log2SubN + log2CN.U)
+  lTaskQ.io.enq.bits.subK := (spCurK >> (spTask.log2SubK + log2CK.U)) << (spTask.log2SubK + log2CK.U)
   lTaskQ.io.enq.bits.pM := spCurPM
   lTaskQ.io.enq.bits.pN := spCurPN
   lTaskQ.io.enq.bits.pK := spCurPK
@@ -177,9 +174,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val spLastK = lTaskQ.io.enq.bits.subK === 0.U
   val spLastN = lTaskQ.io.enq.bits.subN === 0.U
   val spLastM = lTaskQ.io.enq.bits.subM === 0.U
-  val spFirstK = spCurK === spTask.taskK
-  val spFirstN = spCurN === spTask.taskN
-  val spFirstM = spCurM === spTask.taskM
+  val spFirstK = spCurK === spTask.taskK - 1.U
+  val spFirstN = spCurN === spTask.taskN - 1.U
+  val spFirstM = spCurM === spTask.taskM - 1.U
   val spCarryK, spCarryM, spCarryN = Wire(Bool())
   spCarryK := spCPersist | ((spBPersist | (spAPersist & spLastN)) & spLastM)
   spCarryN := spAPersist | ((spCPersist | (spBPersist & spLastM)) & spLastK)
@@ -188,20 +185,20 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   when(taskQ.fire) {
     spTaskBusy := 1.B
     spTaskFirst := 1.B
-    spCurM := taskQ.bits.taskM
-    spCurN := taskQ.bits.taskN
-    spCurK := taskQ.bits.taskK
+    spCurM := taskQ.bits.taskM - 1.U
+    spCurN := taskQ.bits.taskN - 1.U
+    spCurK := taskQ.bits.taskK - 1.U
   }.elsewhen(spTaskBusy & lTaskQ.io.enq.ready) {
     spTaskFirst := 0.B
     spTaskBusy := !spLastTask
-    when(spCarryK) { when(spLastK) { spCurK := spTask.taskK }.otherwise {
-      spCurK := lTaskQ.io.enq.bits.subK
+    when(spCarryK) { when(spLastK) { spCurK := spTask.taskK - 1.U }.otherwise {
+      spCurK := lTaskQ.io.enq.bits.subK - 1.U
     }}
-    when(spCarryN) { when(spLastN) { spCurN := spTask.taskN }.otherwise {
-      spCurN := lTaskQ.io.enq.bits.subN
+    when(spCarryN) { when(spLastN) { spCurN := spTask.taskN - 1.U }.otherwise {
+      spCurN := lTaskQ.io.enq.bits.subN - 1.U
     }}
-    when(spCarryM) { when(spLastM) { spCurM := spTask.taskM }.otherwise {
-      spCurM := lTaskQ.io.enq.bits.subM
+    when(spCarryM) { when(spLastM) { spCurM := spTask.taskM - 1.U }.otherwise {
+      spCurM := lTaskQ.io.enq.bits.subM - 1.U
     }}
   }
   lTaskQ.io.enq.bits.loadCnt := 2.U // 2 / 3
@@ -361,7 +358,8 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
 
 object MatCtrlTaskGen extends App {
   ChiselStage.emitSystemVerilog(
-    new MatCtrlTaskGen(32, 16, 20, 16, 8, 32),
+    new MatCtrlTaskGen(32, 16, 20,
+      4, 2, 8),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",

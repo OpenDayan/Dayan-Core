@@ -216,7 +216,7 @@ class DPArrayTop(
   cLoadTaskSpilter.cmdBuffer.ready := rresp1(0).valid
   cBuffer.extWAddr := cLoadTaskSpilter.cmdBuffer.bits.bufferAddr
   cBuffer.extWBeat := cLoadTaskSpilter.cmdBuffer.bits.beat
-  cBuffer.extWe    := cLoadTaskSpilter.cmdBuffer.valid & !cLoadTaskSpilter.cmdBuffer.bits.isBLoad & rresp0(0).valid
+  cBuffer.extWe    := cLoadTaskSpilter.cmdBuffer.valid & !cLoadTaskSpilter.cmdBuffer.bits.isBLoad & rresp1(0).valid
 
   (0 until ports).foreach(i => {
     // Get Mapped MN - K

@@ -26,7 +26,7 @@ static inline void mainLoop()
     dut->crComp_valid = 0;
     dut->cwComp_valid = 0;
     dut->fComp_ready = 1;
-    dut->sComp_valid = 0;
+    dut->stComp_valid = 0;
     dut->calcCmd_ready = 1;
     dut->ldCmd_ready = 1;
     dut->stCmd_ready = 1;
@@ -41,9 +41,9 @@ static inline void mainLoop()
         dut->task_bits_log2SubN = 2;
         dut->task_bits_log2SubK = 2;
         dut->task_bits_persistentMode = 1; // A Persistence
-        dut->task_bits_taskM = 40;
-        dut->task_bits_taskN = 70;
-        dut->task_bits_taskK = 128;
+        dut->task_bits_taskM = 32;
+        dut->task_bits_taskN = 10;
+        dut->task_bits_taskK = 8;
     }
     // Delay Simulate
     calcRdDelaySim.push(dut->calcCmd_valid);
@@ -101,8 +101,8 @@ static inline void mainLoop()
         ldDelaySim.pop();
     }
     if(stDelaySim.size() > DELAY_ST) {
-        dut->sComp_valid = stDelaySim.front();
-        if(dut->sComp_valid) printf("Store Completion.\n");
+        dut->stComp_valid = stDelaySim.front();
+        if(dut->stComp_valid) printf("Store Completion.\n");
         stDelaySim.pop();
     }
 }
