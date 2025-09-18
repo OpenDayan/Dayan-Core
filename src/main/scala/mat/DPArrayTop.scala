@@ -185,9 +185,7 @@ class DPArrayTop(
     // 开始连线
     rreq0(i).bits.id := 0.U
     rreq0(i).bits.address := addr
-    rreq0(i).valid := abLoadTaskSpilter.cmdURAM.valid &
-      (abLoadTaskSpilter.cmdURAM.bits.pMajor >= fixedMN.U) &
-      (abLoadTaskSpilter.cmdURAM.bits.pMinor >= fixedK.U)
+    rreq0(i).valid := abLoadTaskSpilter.cmdURAM.valid
   })
   // TODO: Check synchronized URAM
   abLoadTaskSpilter.cmdURAM.ready := rreq0(0).ready
@@ -212,9 +210,7 @@ class DPArrayTop(
     // 开始连线
     rreq1(i).bits.id := 0.U
     rreq1(i).bits.address := addr
-    rreq1(i).valid := cLoadTaskSpilter.cmdURAM.valid &
-      (cLoadTaskSpilter.cmdURAM.bits.pMajor >= fixedM.U) &
-      (cLoadTaskSpilter.cmdURAM.bits.pMinor >= fixedN.U)
+    rreq1(i).valid := cLoadTaskSpilter.cmdURAM.valid
   })
   cLoadTaskSpilter.cmdURAM.ready := rreq1(0).ready
   cLoadTaskSpilter.cmdBuffer.ready := rresp1(0).valid
@@ -252,7 +248,7 @@ class DPArrayTop(
   }
   val s2Deny = s2Valid & !wreq(0).ready
   cStoreTaskSpilter.cmdBuffer.ready := !s2Valid | wreq(0).ready
-  cBuffer.extRe := s2Valid | cStoreTaskSpilter.cmdBuffer.valid
+  cBuffer.extRe := s2Deny | cStoreTaskSpilter.cmdBuffer.valid
   cBuffer.extRAddr := Mux(s2Deny, s2RAddr, s1RAddr)
   cBuffer.extRBeat := Mux(s2Deny, s2RBeat, s1RBeat)
 

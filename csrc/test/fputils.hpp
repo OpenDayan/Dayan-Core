@@ -1,10 +1,16 @@
 #pragma once
 #include <vector>
+#include <math.h>
+#include <stdint.h>
+
+static inline float GenRandomFloat(float scale) {
+    return (double)scale * (rand() - RAND_MAX/2) / (double)RAND_MAX;
+}
 
 static inline std::vector<float> GenRandomFloats(int count, float scale) {
     std::vector<float> r(count);
     for(int i = 0; i < count; i ++) {
-        r[i] = (double)scale * (rand() - RAND_MAX/2) / (double)RAND_MAX;
+        r[i] = GenRandomFloat(scale);
     }
     return r;
 }
@@ -181,4 +187,25 @@ inline uint8_t FP32ToFP8(float value) {
         out.bits |= (in.bits >> (23-FP8<E>::M)) & 0x7F;
     }
     return out.bits;
+}
+
+typedef int (*resultHandlerT)(int m, int n, float);
+
+// Standard FP8 Matrix Multiplication Impl.
+void CalcFP8MatMul(uint8_t* a, uint8_t* b, resultHandlerT c, int tM, int tN, int tK) {
+    float A[tK];
+    for(int m = 0 ; m < tM; m ++) {
+        // A Array
+        for(int k = 0; k < tK; k ++) {
+            A[k] = FP8ToFP32<4>(a[m * tK + k]);
+        }
+        for(int n = 0 ; n < tN ; n ++) {
+            float acc = 0.f;
+            for(int k = 0; k < tK; k ++) {
+                acc += A[k] * FP8ToFP32<4>(b[n * tK + k]);
+            }
+            // c[m * tN] = acc;
+            if(c(m, n, acc)) return;
+        }
+    }
 }

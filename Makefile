@@ -7,6 +7,7 @@ VERILATOR_FLAGS = --top-module $(TOP) \
 all: UnitTest.mk
 
 include UnitTest.mk
+include MatTest.mk
 
 .PHONY: UnitTest.mk
 UnitTest.mk: GenerateMakefile.py UnitTestConfig.json generated/testbenchTemplate
