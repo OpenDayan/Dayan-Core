@@ -13,7 +13,7 @@ VMatTestTop *dut;
 unsigned long long sim_time = 0;
 unsigned int stopFlag = 0;
 
-#define ALIGNBYTE 8
+#define ALIGNBYTE 32
 
 // #define URAM_SYNC_WRITE
 

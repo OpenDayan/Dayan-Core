@@ -19,20 +19,23 @@ class DPALoadStoreInnerCommand(storageRatio: Int, mnkWidth: Int, addressWidth: I
   val bufferAddr = UInt((1 + log2Ceil(storageRatio)).W)
 }
 
-class DPALoadStoreMicroCommand(storageRatio: Int, maxBeat: Int) extends Bundle {
+class DPALoadStoreMicroCommand(storageRatio: Int, maxBeat: Int, idWidth: Int) extends Bundle {
   val isBLoad = Bool()
   val beat = UInt(log2Ceil(maxBeat).W)
   val lastLoad = Bool()
   val waitLoadC = Bool()
   val bufferAddr = UInt((1+log2Ceil(storageRatio)).W)
+  val reqId = UInt(idWidth.W)
 }
-class DPALoadStoreURAMMicroCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int) extends Bundle {
+
+class DPALoadStoreURAMMicroCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int, idWidth: Int) extends Bundle {
   val baseUramAddr = UInt(addressWidth.W)
   val majorStride  = UInt(addressWidth.W)
   val baseDimMajor = UInt(mnkWidth.W)
   val baseDimMinor = UInt(mnkWidth.W)
   val pMajor = UInt(log2Ceil(cMNK).W) // pM <= sM
   val pMinor = UInt(log2Ceil(cMNK).W) // pN <= sN
+  val reqId = UInt(idWidth.W)
 }
 
 // Mat RAM Shape -> Address
@@ -51,17 +54,18 @@ class DPALoadStoreURAMMicroCommand(storageRatio: Int, mnkWidth: Int, addressWidt
 class DPArrayLoadStoreBeatHandler(
   storageRatio: Int, busWidth: Int, mnkWidth: Int,
   addressWidth: Int, cMNK: Int, cM: Int, cN: Int, cK: Int,
-  abTask: Boolean, cTask: Boolean, storeTask: Boolean) extends Module {
+  abTask: Boolean, cTask: Boolean, storeTask: Boolean, idWidth: Int = 5) extends Module {
   val maxTileSize = if(abTask) {
     math.max(cM, cN) * cK
   } else {
     cM * cN * 4
   }
-  val maxBeat = maxTileSize / busWidth
-  require(maxBeat * busWidth == maxTileSize)
+  val maxBeat = (maxTileSize + busWidth - 1) / busWidth
+//  require(maxBeat * busWidth == maxTileSize)
   val cmdIn = IO(Flipped(Decoupled(new DPALoadStoreInnerCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
-  val cmdBuffer = IO(Decoupled(new DPALoadStoreMicroCommand(storageRatio, maxBeat)))
-  val cmdURAM = IO(Decoupled(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth, addressWidth, cMNK)))
+  val cmdBuffer = IO(Decoupled(new DPALoadStoreMicroCommand(storageRatio, maxBeat, idWidth)))
+  val cmdURAM = IO(Decoupled(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth, addressWidth, cMNK, idWidth)))
+  val idIn = IO(Flipped(Decoupled(UInt(idWidth.W))))
 
   val cmdQ = Queue(cmdIn)
 
@@ -76,31 +80,35 @@ class DPArrayLoadStoreBeatHandler(
   val curBeat = Reg(UInt(log2Ceil(maxBeat).W))
   val finish = curBeat === 0.U
   val bothReady = cmdBuffer.ready & cmdURAM.ready
-  cmdQ.ready := (bothReady & finish) | !valid
+  cmdQ.ready := (idIn.valid & bothReady & finish) | !valid
 
   when(cmdQ.fire) {
     valid := 1.B
     firstBeat := 1.B
     curBeat := cmdQ.bits.pMajor >> curLog2MajorSliceSize
-  }.elsewhen(valid & bothReady) {
+  }.elsewhen(valid & bothReady & idIn.valid) {
     valid := !finish
     curBeat := curBeat - 1.B
     firstBeat := 0.B
   }
 
-  cmdBuffer.valid := valid & cmdURAM.ready
+  idIn.ready := valid & bothReady
+
+  cmdBuffer.valid := valid & cmdURAM.ready & idIn.valid
 //  cmdBuffer.bits.bank := cmd.bank
   cmdBuffer.bits.isBLoad := cmd.isBLoad
   cmdBuffer.bits.beat := curBeat
   cmdBuffer.bits.lastLoad := cmd.lastLoad & finish
   cmdBuffer.bits.waitLoadC := cmd.waitLoadC
   cmdBuffer.bits.bufferAddr := cmd.bufferAddr
-  cmdURAM.valid := valid & cmdBuffer.ready
+  cmdBuffer.bits.reqId := idIn.bits
+  cmdURAM.valid := valid & cmdBuffer.ready & idIn.valid
   cmdURAM.bits.baseUramAddr := cmd.baseUramAddr
   cmdURAM.bits.majorStride  := cmd.majorStride
   cmdURAM.bits.baseDimMajor := cmd.baseDimMajor + (curBeat << curLog2MajorSliceSize)
   cmdURAM.bits.baseDimMinor := cmd.baseDimMinor
   cmdURAM.bits.pMinor := cmd.pMinor
+  cmdURAM.bits.reqId := idIn.bits
 
   when(firstBeat) {
     if(abTask) {

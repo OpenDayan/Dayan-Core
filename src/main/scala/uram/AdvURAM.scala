@@ -12,7 +12,7 @@ import utils.UltraRAM
 // Maybe: Fused URAM with L1 Cache. Some part of URAM Can be Config to used as L1 Cache Instead of URAM
 
 // Interface Define of AdvURAM
-// Use ID To track Comming Port or other out-stading Informations.
+// Use ID To track Coming Port or other out-standing information.
 class AdvURAMReq(addrWidth: Int, idWidth: Int, dataWidth: Int) extends Bundle {
   val address = UInt(addrWidth.W)
   val id = UInt(idWidth.W)
