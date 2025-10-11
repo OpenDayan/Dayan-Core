@@ -4,212 +4,148 @@ import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
-class TaggedData[T <: Data](log2InN: Int, log2OutN: Int, gen: T) extends Bundle {
+class SrcData[T <: Data](srcW: Int, gen: T) extends Bundle {
+  val src = UInt(srcW.W)
+  val data = gen
+}
+
+class VData[T <: Data](gen: T) extends Bundle {
   val valid = Bool()
-  val src   = UInt(log2InN.W)
   val data  = gen
 }
 
-class GroupXnSwitch[T <: Data](log2InN: Int, log2OutN: Int, nextLog2OutN: Int, routeLength: Int, genT: T) extends Module {
-  val inN  = 1 << log2InN
-  val outN = 1 << log2OutN
+class RoutePackedData[T <: Data](dstW: Int, packetPerPort: Int, gen:T) extends Bundle {
+  val data = Vec(packetPerPort, new VData(gen))
+  val dst  = UInt(dstW.W)
+}
 
-  val inValid = IO( Input(Vec(inN, Bool())))
-  val inRoute = IO( Input(Vec(inN, UInt(routeLength.W))))
-  val in      = IO( Input(Vec(inN, genT)))
-  val inReady = IO(Output(Bool()))
+class XnSwitch[T <: Data](log2N: Int, dstW: Int, packetPerPort: Int, nextLog2N: Int, gen: T) extends Module {
+  val N = 1 << log2N
 
-  val outValid  = IO(Output(Vec(outN, Bool())))
-  val outRoute  = IO(Output(UInt((routeLength - log2OutN).W)))
-  val outGValid = IO(Output(Bool()))
-  val outReady  = IO( Input(Bool()))
-  val out = IO(Vec(outN, genT))
+  val in = IO(Vec(N,
+    Flipped(Decoupled(
+      new RoutePackedData(dstW, packetPerPort, gen)
+    ))
+  ))
 
-  // Input latch
-  val latchPayload  = RegEnable(in, inReady)
-  val latchValid    = RegInit(0.U(inN.W))
-  val latchRoute    = if(routeLength > log2OutN) {
-    RegEnable(VecInit(inRoute.map(_(routeLength - 1, log2OutN))), inReady)
+  val out = IO(Decoupled(
+    new RoutePackedData(dstW - log2N, packetPerPort * N, gen)
+  ))
+
+  // Input FIFO
+  val inQ = VecInit(in.map(Queue(_, 2, false, false)))
+  val curVld = VecInit(inQ.map(_.valid))
+  val curDst = VecInit(inQ.map(_.bits.dst))
+  val curPld = VecInit(inQ.map(_.bits.data))
+  val nextRoute = if(nextLog2N != 0) {
+    VecInit(inQ.map(_.bits.dst(log2N + nextLog2N - 1, log2N)))
   } else {
-    VecInit(inRoute.map(i => 0.U))
+    VecInit(inQ.map(i => 0.U(1.W)))
   }
-  val nextRouteTable = if(nextLog2OutN > 0) {
-    RegEnable(VecInit(inRoute.map(_(log2OutN + nextLog2OutN - 1, log2OutN))), inReady)
+  val nextDst = if(dstW != log2N) {
+    VecInit(inQ.map(_.bits.dst(dstW - 1, log2N)))
   } else {
-    VecInit(inRoute.map(i => 0.U))
+    VecInit(inQ.map(i => 0.U))
   }
-  val curRouteTable  = RegEnable(VecInit(inRoute.map(_(log2OutN - 1, 0))),            inReady)
-  val updateIssue = Wire(Vec(inN, UInt(inN.W)))
 
-  val routeTableCmpMap = VecInit.tabulate(inN)(lIdx => {
-    VecInit.tabulate(inN)(rIdx => {
-      nextRouteTable(lIdx) === nextRouteTable(rIdx)
+  val routeTableCmpMap = VecInit.tabulate(N)(lIdx => {
+    VecInit.tabulate(N)(rIdx => {
+      nextRoute(lIdx) === nextRoute(rIdx)
     })
   })
-  val routeTableAllow = VecInit.tabulate(inN)(cPort => {
+  val routeTableAllow = VecInit.tabulate(N)(cPort => {
     VecInit.tabulate(cPort + 1)(tPort => {
-      routeTableCmpMap(cPort)(tPort) | !latchValid(tPort)
+      routeTableCmpMap(cPort)(tPort) | !curVld(tPort)
     }).reduceTree((l, r) => l & r)
   })
 
-  updateIssue := 0.U.asTypeOf(updateIssue)
-  when(inReady) {
-    latchValid := inValid.asUInt
-  }.otherwise {
-    latchValid := latchValid & (~updateIssue.reduceTree(_ | _)).asUInt
-  }
+  val globalValidMap = routeTableAllow.asUInt & curVld.asUInt
 
-  // CheckOne Reduce Tree
-  val checkOne = VecInit.tabulate(inN)(i => {
-    Cat(0.U(1.W), latchValid(i)) // MoreThanOne, hasOne
-  }).reduceTree((l, r) => {
-    Cat((l(0) & r(0)) | (l(1) | r(1)), l(0) | r(0))
-  })
-  val leftOne = checkOne(0) & ~checkOne(1)
-  val leftZero = ~checkOne(0)
-
-  inReady := (leftOne & outReady) | leftZero
-
-  val globalValidMap = routeTableAllow.asUInt & latchValid
-  outRoute := PriorityMux(globalValidMap, latchRoute)
-
-  // Output Mux
-  for(port <- 0 until outN) {
-    val routeMask = VecInit.tabulate(inN)(curRouteTable(_) === port.U).asUInt
+  val fireVec = Wire(Vec(N, UInt(N.W)))
+  val fireVecR = fireVec.reduceTree(_ | _)
+  for(port <- 0 until N) {
+    inQ(port).ready := fireVecR(port) & out.ready
+    val curRoute  = VecInit.tabulate(N)(curDst(_)(log2N - 1, 0))
+    val routeMask = VecInit.tabulate(N)(curRoute(_) === port.U).asUInt
     val activeMask = globalValidMap & routeMask
-    out(port) := PriorityMux(activeMask, latchPayload)
-    outValid(port) := activeMask.orR
-    when(outReady) {
-      updateIssue(port) := PriorityEncoderOH(activeMask)
+    val selData = PriorityMux(activeMask, curPld)
+    fireVec(port) := PriorityEncoderOH(activeMask)
+    for(packet <- 0 until packetPerPort) {
+      out.bits.data(packet + port * packetPerPort) := selData(packet)
+      out.bits.data(packet + port * packetPerPort).valid := selData(packet).valid & activeMask.orR
     }
   }
-  outGValid := latchValid.orR
+  out.valid := curVld.asUInt.orR
+  out.bits.dst := PriorityMux(globalValidMap, nextDst)
 }
 
 // Simplified version of Crossbar, using not-fully-connected topology.
 // Multi-level Grouped Packet(Flit) Exchange Network
-class GroupXBar[T <: Data](log2InN: Int = 2, log2OutN: Int = 2,
-                           layerInfo: Seq[(Int, Int)], // switch (log2Src, log2Dst)
+class GroupXBar[T <: Data](log2N: Int,
+                           layerInfo: Seq[Int], // switch (log2Src, log2Dst)
                            routerPolicy: (T) => UInt, gen: T) extends Module {
-  val inN  = 1 << log2InN
-  val outN = 1 << log2OutN
+  val N = 1 << log2N
+  val in = IO(Vec(N, Flipped(Decoupled(gen))))
 
-  // TODO: Other Situation?
-  require(inN == outN)
+  require(layerInfo.sum == log2N)
 
-  val in = IO(Vec(inN, Flipped(Decoupled(gen))))
-  val out = IO(Vec(inN, Decoupled(gen)))
+  // Pack Input
+  var tFlow  = Seq.empty[Vec[DecoupledIO[RoutePackedData[SrcData[T]]]]]
+  tFlow = VecInit.tabulate(N)(i => {
+    val t = Wire(Decoupled(new RoutePackedData(log2N, 1, new SrcData(log2N, gen))))
+    t.bits.data(0).data.data  := in(i).bits
+    t.bits.data(0).data.src   := i.U
+    t.bits.data(0).valid      := in(i).valid
+    t.bits.dst                := routerPolicy(in(i).bits)
+    t.valid := in(i).valid
+    in(i).ready := t.ready
+    t
+  }) +: tFlow
 
-  var curSwitchCount = inN
-  var layerPacket = Seq.empty[Vec[TaggedData[T]]]
-  var layerGValid = Seq.empty[Vec[Bool]] // Per Group
-  var layerRoute  = Seq.empty[Vec[UInt]]
-  var layerReady  = Seq.empty[Vec[Bool]]
-
-  // Input Packing
-  layerPacket = VecInit.tabulate(inN)(i => {
-    val p = Wire(new TaggedData(log2InN, log2OutN, gen))
-    p.valid := in(i).valid
-    p.src   := i.U
-    p.data  := in(i).bits
-    p
-  }) +: layerPacket
-  layerGValid = VecInit.tabulate(inN)(i => {
-    in(i).valid
-  }) +: layerGValid
-  layerRoute = VecInit.tabulate(inN)(i => {
-    routerPolicy(in(i).bits)
-  }) +: layerRoute
-  val inReady = Wire(Vec(inN, Bool()))
-  layerReady = inReady +: layerReady
-  for(i <- in.indices) { in(i).ready := inReady(i) }
-
-  var routeBitsNow = 0
-  var packetPerPort  = 1
-  var routeLength = log2OutN
+  // Layers
+  var curGroup = N
+  var packetPerPort = 1
+  var curDstW = log2N
   for(layer <- layerInfo.indices) {
-    val inPortCount  = 1 << layerInfo(layer)._1
-    val outPortCount = 1 << layerInfo(layer)._2
-    curSwitchCount = curSwitchCount / inPortCount
+    val layerLog2N = layerInfo(layer)
+    val layerN = 1 << layerLog2N
+    val switchCount = curGroup / layerN
 
-    // TODO: Other Situation?
-    require(inPortCount == outPortCount)
-    require(curSwitchCount * inPortCount * packetPerPort == inN)
-
-    // Wires Defination
-    val outReady  = Wire(Vec(curSwitchCount, Bool()))
-    val outRoute  = Wire(Vec(curSwitchCount, UInt(routeLength.W)))
-    val outGValid = Wire(Vec(curSwitchCount, Bool()))
-    val outPacket = Wire(Vec(curSwitchCount, Vec(inPortCount, Vec(packetPerPort,
-      new TaggedData(log2InN, log2OutN, gen)))))
-
-    // For Each Switch
-    for(switch <- 0 until curSwitchCount) {
-      // Gather Packet
-      val gatheredPacket = VecInit.tabulate(inPortCount)(port => {
-        VecInit.tabulate(packetPerPort)(packet => {
-          val t = layerPacket.head(packet + (port + switch * inPortCount) * packetPerPort)
-          t
-        })
-      })
-      val gatheredValid = VecInit.tabulate(inPortCount)(port => {
-        val t = layerGValid.head(switch * inPortCount + port)
-        t
-      })
-      val gatheredRoute = VecInit.tabulate(inPortCount)(port => {
-        val t = layerRoute.head(switch * inPortCount + port)
-        t
-      })
-
-      val s = Module(new GroupXnSwitch(layerInfo(layer)._1, layerInfo(layer)._2,
-        if(layer == layerInfo.length-1) 0 else layerInfo(layer + 1)._2, routeLength,
-        Vec(packetPerPort, new TaggedData(log2InN, log2OutN, gen)))
-      )
-
-      s.in      := gatheredPacket
-      s.inValid := gatheredValid
-      s.inRoute := gatheredRoute
-      for(port <- 0 until inPortCount) {
-        layerReady.head(switch * inPortCount + port) := s.inReady
-      }
-
-      outRoute(switch)  := s.outRoute
-      outGValid(switch) := s.outGValid
-      outPacket(switch) := s.out
-      s.outReady        := outReady(switch)
-      for(port <- 0 until outPortCount) {
-        for(packet <- 0 until packetPerPort) {
-          outPacket(switch)(port)(packet).valid := s.out(port)(packet).valid & s.outValid(port)
-        }
-      }
+    val nextIO = Wire(Vec(switchCount, Decoupled(
+      new RoutePackedData(curDstW - layerLog2N, packetPerPort * layerN, new SrcData(log2N, gen))
+    )))
+    for(switch <- 0 until switchCount) {
+      val partitialIn = VecInit.tabulate(layerN)(i => tFlow.head(switch * layerN + i))
+      val s = Module(new XnSwitch(layerLog2N, curDstW, packetPerPort,
+        if(layer == layerInfo.length - 1) 0 else layerInfo(layer + 1), new SrcData(log2N, gen)))
+      s.in <> partitialIn
+      s.out <> nextIO(switch)
     }
 
-    layerReady  = outReady  +: layerReady
-    layerRoute  = outRoute  +: layerRoute
-    layerGValid = outGValid +: layerGValid
-    layerPacket = outPacket.asTypeOf(Vec(curSwitchCount * inPortCount * packetPerPort,
-      new TaggedData(log2InN, log2OutN, gen))) +: layerPacket
-
-    routeLength    = routeLength - layerInfo(layer)._2
-    packetPerPort  = packetPerPort * outPortCount
+    tFlow = nextIO +: tFlow
+    curGroup = curGroup / layerN
+    packetPerPort = packetPerPort * layerN
+    curDstW = curDstW - layerLog2N
   }
 
-  // Output Unpacking
-  for(port <- 0 until outN) {
-    out(port).bits  := layerPacket.head(port).data
-    out(port).valid := layerPacket.head(port).valid
-    assert(!out(port).valid | out(port).ready)
+  // Unpack Output
+  val out = IO(Decoupled(Vec(N, gen)))
+  val outVld = IO(Output(Vec(N, Bool())))
+  val outSrc = IO(Output(Vec(N, UInt(log2N.W)))) // Used For resp XBar
+
+  for(port <- 0 until N) {
+    out.bits(port) := tFlow.head(0).bits.data(port).data.data
+    outSrc(port)   := tFlow.head(0).bits.data(port).data.src
+    outVld(port)   := tFlow.head(0).bits.data(port).valid
   }
-  layerReady.head(0) := 1.B // Assert no stalling
+  tFlow.head(0).ready := out.ready
+  out.valid := tFlow.head(0).valid
 
 }
 
 object GroupXBar extends App {
   ChiselStage.emitSystemVerilog(
-    new GroupXBar(5, 5,
-      Seq((2,2), (3,3)),
-      (in: UInt) => in(4, 0),
-      UInt(32.W)),
+    new GroupXBar(5, Seq(2, 3), (i: UInt) => i(4, 0), UInt(32.W)),
     firtoolOpts = Array(
     "-disable-all-randomization",
     "-strip-debug-info",
