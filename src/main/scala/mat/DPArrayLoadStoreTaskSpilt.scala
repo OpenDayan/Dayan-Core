@@ -133,7 +133,7 @@ class DPArrayLoadStoreBeatHandler(
 class DPArrayLoadStoreTaskSpilt(
   storageRatio: Int, busWidth: Int, mnkWidth: Int,
   addressWidth: Int, cMNK: Int, cM: Int, cN: Int, cK: Int,
-  abTask: Boolean, cTask: Boolean, storeTask: Boolean, bankSft: Int
+  abTask: Boolean, cTask: Boolean, storeTask: Boolean, bankSft: Int, idWidth: Int
 ) extends Module {
   val cmdIn = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
   val valid = RegInit(0.B)
@@ -141,8 +141,8 @@ class DPArrayLoadStoreTaskSpilt(
   val beatSpilt = Module(new DPArrayLoadStoreBeatHandler(
     storageRatio, busWidth, mnkWidth, addressWidth, cMNK, cM, cN, cK, abTask, cTask, storeTask))
 
-  val cmdBuffer = IO(Decoupled(new DPALoadStoreMicroCommand(storageRatio, beatSpilt.maxBeat)))
-  val cmdURAM = IO(Decoupled(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth, addressWidth, cMNK)))
+  val cmdBuffer = IO(Decoupled(new DPALoadStoreMicroCommand(storageRatio, beatSpilt.maxBeat, idWidth)))
+  val cmdURAM = IO(Decoupled(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth, addressWidth, cMNK, idWidth)))
 
   cmdBuffer :<>= Queue(beatSpilt.cmdBuffer, 4)
   cmdURAM :<>= Queue(beatSpilt.cmdURAM)
@@ -225,7 +225,7 @@ class DPArrayLoadStoreTaskSpilt(
 object DPArrayLoadStoreTaskSpilt extends App {
   ChiselStage.emitSystemVerilog(
     new DPArrayLoadStoreTaskSpilt(
-      32, 256, 12, 20, 32, 16, 8, 32, true, false, false, 4
+      32, 256, 12, 20, 32, 16, 8, 32, true, false, false, 4, 5
     ),
     firtoolOpts = Array(
       "-disable-all-randomization",

@@ -57,7 +57,7 @@ class MatLoadStoreCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, c
 
 class DPArrayTop(
  storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int,
- cM: Int, cN: Int, cK: Int, sK: Int,
+ cM: Int, cN: Int, cK: Int, sK: Int, idWidth: Int,
  wE: Int = 9, wF: Int = 25) extends Module {
   val cMNK = Array(cM, cN, cK).max
   val maxTileSize = Array(cM * cK, cN * cK, cM * cN * 4).max
@@ -150,17 +150,17 @@ class DPArrayTop(
   // A / B Load Task Spilt Unit
   val abLoadTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = true, cTask = false, storeTask = false, abBankSft
+    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = true, cTask = false, storeTask = false, abBankSft, idWidth
   ))
   // C Load Task Spilt Unit
   val cLoadTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = false, cTask = true, storeTask = false, cBankSft
+    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = false, cTask = true, storeTask = false, cBankSft, idWidth
   ))
   // C Store Task Spilt Unit
   val cStoreTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = false, cTask = true, storeTask = true, cBankSft
+    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = false, cTask = true, storeTask = true, cBankSft, idWidth
   ))
   abLoadTaskSpilter.cmdIn :<>= ldABCmd
   cLoadTaskSpilter.cmdIn  :<>= ldCCmd
@@ -268,7 +268,7 @@ class DPArrayTop(
 
 object DPArrayTop extends App {
   ChiselStage.emitSystemVerilog(
-    new DPArrayTop(32, 16, 20, 20, 4, 2, 8, 8),
+    new DPArrayTop(32, 16, 20, 20, 4, 2, 8, 8, 5),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",

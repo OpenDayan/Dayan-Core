@@ -38,6 +38,4 @@ class ReorderIdTableInorder(idWidth: Int = 5) extends Module{
 
   chisel3.assert(!(empty & idIn.fire), "Release when no allocated ID.")
   chisel3.assert(!(idIn.fire & idIn.bits =/= releasePtr), "Release are not inordered!")
-
-
 }

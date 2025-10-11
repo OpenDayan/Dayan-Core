@@ -20,7 +20,7 @@ class MatInst extends Bundle {
 
 class MatTop(
               storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int,
-              cM: Int, cN: Int, cK: Int, kPerScale: Int,
+              cM: Int, cN: Int, cK: Int, kPerScale: Int, idWidth: Int = 5,
               wE: Int = 9, wF: Int = 25) extends Module {
   val matInst = IO(Flipped(Decoupled(new MatInst)))
   val matInstResp = IO(Decoupled(UInt(64.W)))
@@ -85,7 +85,7 @@ class MatTop(
   // DPArray Top
   val dpa = Module(new DPArrayTop(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cM = cM, cN = cN, cK = cK, sK = kPerScale, wE = wE, wF = wF
+    cM = cM, cN = cN, cK = cK, sK = kPerScale, idWidth = idWidth, wE = wE, wF = wF
   ))
 
   dpa.ldABCmd <> Queue(matSpilt.ldABCmd, 8)
