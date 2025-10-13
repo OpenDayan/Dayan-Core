@@ -24,7 +24,7 @@ class SyncBarSource(fifoSize: Int, streamCount: Int, sourceCount: Int) extends M
   val selReady = emptyFlit =/= 0.U & outReady.asUInt.andR
 
   // RR Arbiter of Input
-  val arb = Module(new Arbiter(Vec(streamCount, Bool()), sourceCount))
+  val arb = Module(new RRArbiter(Vec(streamCount, Bool()), sourceCount))
   arb.io.in := VecInit.tabulate(sourceCount)(i => {
     val s = Decoupled(Vec(streamCount, Bool()))
     s.valid := inValidR(i)

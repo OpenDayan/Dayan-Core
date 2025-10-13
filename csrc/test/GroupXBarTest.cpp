@@ -20,6 +20,11 @@ static inline void initArray(int bank) {
         else reqArray[i] = (i & 0x3) | (bank * 4);
     }
 }
+static inline void rndInitArray() {
+    for(int i = 0 ; i < N ; i ++) {
+        reqArray[i] = rand();
+    }
+}
 static inline void shuffle(unsigned int * start, int elemSize, int range) {
     // 计算实际的元素个数（以elemSize为单位）
     int numElements = range / elemSize;
@@ -40,15 +45,20 @@ static inline void shuffle(unsigned int * start, int elemSize, int range) {
     }
 }
 
+unsigned long long totalValid = 0;
+unsigned long long totalFired = 0;
+
 static inline void mainLoop()
 {
     static int i = -1;
     // Random Assign 32 Request to Each Ports with no conflict!
-    initArray(i++);
-    for(int i = 0 ; i < N / 4; i++) {
-        shuffle(reqArray + i * 4, 1, 4);
-    }
-    shuffle(reqArray, 4, N);
+    // initArray(0);
+    rndInitArray();
+    // for(int i = 0 ; i < N / 4; i++) {
+    //     shuffle(reqArray + i * 4, 1, 4);
+    // }
+    // shuffle(reqArray, 4, N);
+    // shuffle(reqArray, 1, N);
 
     dut->in_0_bits = reqArray[ 0 + 0];dut->in_1_bits = reqArray[ 0 + 1];dut->in_2_bits = reqArray[ 0 + 2];dut->in_3_bits = reqArray[ 0 + 3];
     dut->in_4_bits = reqArray[ 4 + 0];dut->in_5_bits = reqArray[ 4 + 1];dut->in_6_bits = reqArray[ 4 + 2];dut->in_7_bits = reqArray[ 4 + 3];
@@ -67,6 +77,17 @@ static inline void mainLoop()
     dut->in_20_valid = 1;dut->in_21_valid = 1;dut->in_22_valid = 1;dut->in_23_valid = 1;
     dut->in_24_valid = 1;dut->in_25_valid = 1;dut->in_26_valid = 1;dut->in_27_valid = 1;
     dut->in_28_valid = 1;dut->in_29_valid = 1;dut->in_30_valid = 1;dut->in_31_valid = 1;
+
+    totalValid += 32;
+    totalFired += 
+    dut->in_0_ready  + dut->in_1_ready  + dut->in_2_ready  + dut->in_3_ready +
+    dut->in_4_ready  + dut->in_5_ready  + dut->in_6_ready  + dut->in_7_ready +
+    dut->in_8_ready  + dut->in_9_ready  + dut->in_10_ready + dut->in_11_ready +
+    dut->in_12_ready + dut->in_13_ready + dut->in_14_ready + dut->in_15_ready +
+    dut->in_16_ready + dut->in_17_ready + dut->in_18_ready + dut->in_19_ready +
+    dut->in_20_ready + dut->in_21_ready + dut->in_22_ready + dut->in_23_ready +
+    dut->in_24_ready + dut->in_25_ready + dut->in_26_ready + dut->in_27_ready +
+    dut->in_28_ready + dut->in_29_ready + dut->in_30_ready + dut->in_31_ready;
 
     dut->out_ready = 1;
 
@@ -109,6 +130,7 @@ int main(int argc, char **argv)
             if((--stopFlag) == 1) break;
         }
     }
+    printf("Total Valid: %lld, Total Fired: %lld, Rate: %lf\n", totalValid, totalFired, (double)totalFired / (double)totalValid);
     if(!stopFlag) {
         printf("\033[42;32mVerilator: GroupXBar Test PASS!\033[0m\n");
     } else {

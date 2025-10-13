@@ -50,25 +50,18 @@ class XnSwitch[T <: Data](log2N: Int, dstW: Int, rDstW: Int, packetPerPort: Int,
     VecInit(curDst.map(i => 0.U))
   }
 
-  val rrIdx = RegInit(0.U(log2N.W))
-  rrIdx := rrIdx + 1.U
-  val rrCurVld = VecInit.tabulate(2 * N)(i => {
-    if(i < N) {
-      curVld(i) & (rrIdx <= i.U)
-    } else {
-      curVld(i - N) & (i.U < rrIdx)
-    }
-  })
-  val rrNextDst = VecInit.tabulate(2 * N)(i => {
-    if(i < N) {
-      nextDst(i)
-    } else {
-      nextDst(i - N)
-    }
+  // selRoute: RRArbiter
+  val routeArb = Module(new RRArbiter(nextDst(0).cloneType, N))
+  routeArb.io.in <> VecInit.tabulate(N)(i => {
+    val r = Wire(Decoupled(nextDst(0).cloneType))
+    r.valid := curVld(i)
+    r.bits := nextDst(i)
+    r
   })
 
-  // selRoute: RoundRobin?
-  out.bits.dst := PriorityMux(rrCurVld, rrNextDst)
+  out.bits.dst := routeArb.io.out.bits
+  routeArb.io.out.ready := out.ready
+
   val selRoute = if(nextLog2N != 0) {
     out.bits.dst(nextLog2N - 1, 0)
   } else {
@@ -80,14 +73,24 @@ class XnSwitch[T <: Data](log2N: Int, dstW: Int, rDstW: Int, packetPerPort: Int,
 
   val globalValidMap = routeTableAllow.asUInt & curVld.asUInt
 
-  val fireVec = Wire(Vec(N, UInt(N.W)))
-  val fireVecR = fireVec.reduceTree(_ | _)
+  val fireVec = Wire(Vec(N, Vec(N, Bool())))
+  val fireVecR = VecInit(fireVec.map(_.asUInt)).reduceTree(_ | _)
   for(port <- 0 until N) {
     inQ(port).ready := fireVecR(port) & out.ready
     val routeMask = VecInit(curRoute.map(_ === port.U)).asUInt
     val activeMask = globalValidMap & routeMask
-    val selData = PriorityMux(activeMask, curPld)
-    fireVec(port) := PriorityEncoderOH(activeMask)
+//    val selData = PriorityMux(activeMask, curPld)
+//    fireVec(port) := PriorityEncoderOH(activeMask)
+    val arb = Module(new RRArbiter(curPld(0).cloneType, N))
+    arb.io.in <> VecInit.tabulate(N)(i => {
+      val r = Wire(Decoupled(curPld(0).cloneType))
+      r.valid := activeMask(i)
+      r.bits := curPld(i)
+      fireVec(port)(i) := (arb.io.chosen === i.U) & arb.io.out.valid
+      r
+    })
+    val selData = arb.io.out.bits
+    arb.io.out.ready := out.ready
     for(packet <- 0 until packetPerPort) {
       out.bits.data(packet + port * packetPerPort) := selData(packet)
       out.bits.data(packet + port * packetPerPort).valid := selData(packet).valid & activeMask.orR
@@ -166,10 +169,6 @@ class GroupXBar[T <: Data](log2N: Int,
     outRVld(port)  := outVld(outReverseRoute(port)) & (outRSrc(port) === port.U)
     outRSrc(port)  := outSrc(outReverseRoute(port))
     outR(port)     := tFlow.head(0).bits.data(outReverseRoute(port)).data.data
-//    when(outRVld(port) & (outRSrc(port) === port.U)) {
-//      chisel3.printf("Port: %d, outReverseRoute: %d outVld: %b, outSrc: %d\n", port.U,
-//        outReverseRoute(port), outRVld(port), outRSrc(port))
-//    }
   }
   tFlow.head(0).ready := out.ready
   out.valid := tFlow.head(0).valid
