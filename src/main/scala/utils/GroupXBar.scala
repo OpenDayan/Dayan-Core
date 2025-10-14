@@ -182,7 +182,7 @@ object GroupXBar extends App {
     // 4, 1  36%  34% 100%
     // 3, 2  22%  22% 100%
     // 2, 3  21%  20% 100%
-    new GroupXBar(5, Seq(5, 0), (i: UInt) => i(4, 0), UInt(32.W)),
+    new GroupXBar(5, Seq(0, 5, 0), (i: UInt) => i(4, 0), UInt(32.W)),
     firtoolOpts = Array(
     "-disable-all-randomization",
     "-strip-debug-info",
