@@ -52,12 +52,13 @@ static inline void mainLoop()
 {
     static int i = -1;
     // Random Assign 32 Request to Each Ports with no conflict!
-    // initArray(0);
-    rndInitArray();
-    // for(int i = 0 ; i < N / 4; i++) {
-    //     shuffle(reqArray + i * 4, 1, 4);
-    // }
-    // shuffle(reqArray, 4, N);
+    initArray(i++);
+    // initArray(-1);
+    // rndInitArray();
+    for(int i = 0 ; i < N / 4; i++) {
+        shuffle(reqArray + i * 4, 1, 4);
+    }
+    shuffle(reqArray, 4, N);
     // shuffle(reqArray, 1, N);
 
     dut->in_0_bits = reqArray[ 0 + 0];dut->in_1_bits = reqArray[ 0 + 1];dut->in_2_bits = reqArray[ 0 + 2];dut->in_3_bits = reqArray[ 0 + 3];

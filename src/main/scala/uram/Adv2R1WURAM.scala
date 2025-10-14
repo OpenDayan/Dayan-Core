@@ -9,6 +9,8 @@ import utils.DPIRamBase
 // Latency is Flex-Variable
 class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int, N: Int, addrWidth: Int, idWidth: Int, dataWidth: Int) {
 
+  val log2N = log2Ceil(N)
+
   // R Port
   val r0req_i = IO(Flipped(Vec(R0Port, Vec(N, Decoupled(new AdvURAMReq(addrWidth, idWidth, dataWidth))))))
   val r0esp_o = IO(Vec(R0Port, Vec(N, new AdvURAMResp(addrWidth, idWidth, dataWidth))))
@@ -24,6 +26,15 @@ class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int, N: Int, addrWidth: Int, i
   val r0ValidReq  = Wire(Vec(N, Bool()))
   val r1BankedReq = Wire(Vec(N, new AdvURAMReq(addrWidth, idWidth, dataWidth)))
   val r1ValidReq  = Wire(Vec(N, Bool()))
+
+  // R Port Reverse Routing
+  val r0RRoute = Wire(Vec(N, UInt(log2N.W)))
+  val r1RRoute = Wire(Vec(N, UInt(log2N.W)))
+
+  // URAM (2-Cycle Latency)
+
+  // Response Switch
+
 
   // W Port
   class WReq extends Bundle {

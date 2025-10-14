@@ -177,7 +177,12 @@ class GroupXBar[T <: Data](log2N: Int,
 
 object GroupXBar extends App {
   ChiselStage.emitSystemVerilog(
-    new GroupXBar(5, Seq(2, 3), (i: UInt) => i(4, 0), UInt(32.W)),
+    // size  NoC  Rnd  MAT
+    // 5, 0 100%  60% 100%
+    // 4, 1  36%  34% 100%
+    // 3, 2  22%  22% 100%
+    // 2, 3  21%  20% 100%
+    new GroupXBar(5, Seq(5, 0), (i: UInt) => i(4, 0), UInt(32.W)),
     firtoolOpts = Array(
     "-disable-all-randomization",
     "-strip-debug-info",
