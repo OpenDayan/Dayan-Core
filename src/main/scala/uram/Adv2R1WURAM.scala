@@ -3,7 +3,7 @@ package uram
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
-import utils.{DPIRamBase, SyncBarSource, UltraRAM2R1W, pipe}
+import utils.{DPIRamBase, GroupXBar, SyncBarSink, SyncBarSource, UltraRAM2R1W, pipe}
 
 // Real URAM Implement, 32(N) x 8B Request / Ports.
 // Read  Latency is 3(Input Switch) + 2(UltraRAM/SRAM) + 1(Output Switch) + 1(Output) == 7 Cycles
@@ -49,33 +49,73 @@ class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int,
   }))
   val r0ValidResp = pipe.genPipe(r0RValid, 3)(3)
   val r1ValidResp = pipe.genPipe(r1RValid, 3)(3)
+  val r0IDResp = pipe.genPipe(VecInit(r0BankedReq.map(_.id)), 3)(3)
+  val r1IDResp = pipe.genPipe(VecInit(r1BankedReq.map(_.id)), 3)(3)
 
-  val r0resp_o = IO(Vec(R0Port, Vec(N, new AdvURAMResp(addrWidth, idWidth, dataWidth))))
-  val r1resp_o = IO(Vec(R1Port, Vec(N, new AdvURAMResp(addrWidth, idWidth, dataWidth))))
+  val r0resp_o = IO(Vec(R0Port, Vec(N, Decoupled(new AdvURAMResp(addrWidth, idWidth, dataWidth)))))
+  val r1resp_o = IO(Vec(R1Port, Vec(N, Decoupled(new AdvURAMResp(addrWidth, idWidth, dataWidth)))))
 
   // R Sync Bar Generation
   // 4-Stream Gathered Sync Bar
   // SyncBar Flit Link
-  val r0SyncFlit = Wire(Vec(N / 4, Bool()))
-  val r1SyncFlit = Wire(Vec(N / 4, Bool()))
-  val r0SyncFire = Wire(Vec(N / 4, Bool()))
-  val r1SyncFire = Wire(Vec(N / 4, Bool()))
-  val wSyncFlit = Wire(Vec(N / 4, Bool()))
   for(syncBarId <- 0 until (N / 4)) {
     val r0SyncBarSrc = Module(new SyncBarSource(fifoSize, 4, R0Port))
-    r0SyncBarSrc.inFlit := r0SyncFlit(syncBarId)
     r0SyncBarSrc.inValid := VecInit.tabulate(R0Port)(inReqId => VecInit.tabulate(4)(streamId => {
       r0req_i(inReqId)(syncBarId * 4 + streamId).ready := r0SyncBarSrc.inReady(inReqId)
       r0req_i(inReqId)(syncBarId * 4 + streamId).valid
     }))
-    r0SyncFire(syncBarId) := r0SyncBarSrc.outFire
+    for(streamId <- 0 until 4) {
+      r0SyncReq(syncBarId * 4 + streamId).valid := r0SyncBarSrc.outValid(streamId)
+      r0SyncBarSrc.outReady(streamId) := r0SyncReq(syncBarId * 4 + streamId).ready
+      r0SyncReq(syncBarId * 4 + streamId).bits := r0req_i(r0SyncBarSrc.outSel)(syncBarId * 4 + streamId).bits
+    }
+
+    val r0SyncBarSink = Module(new SyncBarSink(fifoSize, 4, R0Port, new AdvURAMResp(addrWidth, idWidth, dataWidth)))
+    r0SyncBarSink.in := VecInit.tabulate(4)(streamId => {
+      val r = new AdvURAMResp(addrWidth, idWidth, dataWidth)
+      r0SyncBarSink.inValid := r0ValidResp(syncBarId * 4 + streamId)
+      r.valid := r0ValidResp(syncBarId * 4 + streamId)
+      r.data  := r0Resp(syncBarId * 4 + streamId)
+      r.id    := r0IDResp(syncBarId * 4 + streamId)
+      r0resp_o
+      r
+    })
+
+    r0SyncBarSrc.inFlit    := r0SyncBarSink.outFlit
+    r0SyncBarSink.srcSel   := r0SyncBarSrc.outSel
+    r0SyncBarSink.srcFire  := r0SyncBarSrc.outFire
+    r0SyncBarSink.srcValid := r0SyncBarSrc.outValid
+
     val r1SyncBarSrc = Module(new SyncBarSource(fifoSize, 4, R1Port))
-    r1SyncBarSrc.inFlit := r1SyncFlit(syncBarId)
     r1SyncBarSrc.inValid := VecInit.tabulate(R1Port)(inReqId => VecInit.tabulate(4)(streamId => {
       r1req_i(inReqId)(syncBarId * 4 + streamId).ready := r1SyncBarSrc.inReady(inReqId)
       r1req_i(inReqId)(syncBarId * 4 + streamId).valid
     }))
+    for(streamId <- 0 until 4) {
+      r1SyncReq(syncBarId * 4 + streamId).valid := r1SyncBarSrc.outValid(streamId)
+      r1SyncBarSrc.outReady(streamId) := r1SyncReq(syncBarId * 4 + streamId).ready
+      r1SyncReq(syncBarId * 4 + streamId).bits := r1req_i(r1SyncBarSrc.outSel)(syncBarId * 4 + streamId).bits
+    }
   }
+
+  // R Port XBar
+  val r0XBar = Module(new GroupXBar(log2N, Seq(0, log2N, 0), (i: UInt) => i(log2N - 1, 0),
+    new AdvURAMResp(addrWidth, idWidth, dataWidth)))
+  val r1XBar = Module(new GroupXBar(log2N, Seq(0, log2N, 0), (i: UInt) => i(log2N - 1, 0),
+    new AdvURAMResp(addrWidth, idWidth, dataWidth)))
+
+  r0XBar.in <> r0SyncReq
+  r1XBar.in <> r1SyncReq
+  r0XBar.out.ready := 1.B
+  r1XBar.out.ready := 1.B
+  r0BankedReq := r0XBar.out.bits
+  r1BankedReq := r1XBar.out.bits
+  r0BankedValidReq := r0XBar.outVld
+  r1BankedValidReq := r1XBar.outVld
+  r0RRoute := r0XBar.outReverseRoute
+  r1RRoute := r1XBar.outReverseRoute
+  r0RValid := r0XBar.outRVld
+  r1RValid := r1XBar.outRVld
 
   // W Port
   class WReq extends Bundle {

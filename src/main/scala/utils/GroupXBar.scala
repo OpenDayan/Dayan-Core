@@ -164,7 +164,7 @@ class GroupXBar[T <: Data](log2N: Int,
   for(port <- 0 until N) {
     out.bits(port) := tFlow.head(0).bits.data(port).data.data
     outSrc(port)   := tFlow.head(0).bits.data(port).data.src
-    outVld(port)   := tFlow.head(0).bits.data(port).valid
+    outVld(port)   := tFlow.head(0).bits.data(port).valid & tFlow.head(0).valid
     outReverseRoute(port) := tFlow.head(0).bits.reverseDst(port)(log2N, 1)
     outRVld(port)  := outVld(outReverseRoute(port)) & (outRSrc(port) === port.U)
     outRSrc(port)  := outSrc(outReverseRoute(port))
