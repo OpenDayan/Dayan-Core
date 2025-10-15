@@ -36,41 +36,21 @@ int persistentMode = 0;
 int randomRange = 480;
 
 // Bank Count
-#define MAXID 32
-#define URAMSIZE (1024 * 1024ull)
+// 1: 2, 2: 4, 3: 8, 4: 16, 5: 32
+#define LOG2BANK 3
+#define URAMSIZE (32 * 32 * 1024ull)
 long int uram[URAMSIZE / 8]; // 1024KBytes URAM
 static char* uramBase = (char*)&uram;
 
-extern "C" long long DPIRamProvider(int id, int raddr, char re, int waddr, char we, long long int wdata)
+extern "C" long long UltraRamRead(int id, int raddr)
 {
-#ifdef URAM_SYNC_WRITE
-    static int maxCycle = 0;
-    static int cycle[MAXID];
-    static int Lwaddr[MAXID];
-    static long int Lwdata[MAXID];
+    return uram[id | (raddr << LOG2BANK)];
+}
 
-    if(cycle[id] > maxCycle) {
-        maxCycle = cycle[id];
-        for(int i = 0; i < MAXID ; i++) {
-            if(Lwaddr[i] != -1) uram[Lwaddr[i]] = Lwdata[i];
-        }
-    }
-    cycle[id]++;
-
-    if(we) {
-        Lwaddr[id] = waddr;
-        Lwdata[id] = wdata;
-    } else {
-        Lwaddr[id] = -1;
-    }
-    return re ? uram[raddr] : 0;
-#else
-    long long rvalue = re ? uram[raddr] : 0;
-    if(we) {
-        uram[waddr] = wdata;
-    }
-    return rvalue;
-#endif
+extern "C" long long UltraRamWrite(int id, int waddr, long int wdata)
+{
+    uram[id | (waddr << LOG2BANK)] = wdata;
+    return 0;
 }
 
 static inline float getMatrixElemFP8(int base, int major, int minor)
