@@ -8,9 +8,15 @@ all: UnitTest.mk
 
 include UnitTest.mk
 
-.PHONY: UnitTest.mk
+.PHONY: UnitTest.mk CodeStatistics
 UnitTest.mk: GenerateMakefile.py UnitTestConfig.json generated/testbenchTemplate
 	python3 GenerateMakefile.py
+
+CodeStatistics:
+	git ls-files | xargs wc -l
+
+CodeStatisticsScala:
+	git ls-files | grep "scala" | xargs wc -l
 
 generated/testbenchTemplate:
 	mkdir -p generated/testbenchTemplate

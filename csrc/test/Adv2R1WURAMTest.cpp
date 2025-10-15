@@ -51,6 +51,10 @@ static inline void mainLoop()
     dut->r0resp_o_0_1_ready = 1;
     dut->r0resp_o_1_0_ready = 1;
     dut->r0resp_o_1_1_ready = 1;
+    dut->r1resp_o_0_0_ready = 1;
+    dut->r1resp_o_0_1_ready = 1;
+    dut->r1resp_o_1_0_ready = 1;
+    dut->r1resp_o_1_1_ready = 1;
 }
 
 int main(int argc, char **argv)

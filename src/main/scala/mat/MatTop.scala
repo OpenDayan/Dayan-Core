@@ -18,6 +18,9 @@ class MatInst extends Bundle {
   val dst  = UInt(64.W) // Based Address of C
 }
 
+// Requirement for URAM:
+//   busWidth === cK * AnyValue
+//   busGroupSize === cK
 class MatTop(
               storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int,
               cM: Int, cN: Int, cK: Int, kPerScale: Int, idWidth: Int = 5,
@@ -88,8 +91,10 @@ class MatTop(
     cM = cM, cN = cN, cK = cK, sK = kPerScale, idWidth = idWidth, wE = wE, wF = wF
   ))
 
-  dpa.ldABCmd <> Queue(matSpilt.ldABCmd, 8)
+  dpa.ldACmd <> Queue(matSpilt.ldACmd, 8)
+  dpa.ldBCmd <> Queue(matSpilt.ldBCmd, 8)
   dpa.ldCCmd <> Queue(matSpilt.ldCCmd, 8)
+  dpa.ldBar  <> Queue(matSpilt.ldBar,  8)
   dpa.stCmd <> Queue(matSpilt.stCmd, 2)
   dpa.calcCmd <> Queue(matSpilt.calcCmd, 2)
 
@@ -104,19 +109,23 @@ class MatTop(
   matSpilt.fComp.ready := 1.B
 
   // URAM Interface
+  val channelCount    = busWidth / cK
+  val portsPerChannel = ports    / channelCount
   val ports = busWidth / 8
   val rreq0  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-  val rresp0 = IO(Flipped(Vec(ports, new AdvURAMResp(addressWidth,   0, 64))))
   val rreq1  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-  val rresp1 = IO(Flipped(Vec(ports, new AdvURAMResp(addressWidth,   0, 64))))
-  val wreq  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-  val wdata = IO(Output(Vec(ports, UInt(64.W))))
+  val wreq   = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
+  val wdata  = IO(Output(Vec(ports, UInt(64.W))))
+  val rresp0 = IO(Flipped(Vec(channelCount, Decoupled(Vec(portsPerChannel, new AdvURAMResp(addressWidth,  0, 64))))))
+  val rresp1 = IO(Flipped(Vec(channelCount, Decoupled(Vec(portsPerChannel, new AdvURAMResp(addressWidth,  0, 64))))))
+  val wresp  = IO(Flipped(Vec(channelCount, Decoupled(Vec(portsPerChannel, new AdvURAMWResp(addressWidth, 0, 64))))))
   rreq0 :<>= dpa.rreq0
   rreq1 :<>= dpa.rreq1
-  dpa.rresp0 :<>= rresp0
-  dpa.rresp1 :<>= rresp1
   wreq :<>= dpa.wreq
   wdata := dpa.wdata
+  dpa.rresp0 :<>= rresp0
+  dpa.rresp1 :<>= rresp1
+  dpa.wresp  :<>= wresp
 }
 
 class MatTestTop(
@@ -125,25 +134,24 @@ class MatTestTop(
               wE: Int = 9, wF: Int = 25) extends Module {
   val mat = Module(new MatTop(storageRatio, busWidth, mnkWidth, addressWidth, cM, cN, cK, kPerScale, wE, wF))
   val ports = busWidth / 8
-  val fakeUram0 = Module(new FakeURAM(ports, addressWidth, 0, 64))
-  val fakeUram1 = Module(new FakeURAM(ports, addressWidth, 0, 64))
-  (0 until ports).foreach(i => {
-    fakeUram1.wreq_i(i).valid := 0.U
-    fakeUram1.wreq_i(i).bits := 0.U.asTypeOf(fakeUram1.wreq_i(i).bits)
-    fakeUram1.wdata_i(i) := 0.U
-  })
+  // URAM Instance
+  val uram = Module(new Adv2R1WURAM(
+    R0Port = 1, R1Port = 1, W0Port = 1, GroupCount = cK / 8,
+    fifoSize = 16, N = busWidth / 8, addrWidth = addressWidth, idWidth = 0, dataWidth = 64
+  ))
+
   val matInst = IO(Flipped(Decoupled(new MatInst)))
   val finish = IO(Output(Bool()))
   mat.matInst :<>= matInst
   mat.matInstResp.ready := 1.B
   finish := mat.finish
-
-  fakeUram0.rreq_i :<>= mat.rreq0
-  fakeUram1.rreq_i :<>= mat.rreq1
-  fakeUram0.wreq_i :<>= mat.wreq
-  fakeUram0.wdata_i :<>= mat.wdata
-  mat.rresp0 :<>= fakeUram0.resp_o
-  mat.rresp1 :<>= fakeUram1.resp_o
+  uram.r0req_i(0) :<>= mat.rreq0
+  uram.r1req_i(0) :<>= mat.rreq1
+  uram.wreq_i(0)  :<>= mat.wreq
+  uram.wdata_i(0) :<>= mat.wdata
+  mat.rresp0 :<>= uram.r0resp_o(0)
+  mat.rresp1 :<>= uram.r1resp_o(0)
+  mat.wresp  :<>= uram.wresp_o(0)
 }
 
 object MatTestTop extends App {

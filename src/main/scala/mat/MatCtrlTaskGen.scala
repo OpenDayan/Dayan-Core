@@ -62,8 +62,10 @@ class MatSubTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bu
 class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: Int, cN: Int, cK: Int) extends Module {
   require(cK >= cM & cK >= cN) // MatLoadCommand.wMNK Should be the Max(cM, cN, cK)
   val task = IO(Flipped(Decoupled(new MatTask(storageRatio, mnkWidth, addressWidth))))
-  val ldABCmd = IO(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
+  val ldACmd = IO(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
+  val ldBCmd = IO(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
   val ldCCmd = IO(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
+  val ldBar  = IO(Decoupled(Vec(3, Bool()))) // Ld Barrier
   val calcCmd = IO(Decoupled(new MatCalcCommand(storageRatio)))
   val stCmd = IO(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
   val log2CM = log2Ceil(cM)
@@ -72,8 +74,10 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val log2S = log2Ceil(storageRatio)
 
   // load/calc/st Cmd Queue should NEVER Stall!
-  chisel3.assert(!(ldABCmd.valid & !ldABCmd.ready), "ldABCmd OverFlow!")
+  chisel3.assert(!(ldACmd.valid & !ldACmd.ready), "ldACmd OverFlow!")
+  chisel3.assert(!(ldBCmd.valid & !ldBCmd.ready), "ldBCmd OverFlow!")
   chisel3.assert(!(ldCCmd.valid  & !ldCCmd.ready),  "ldCCmd OverFlow!")
+  chisel3.assert(!(ldBar.valid  & !ldBar.ready),  "ldBar OverFlow!")
   chisel3.assert(!(calcCmd.valid & !calcCmd.ready), "calcCmd OverFlow!")
   chisel3.assert(!(stCmd.valid   & !stCmd.ready), "stCmd OverFlow!")
 
@@ -233,6 +237,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val lACmdFinish = RegInit(Bool(), 1.B)
   val lBCmdFinish = RegInit(Bool(), 1.B)
   val lCCmdFinish = RegInit(Bool(), 1.B)
+  val lBarFinish  = RegInit(Bool(), 1.B)
   val lCmdLeft = RegInit(UInt(2.W), 0.U)
   val lACmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
   val lBCmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
@@ -249,12 +254,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   lACmd.bank := lTask.aBank
   lBCmd.bank := lTask.bBank
   lCCmd.bank := lTask.cBank
-  lACmd.lastLoadAB := !lTask.bLoad
-  lACmd.waitLoadC := lTask.cLoad
-  lBCmd.lastLoadAB := 1.B
-  lBCmd.waitLoadC := lTask.cLoad
-  lCCmd.lastLoadAB := 0.B
-  lCCmd.waitLoadC := 0.B
+  ldBar.bits(0) := lTask.aLoad
+  ldBar.bits(1) := lTask.bLoad
+  ldBar.bits(2) := lTask.cLoad
   lACmd.pMajor := lTask.pM
   lACmd.pMinor := lTask.pK
   lBCmd.pMajor := lTask.pN
@@ -278,22 +280,26 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
     lACmdFinish := !lTaskQ.io.deq.bits.aLoad
     lBCmdFinish := !lTaskQ.io.deq.bits.bLoad
     lCCmdFinish := !lTaskQ.io.deq.bits.cLoad
+    lBarFinish  := 0.B
     lCmdLeft := lTaskQ.io.deq.bits.loadCnt
   }.otherwise {
     when(!lACmdFinish)          { lACmdFinish := 1.B }
-      .otherwise                { lBCmdFinish := 1.B }
+    when(!lBCmdFinish)          { lBCmdFinish := 1.B }
     when(sCompQ4L.io.deq.valid) { lCCmdFinish := 1.B }
-    lCmdLeft := lCmdLeft - ldABCmd.fire.asUInt - ldCCmd.fire.asUInt
+    when(!lBarFinish)           { lBarFinish  := 1.B }
+    lCmdLeft := lCmdLeft - ldACmd.fire.asUInt - ldBCmd.fire.asUInt - ldCCmd.fire.asUInt
   }
   // Should not fire unused ldCmd
-  chisel3.assert(!(lCmdLeft === 0.U & ldABCmd.fire))
+  chisel3.assert(!(lCmdLeft === 0.U & ldACmd.fire))
+  chisel3.assert(!(lCmdLeft === 0.U & ldBCmd.fire))
   chisel3.assert(!(lCmdLeft === 0.U & ldCCmd.fire))
+  ldACmd.bits := lACmd; ldACmd.valid := !lACmdFinish
+  ldBCmd.bits := lBCmd; ldBCmd.valid := !lBCmdFinish
   ldCCmd.bits := lCCmd; ldCCmd.valid := !lCCmdFinish & sCompQ4L.io.deq.valid
-  ldABCmd.bits := lBCmd; ldABCmd.valid := !(lACmdFinish & lBCmdFinish)
-  when(!lACmdFinish) { ldABCmd.bits := lACmd; ldABCmd.valid := 1.B }
+  ldBar.valid := !lBarFinish
   sCompQ4L.io.deq.ready := !lCCmdFinish /* & ldCmd.ready */
   // No Bubble at all!
-  lFinish := lCmdLeft === 0.U | (lCmdLeft === 1.U & (ldABCmd.valid | ldCCmd.valid))
+  lFinish := lCCmdFinish | sCompQ4L.io.deq.valid
   when(lTaskFire) {
     lTaskValid  := 1.B
   }.elsewhen(lFinish) {

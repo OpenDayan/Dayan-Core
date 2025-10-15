@@ -37,8 +37,6 @@ class MatCalcCommand(storageRatio: Int) extends Bundle {
 class MatLoadStoreCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int) extends Bundle {
   // Compute Mode
   val bank = Bool()
-  val lastLoadAB = Bool()  // Need Completion, Last Load Command In A/B
-  val waitLoadC  = Bool()  // Completion need to wait C Completion or not
   val ctrl = DPArrayStorageCmd()
   // Storage Shape
   // 0 -> 1, 1 -> 2, 2 -> 4, 3 -> 8, 4 -> 16, 5 -> 32
@@ -58,16 +56,18 @@ class MatLoadStoreCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, c
 class DPArrayTop(
  storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int,
  cM: Int, cN: Int, cK: Int, sK: Int, idWidth: Int,
- wE: Int = 9, wF: Int = 25) extends Module {
+ wE: Int = 9, wF: Int = 25, outStanding: Int = 16) extends Module {
   val cMNK = Array(cM, cN, cK).max
   val maxTileSize = Array(cM * cK, cN * cK, cM * cN * 4).max
   val maxBeat = maxTileSize / busWidth
   val ports = busWidth / 8
 
   // Load/Store Cmd Interface
-  val ldABCmd = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
-  val ldCCmd = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
-  val stCmd = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
+  val ldACmd    = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
+  val ldBCmd    = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
+  val ldCCmd    = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
+  val ldBar     = IO(Flipped(Decoupled(Vec(3, Bool())))) // Ld Barrier
+  val stCmd     = IO(Flipped(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
 
   // Calculate  Cmd Interface
   val calcCmd = IO(Flipped(Decoupled(new MatCalcCommand(storageRatio))))
@@ -79,12 +79,16 @@ class DPArrayTop(
   val stComp = IO(Decoupled(Bool()))
 
   // URAM Interface
+  val channelCount    = busWidth / cK
+  val portsPerChannel = ports    / channelCount
   val rreq0  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-  val rresp0 = IO(Flipped(Vec(ports, new AdvURAMResp(addressWidth,   0, 64))))
   val rreq1  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-  val rresp1 = IO(Flipped(Vec(ports, new AdvURAMResp(addressWidth,   0, 64))))
-  val wreq  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-  val wdata = IO(Output(Vec(ports, UInt(64.W))))
+  val wreq   = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
+  val wdata  = IO(Output(Vec(ports,        UInt(64.W))))
+
+  val rresp0 = IO(Flipped(Vec(channelCount, Decoupled(Vec(portsPerChannel, new AdvURAMResp(addressWidth,  0, 64))))))
+  val rresp1 = IO(Flipped(Vec(channelCount, Decoupled(Vec(portsPerChannel, new AdvURAMResp(addressWidth,  0, 64))))))
+  val wresp  = IO(Flipped(Vec(channelCount, Decoupled(Vec(portsPerChannel, new AdvURAMWResp(addressWidth, 0, 64))))))
 
   // Non-Blocking calculating array
   val calcCore = Module(new FP8BF16FusedDPArray((tM, tN, tK) => new U8m2n2k1U4m2n2k2Mul(tM, tN, tK),
@@ -138,17 +142,30 @@ class DPArrayTop(
   cBuffer.cWe := calcCMatValidPipe(calcCore.r0Latency + 3)
 
   // Connecting wPort / rPort of all buffer to uram
-  val flattenUramRData0 = VecInit.tabulate(ports)(i => rresp0(i).data).asTypeOf(Vec(busWidth, UInt(8.W)))
-  val flattenUramRData1 = VecInit.tabulate(ports)(i => rresp1(i).data).asTypeOf(Vec(busWidth, UInt(8.W)))
-  aBuffer.wData    := flattenUramRData0
+  val flattenUramRData0 = VecInit(rresp0.map(c => {
+    VecInit(c.map(p => {
+      VecInit(p.map(_.data))
+    }))
+  })).asTypeOf(Vec(busWidth, UInt(8.W)))
+  val flattenUramRData1 = VecInit(rresp1.map(c => {
+    VecInit(c.map(p => {
+      VecInit(p.map(_.data))
+    }))
+  })).asTypeOf(Vec(busWidth, UInt(8.W)))
+  aBuffer.wData    := flattenUramRData1
   bBuffer.wData    := flattenUramRData0
   cBuffer.extWData := flattenUramRData1
   wdata := cBuffer.extRData.asTypeOf(wdata)
 
   // Load Store Task Spilt Unit
 
-  // A / B Load Task Spilt Unit
-  val abLoadTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
+  // A Load Task Spilt Unit
+  val aLoadTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
+    storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
+    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = true, cTask = false, storeTask = false, abBankSft, idWidth
+  ))
+  // B Load Task Spilt Unit
+  val bLoadTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
     cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = true, cTask = false, storeTask = false, abBankSft, idWidth
   ))
@@ -162,108 +179,216 @@ class DPArrayTop(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
     cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = false, cTask = true, storeTask = true, cBankSft, idWidth
   ))
-  abLoadTaskSpilter.cmdIn :<>= ldABCmd
+  aLoadTaskSpilter.cmdIn  :<>= ldACmd
+  bLoadTaskSpilter.cmdIn  :<>= ldBCmd
   cLoadTaskSpilter.cmdIn  :<>= ldCCmd
   cStoreTaskSpilter.cmdIn :<>= stCmd
   val cStoreURAMReq = Queue(cStoreTaskSpilter.cmdURAM)
 
-  // Address Calculation for URAM RReq-0
-  // Per Line Used Ports:
-  val portsPerLine0 = cK / 8
-  (0 until ports).foreach(i => {
-    // Get Mapped MN - K
-    val fixedMN = i / portsPerLine0
-    val fixedK = 8 * (i % portsPerLine0)
-    val mn = fixedMN.U + abLoadTaskSpilter.cmdURAM.bits.baseDimMajor // 对应行起始
-    val k =  fixedK.U + abLoadTaskSpilter.cmdURAM.bits.baseDimMinor  // 对应列起始
-    // 对应偏移
-    val addr = mn * abLoadTaskSpilter.cmdURAM.bits.majorStride + k + abLoadTaskSpilter.cmdURAM.bits.baseUramAddr
-    // Swizzling 逻辑
-    // 开始连线
-    rreq0(i).bits.id := 0.U
-    rreq0(i).bits.address := addr
-    rreq0(i).valid := abLoadTaskSpilter.cmdURAM.valid
-  })
-  // TODO: Check synchronized URAM
-  abLoadTaskSpilter.cmdURAM.ready := rreq0(0).ready
-  abLoadTaskSpilter.cmdBuffer.ready := rresp0(0).valid
-  aBuffer.wAddr := abLoadTaskSpilter.cmdBuffer.bits.bufferAddr
-  aBuffer.wBeat := abLoadTaskSpilter.cmdBuffer.bits.beat
-  aBuffer.we := abLoadTaskSpilter.cmdBuffer.valid & !abLoadTaskSpilter.cmdBuffer.bits.isBLoad & rresp0(0).valid
-  bBuffer.wAddr := abLoadTaskSpilter.cmdBuffer.bits.bufferAddr
-  bBuffer.wBeat := abLoadTaskSpilter.cmdBuffer.bits.beat
-  bBuffer.we := abLoadTaskSpilter.cmdBuffer.valid &  abLoadTaskSpilter.cmdBuffer.bits.isBLoad & rresp0(0).valid
+  // URAM RP0: MAT.B,  VEC.L
+  // URAM RP1: MAT.AC, LSU.L
+  // URAM WP0: MAT.C,  VEC.S, LSU.S
 
-  val portsPerLine1 = cN * 4 / 8
-  (0 until ports).foreach(i => {
-    // Get Mapped MN - K
-    val fixedM = i / portsPerLine1
-    val fixedN = 2 * (i % portsPerLine1)
-    val m = fixedM.U + cLoadTaskSpilter.cmdURAM.bits.baseDimMajor // 对应行起始
-    val n = fixedN.U + cLoadTaskSpilter.cmdURAM.bits.baseDimMinor // 对应列起始
-    // 对应偏移
-    val addr = m * cLoadTaskSpilter.cmdURAM.bits.majorStride + (n << 2) + cLoadTaskSpilter.cmdURAM.bits.baseUramAddr
-    // Swizzling 逻辑
-    // 开始连线
-    rreq1(i).bits.id := 0.U
-    rreq1(i).bits.address := addr
-    rreq1(i).valid := cLoadTaskSpilter.cmdURAM.valid
-  })
-  cLoadTaskSpilter.cmdURAM.ready := rreq1(0).ready
-  cLoadTaskSpilter.cmdBuffer.ready := rresp1(0).valid
-  cBuffer.extWAddr := cLoadTaskSpilter.cmdBuffer.bits.bufferAddr
-  cBuffer.extWBeat := cLoadTaskSpilter.cmdBuffer.bits.beat
-  cBuffer.extWe    := cLoadTaskSpilter.cmdBuffer.valid & !cLoadTaskSpilter.cmdBuffer.bits.isBLoad & rresp1(0).valid
+  // RP1 Arbiter
+  val uramRP1Arb = Module(new RRArbiter(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth,
+    addressWidth, cMNK, idWidth), 2))
+  uramRP1Arb.io.in <> VecInit(Seq(aLoadTaskSpilter.cmdURAM, cLoadTaskSpilter.cmdURAM))
+  aLoadTaskSpilter.cmdTile.ready := 0.B
+  cLoadTaskSpilter.cmdTile.ready := 0.B
+  val tileRP1Arb = VecInit(Seq(aLoadTaskSpilter.cmdTile, cLoadTaskSpilter.cmdTile))(uramRP1Arb.io.chosen)
 
-  (0 until ports).foreach(i => {
-    // Get Mapped MN - K
-    val fixedM = i / portsPerLine1
-    val fixedN = 2 * (i % portsPerLine1)
-    val m = fixedM.U + cStoreURAMReq.bits.baseDimMajor // 对应行起始
-    val n = fixedN.U + cStoreURAMReq.bits.baseDimMinor // 对应列起始
-    // 对应偏移
-    val addr = m * cStoreURAMReq.bits.majorStride + (n << 2) + cStoreURAMReq.bits.baseUramAddr
-    // Swizzling 逻辑
-    // 开始连线
-    wreq(i).bits.id := 0.U
-    wreq(i).bits.address := addr
-    wreq(i).valid := cStoreURAMReq.valid &
-      (cStoreURAMReq.bits.pMajor >= fixedM.U) &
-      (cStoreURAMReq.bits.pMinor >= fixedN.U)
-  })
-  cStoreURAMReq.ready := wreq(0).ready
-  // Two-stage rdata handling
-  val s1RAddr = cStoreTaskSpilter.cmdBuffer.bits.bufferAddr
-  val s1RBeat = cStoreTaskSpilter.cmdBuffer.bits.beat
-  val s2RAddr = RegEnable(s1RAddr, cStoreTaskSpilter.cmdBuffer.fire)
-  val s2RBeat = RegEnable(s1RBeat, cStoreTaskSpilter.cmdBuffer.fire)
-  val s2LastLoad = RegEnable(cStoreTaskSpilter.cmdBuffer.bits.lastLoad, cStoreTaskSpilter.cmdBuffer.fire)
-//  val s2Valid = RegEnable(cStoreTaskSpilter.cmdBuffer.valid, wreq(0).ready | !s2Valid)
-  val s2Valid = RegInit(0.B)
-  when(wreq(0).ready | !s2Valid) {
-    s2Valid := cStoreTaskSpilter.cmdBuffer.valid
+  // Barrier signals
+  val aLdCompChannel = Wire(Vec(channelCount, Bool()))
+  val aLdCompChannelR = aLdCompChannel.asUInt.andR
+  val aLdCompReady   = Wire(Bool())
+  val bLdCompChannel = Wire(Vec(channelCount, Bool()))
+  val bLdCompReady   = Wire(Bool())
+  val bLdCompChannelR = bLdCompChannel.asUInt.andR
+  val cLdCompChannel = Wire(Vec(channelCount, Bool()))
+  val cLdCompReady   = Wire(Bool())
+  val cLdCompChannelR = cLdCompChannel.asUInt.andR
+  val cStCompChannel = Wire(Vec(channelCount, Bool()))
+  val cStCompReady   = Wire(Bool())
+  val cStCompChannelR = cStCompChannel.asUInt.andR
+
+  // Split Uram Cmd to Separate Buffer.
+  val uramRP0QReady = Wire(Vec(channelCount, Bool()))
+  val uramRP1QReady = Wire(Vec(channelCount, Bool()))
+  val uramWPQReady = Wire(Vec(channelCount, Bool()))
+  val tileRP0QReady = Wire(Vec(channelCount, Bool()))
+  val tileRP1QReady = Wire(Vec(channelCount, Bool()))
+  val tileWPQReady = Wire(Vec(channelCount, Bool()))
+  bLoadTaskSpilter.cmdURAM.ready := uramRP0QReady.asUInt.andR
+  bLoadTaskSpilter.cmdTile.ready := tileRP0QReady.asUInt.andR
+  uramRP1Arb.io.out.ready := uramRP1QReady.asUInt.andR
+  tileRP1Arb.ready := tileRP1QReady.asUInt.andR
+  cStoreTaskSpilter.cmdURAM.ready := uramWPQReady.asUInt.andR
+  cStoreTaskSpilter.cmdTile.ready := tileWPQReady.asUInt.andR
+  for(channel <- 0 until channelCount) {
+    // WP
+    val uramWPQ = Module(new Queue(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth,
+      addressWidth, cMNK, idWidth), outStanding, false, false))
+    uramWPQReady(channel) := uramWPQ.io.enq.ready
+    uramWPQ.io.enq.valid  := cStoreTaskSpilter.cmdURAM.fire
+    uramWPQ.io.enq.bits   := cStoreTaskSpilter.cmdURAM.bits
+
+    val tileWPQ = Module(new Queue(
+      new DPALoadStoreTileMicroCommand(storageRatio, maxBeat, idWidth), outStanding, false, false))
+    tileWPQReady(channel) := tileWPQ.io.enq.ready
+    tileWPQ.io.enq.valid   := cStoreTaskSpilter.cmdTile.fire
+    tileWPQ.io.enq.bits    := cStoreTaskSpilter.cmdTile.bits
+
+    val tileIsLastWPQ = Module(new Queue(Bool(), outStanding, false, false))
+    tileIsLastWPQ.io.enq.valid := tileWPQ.io.deq.fire
+    tileIsLastWPQ.io.enq.bits  := tileWPQ.io.deq.bits.last
+    tileIsLastWPQ.io.deq.ready := wresp(channel).valid
+
+    // TODO: 4 maybe too huge or too small?
+    val compWPQ = Module(new Queue(Bool(), 4, false, false))
+    compWPQ.io.enq.valid := wresp(channel).valid & tileIsLastWPQ.io.deq.bits
+    compWPQ.io.enq.bits  := 0.B
+    cStCompChannel(channel) := compWPQ.io.deq.valid
+    compWPQ.io.deq.ready := cStCompReady
+
+    // Two-stage rdata handling
+    val s1RAddr = tileWPQ.io.deq.bits.bufferAddr
+    val s1RBeat = tileWPQ.io.deq.bits.beat
+    val s2RAddr = RegEnable(s1RAddr, tileWPQ.io.deq.fire)
+    val s2RBeat = RegEnable(s1RBeat, tileWPQ.io.deq.fire)
+    val s2Valid = RegInit(0.B)
+    when(wreq(channel * portsPerChannel).ready | !s2Valid) {
+      s2Valid := tileWPQ.io.deq.valid
+    }
+    val s2Deny = s2Valid & !wreq(channel * portsPerChannel).ready
+    tileWPQ.io.deq.ready := !s2Valid | wreq(channel * portsPerChannel).ready
+    cBuffer.extRe := s2Deny | cStoreTaskSpilter.cmdTile.valid
+    cBuffer.extRAddr := Mux(s2Deny, s2RAddr, s1RAddr)
+    cBuffer.extRBeat := Mux(s2Deny, s2RBeat, s1RBeat)
+
+    (0 until portsPerChannel).foreach(p => {
+      // Get Mapped
+      val fixedMajor = channel
+      val fixedMinorByte = 8 * p
+      val major = fixedMajor.U         + uramWPQ.io.deq.bits.baseDimMajor
+      val minorByte = fixedMinorByte.U + uramWPQ.io.deq.bits.baseDimMinorByte
+      // 对应偏移
+      val addr = major * uramWPQ.io.deq.bits.majorStride + minorByte + uramWPQ.io.deq.bits.baseUramAddr
+      // TODO: Swizzling 逻辑
+      // 开始连线
+      wreq(channel * portsPerChannel + p).bits.id := 0.U
+      wreq(channel * portsPerChannel + p).bits.address := addr
+      wreq(channel * portsPerChannel + p).valid := uramWPQ.io.deq.valid & s2Valid
+    })
+    uramWPQ.io.deq.ready := wreq(channel * portsPerChannel).ready & s2Valid
+    wresp(channel).ready := 1.B
+
+    // RP0
+    val uramRP0Q = Module(new Queue(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth,
+      addressWidth, cMNK, idWidth), outStanding, false, false))
+    uramRP0QReady(channel) := uramRP0Q.io.enq.ready
+    uramRP0Q.io.enq.valid  := bLoadTaskSpilter.cmdURAM.fire
+    uramRP0Q.io.enq.bits   := bLoadTaskSpilter.cmdURAM.bits
+
+    val tileRP0Q = Module(new Queue(
+      new DPALoadStoreTileMicroCommand(storageRatio, maxBeat, idWidth), outStanding, false, false))
+    tileRP0QReady(channel) := tileRP0Q.io.enq.ready
+    tileRP0Q.io.enq.valid   := bLoadTaskSpilter.cmdTile.fire
+    tileRP0Q.io.enq.bits    := bLoadTaskSpilter.cmdTile.bits
+
+    // TODO: 4 maybe too huge or too small?
+    val compRP0Q = Module(new Queue(Bool(), 4, false, false))
+    compRP0Q.io.enq.valid := rresp0(channel).valid & tileRP0Q.io.deq.bits.last
+    compRP0Q.io.enq.bits  := 0.B
+    bLdCompChannel(channel) := compRP0Q.io.deq.valid
+    compRP0Q.io.deq.ready := bLdCompReady
+
+    (0 until portsPerChannel).foreach(p => {
+      // Get Mapped
+      val fixedMajor = channel
+      val fixedMinorByte = 8 * p
+      val major = fixedMajor.U         + uramRP0Q.io.deq.bits.baseDimMajor
+      val minorByte = fixedMinorByte.U + uramRP0Q.io.deq.bits.baseDimMinorByte
+      // 对应偏移
+      val addr = major * uramRP0Q.io.deq.bits.majorStride + minorByte + uramRP0Q.io.deq.bits.baseUramAddr
+      // TODO: Swizzling 逻辑
+      // 开始连线
+      rreq0(channel * portsPerChannel + p).bits.id := 0.U
+      rreq0(channel * portsPerChannel + p).bits.address := addr
+      rreq0(channel * portsPerChannel + p).valid := uramRP0Q.io.deq.valid
+    })
+    bBuffer.wAddr(channel) := tileRP0Q.io.deq.bits.bufferAddr
+    bBuffer.wBeat(channel) := tileRP0Q.io.deq.bits.beat
+    bBuffer.we(channel) := tileRP0Q.io.deq.valid /* & tileRP0Q.io.deq.bits.isBLoad */ & rresp0(channel).valid
+    tileRP0Q.io.deq.ready := rresp0(channel).valid
+    uramRP0Q.io.deq.ready := rreq0(channel * portsPerChannel).ready
+    rresp0(channel).ready := 1.B
+
+    // RP1
+    val uramRP1Q = Module(new Queue(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth,
+      addressWidth, cMNK, idWidth), outStanding, false, false))
+    uramRP1QReady(channel) := uramRP1Q.io.enq.ready
+    uramRP1Q.io.enq.valid  := uramRP1Arb.io.out.fire
+    uramRP1Q.io.enq.bits   := uramRP1Arb.io.out.bits
+
+    val tileRP1Q = Module(new Queue(
+      new DPALoadStoreTileMicroCommand(storageRatio, maxBeat, idWidth), outStanding, false, false))
+    tileRP1QReady(channel)  := tileRP1Q.io.enq.ready
+    tileRP1Q.io.enq.valid   := tileRP1Arb.fire
+    tileRP1Q.io.enq.bits    := tileRP1Arb.bits
+
+    // TODO: 4 maybe too huge or too small?
+    val compRP1AQ = Module(new Queue(Bool(), 4, false, false))
+    compRP1AQ.io.enq.valid := rresp0(channel).valid & tileRP1Q.io.deq.bits.last & tileRP1Q.io.deq.bits.isALoad
+    compRP1AQ.io.enq.bits  := 0.B
+    aLdCompChannel(channel) := compRP1AQ.io.deq.valid
+    compRP1AQ.io.deq.ready := aLdCompReady
+    val compRP1CQ = Module(new Queue(Bool(), 4, false, false))
+    compRP1CQ.io.enq.valid := rresp0(channel).valid & tileRP1Q.io.deq.bits.last & tileRP1Q.io.deq.bits.isCLoad
+    compRP1CQ.io.enq.bits  := 0.B
+    cLdCompChannel(channel) := compRP1CQ.io.deq.valid
+    compRP1CQ.io.deq.ready := cLdCompReady
+
+    (0 until portsPerChannel).foreach(p => {
+      // Get Mapped
+      val fixedMajor = channel
+      val fixedMinorByte = 8 * p
+      val major = fixedMajor.U     + uramRP1Q.io.deq.bits.baseDimMajor
+      val minorByte = fixedMinorByte.U + uramRP1Q.io.deq.bits.baseDimMinorByte
+      // 对应偏移
+      val addr = major * uramRP1Q.io.deq.bits.majorStride + minorByte + uramRP1Q.io.deq.bits.baseUramAddr
+      // TODO: Swizzling 逻辑
+      // 开始连线
+      rreq1(channel * portsPerChannel + p).bits.id := 0.U
+      rreq1(channel * portsPerChannel + p).bits.address := addr
+      rreq1(channel * portsPerChannel + p).valid := uramRP1Q.io.deq.valid
+    })
+    aBuffer.wAddr(channel) := tileRP1Q.io.deq.bits.bufferAddr
+    aBuffer.wBeat(channel) := tileRP1Q.io.deq.bits.beat
+    aBuffer.we(channel)    := tileRP1Q.io.deq.valid & tileRP1Q.io.deq.bits.isALoad & rresp1(channel).valid
+    cBuffer.extWAddr(channel) := tileRP1Q.io.deq.bits.bufferAddr
+    cBuffer.extWBeat(channel) := tileRP1Q.io.deq.bits.beat
+    cBuffer.extWe(channel)    := tileRP1Q.io.deq.valid & tileRP1Q.io.deq.bits.isCLoad & rresp1(channel).valid
+    tileRP1Q.io.deq.ready := rresp1(channel).valid
+    uramRP1Q.io.deq.ready := rreq1(channel * portsPerChannel).ready
+    rresp1(channel).ready := 1.B
   }
-  val s2Deny = s2Valid & !wreq(0).ready
-  cStoreTaskSpilter.cmdBuffer.ready := !s2Valid | wreq(0).ready
-  cBuffer.extRe := s2Deny | cStoreTaskSpilter.cmdBuffer.valid
-  cBuffer.extRAddr := Mux(s2Deny, s2RAddr, s1RAddr)
-  cBuffer.extRBeat := Mux(s2Deny, s2RBeat, s1RBeat)
+
+  // Load Bar
+  val loadBar = Queue(ldBar, 8, false, false)
 
   // load Completion Handling
-  val loadABCompQ = Module(new Queue(Bool(), 4))
-  val loadCCompQ  = Module(new Queue(Bool(), 4))
-  loadCCompQ.io.enq.bits := 0.B
-  loadCCompQ.io.enq.valid := cLoadTaskSpilter.cmdBuffer.fire & cLoadTaskSpilter.cmdBuffer.bits.lastLoad
-  loadABCompQ.io.enq.bits := abLoadTaskSpilter.cmdBuffer.bits.waitLoadC
-  loadABCompQ.io.enq.valid := abLoadTaskSpilter.cmdBuffer.fire & abLoadTaskSpilter.cmdBuffer.bits.lastLoad
-  loadABCompQ.io.deq.ready := !loadABCompQ.io.deq.bits | loadCCompQ.io.deq.valid
-  loadCCompQ.io.deq.ready := loadABCompQ.io.deq.valid & loadABCompQ.io.deq.bits
-  ldComp.valid := loadABCompQ.io.deq.valid & (!loadABCompQ.io.deq.bits | loadCCompQ.io.deq.valid)
+  //  ldComp.valid := loadABCompQ.io.deq.valid & (!loadABCompQ.io.deq.bits | loadCCompQ.io.deq.valid)
   ldComp.bits := 0.B
+  ldComp.valid := loadBar.bits.asUInt === (loadBar.bits.asUInt & Cat(cLdCompChannelR, bLdCompChannelR, aLdCompChannelR))
+  aLdCompReady := ldComp.valid & loadBar.bits(0)
+  bLdCompReady := ldComp.valid & loadBar.bits(1)
+  cLdCompReady := ldComp.valid & loadBar.bits(2)
 
   // store Completion Handling
-  stComp.valid := wreq(0).ready & s2LastLoad & s2Valid
+  //  stComp.valid := wreq(0).ready & s2LastLoad & s2Valid
   stComp.bits := 0.B
+  stComp.valid := cStCompChannelR
+  cStCompReady := stComp.valid
 }
 
 object DPArrayTop extends App {
