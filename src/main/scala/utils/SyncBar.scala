@@ -25,18 +25,18 @@ class SyncBarSource(fifoSize: Int, streamCount: Int, sourceCount: Int) extends M
 
   // RR Arbiter of Input
   val arb = Module(new RRArbiter(Vec(streamCount, Bool()), sourceCount))
-  arb.io.in := VecInit.tabulate(sourceCount)(i => {
-    val s = Decoupled(Vec(streamCount, Bool()))
+  arb.io.in <> VecInit.tabulate(sourceCount)(i => {
+    val s = Wire(Decoupled(Vec(streamCount, Bool())))
     s.valid := inValidR(i)
     s.bits  := inValid(i)
     inReady(i) := s.ready
     s
   })
-  selValid := arb.io.out.valid
+  selValid := inValid(arb.io.chosen)
   arb.io.out.ready := selReady
   outSel := arb.io.chosen
 
-  outFire := selReady & selValid.asUInt.orR
+  outFire := selReady & arb.io.out.valid
   outValid := VecInit(selValid.map(_ & selReady))
 
   emptyFlit := emptyFlit + inFlit.asUInt - outFire.asUInt
@@ -79,6 +79,8 @@ class SyncBarSink[T <: Data](fifoSize: Int, streamCount: Int, sourceCount: Int, 
   val outValid = IO(Output(Vec(sourceCount, Vec(streamCount, Bool()))))
   val outGValid = curMatch & vldQ.io.deq.valid
   val outReady = out(selQ.io.deq.bits).ready
+  vldQ.io.deq.ready := outReady
+  selQ.io.deq.ready := outReady
   val outFire = outGValid & outReady
   for(s <- 0 until streamCount) {
     channelQ(s).ready := vldQ.io.deq.bits(s) & outFire

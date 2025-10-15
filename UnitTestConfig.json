@@ -43,5 +43,8 @@
     },
     "GroupXBar": {
         "Package": "utils"
+    },
+    "Adv2R1WURAM": {
+        "Package": "uram"
     }
 }

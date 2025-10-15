@@ -26,26 +26,29 @@ module DPIUltraRAM2R1WBase #(
         input  int id,
         input  int raddr
     );
-    
+
     import "DPI-C" function longint UltraRamWrite(
         input  int id,
-        input  int waddr
+        input  int waddr,
         input  longint wdata
     );
 
+    /* verilator lint_off WIDTHEXPAND */
     reg [DWIDTH-1:0] readreg0, readreg1;
-    always @(posedge clk) begin
+    reg [63:0] wret;
+    always @(posedge core_clk) begin
         if(read_enable0) readreg0 = UltraRamRead(id, addrb0);
         if(read_enable1) readreg1 = UltraRamRead(id, addrb1);
-        if(write_enable) UltraRamWrite(id, addra, dina);
+        if(write_enable) wret = UltraRamWrite(id, addra, dina);
     end
 
     reg read_enable0_q, read_enable1_q;
-    always @(posedge clk) begin
+    always @(posedge core_clk) begin
         read_enable0_q <= read_enable0;
         read_enable1_q <= read_enable1;
         if(read_enable0_q) doutb0 <= readreg0;
         if(read_enable1_q) doutb1 <= readreg1;
     end
+    /* verilator lint_on WIDTHEXPAND */
 
 endmodule

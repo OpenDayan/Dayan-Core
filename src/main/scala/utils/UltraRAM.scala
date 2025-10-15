@@ -47,7 +47,7 @@ class DPIUltraRAM2R1WBase(DWIDTH: Int = 64, AWIDTH: Int = 12) extends
 
     val id = Input(UInt(32.W))
   })
-  addResource("/verilog/UltraRAMBase.sv")
+  addResource("/verilog/UltraRAM2R1WBase.sv")
   require(DWIDTH <= 72, "In URAM, data width should be equal or less than 72bits")
   require(AWIDTH <= 12, "In URAM, address width should be equal or less than 12bits")
 
