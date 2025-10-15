@@ -8,7 +8,7 @@ import utils.{DPIRamBase, GroupXBar, SyncBarSink, SyncBarSource, UltraRAM2R1W, p
 // Real URAM Implement, 32(N) x 8B Request / Ports.
 // Read  Latency is 3(Input Switch) + 2(UltraRAM/SRAM) + 1(Output Switch) + 1(Output) == 7 Cycles
 // Write Latency is 3(Input Switch) + 1(UltraRAM/SRAM) + 1(Output) == 5 Cycles
-class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int,
+class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int, GroupCount: Int = 4,
                   fifoSize: Int = 16, N: Int = 32, addrWidth: Int = 17, idWidth: Int = 1, dataWidth: Int = 64) {
 
   val log2N = log2Ceil(N)
@@ -52,57 +52,85 @@ class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int,
   val r0IDResp = pipe.genPipe(VecInit(r0BankedReq.map(_.id)), 3)(3)
   val r1IDResp = pipe.genPipe(VecInit(r1BankedReq.map(_.id)), 3)(3)
 
-  val r0resp_o = IO(Vec(R0Port, Vec(N, Decoupled(new AdvURAMResp(addrWidth, idWidth, dataWidth)))))
-  val r1resp_o = IO(Vec(R1Port, Vec(N, Decoupled(new AdvURAMResp(addrWidth, idWidth, dataWidth)))))
+  val r0resp_o = IO(Vec(R0Port, Vec(N / GroupCount,
+    Decoupled(Vec(GroupCount, new AdvURAMResp(addrWidth, idWidth, dataWidth))))))
+  val r1resp_o = IO(Vec(R1Port, Vec(N / GroupCount,
+    Decoupled(Vec(GroupCount, Decoupled(new AdvURAMResp(addrWidth, idWidth, dataWidth)))))))
 
   // R Sync Bar Generation
-  // 4-Stream Gathered Sync Bar
+  // GroupCount streams Gathered Sync Bar
   // SyncBar Flit Link
-  for(syncBarId <- 0 until (N / 4)) {
-    val r0SyncBarSrc = Module(new SyncBarSource(fifoSize, 4, R0Port))
-    r0SyncBarSrc.inValid := VecInit.tabulate(R0Port)(inReqId => VecInit.tabulate(4)(streamId => {
-      r0req_i(inReqId)(syncBarId * 4 + streamId).ready := r0SyncBarSrc.inReady(inReqId)
-      r0req_i(inReqId)(syncBarId * 4 + streamId).valid
+  for(syncBarId <- 0 until (N / GroupCount)) {
+    val r0SyncBarSrc = Module(new SyncBarSource(fifoSize, GroupCount, R0Port))
+    r0SyncBarSrc.inValid := VecInit.tabulate(R0Port)(inReqId => VecInit.tabulate(GroupCount)(streamId => {
+      r0req_i(inReqId)(syncBarId * GroupCount + streamId).ready := r0SyncBarSrc.inReady(inReqId)
+      r0req_i(inReqId)(syncBarId * GroupCount + streamId).valid
     }))
-    for(streamId <- 0 until 4) {
-      r0SyncReq(syncBarId * 4 + streamId).valid := r0SyncBarSrc.outValid(streamId)
-      r0SyncBarSrc.outReady(streamId) := r0SyncReq(syncBarId * 4 + streamId).ready
-      r0SyncReq(syncBarId * 4 + streamId).bits := r0req_i(r0SyncBarSrc.outSel)(syncBarId * 4 + streamId).bits
+    for(streamId <- 0 until GroupCount) {
+      r0SyncReq(syncBarId * GroupCount + streamId).valid := r0SyncBarSrc.outValid(streamId)
+      r0SyncBarSrc.outReady(streamId) := r0SyncReq(syncBarId * GroupCount + streamId).ready
+      r0SyncReq(syncBarId * GroupCount + streamId).bits :=
+        r0req_i(r0SyncBarSrc.outSel)(syncBarId * GroupCount + streamId).bits
     }
 
-    val r0SyncBarSink = Module(new SyncBarSink(fifoSize, 4, R0Port, new AdvURAMResp(addrWidth, idWidth, dataWidth)))
-    r0SyncBarSink.in := VecInit.tabulate(4)(streamId => {
+    val r0SyncBarSink = Module(new SyncBarSink(fifoSize, GroupCount, R0Port, new AdvURAMResp(addrWidth, idWidth, dataWidth)))
+    r0SyncBarSink.in := VecInit.tabulate(GroupCount)(streamId => {
       val r = new AdvURAMResp(addrWidth, idWidth, dataWidth)
-      r0SyncBarSink.inValid := r0ValidResp(syncBarId * 4 + streamId)
-      r.valid := r0ValidResp(syncBarId * 4 + streamId)
-      r.data  := r0Resp(syncBarId * 4 + streamId)
-      r.id    := r0IDResp(syncBarId * 4 + streamId)
-      r0resp_o
+      r0SyncBarSink.inValid := r0ValidResp(syncBarId * GroupCount + streamId)
+      r.valid := r0ValidResp(syncBarId * GroupCount + streamId)
+      r.data  := r0Resp(syncBarId * GroupCount + streamId)
+      r.id    := r0IDResp(syncBarId * GroupCount + streamId)
       r
     })
-
     r0SyncBarSrc.inFlit    := r0SyncBarSink.outFlit
     r0SyncBarSink.srcSel   := r0SyncBarSrc.outSel
     r0SyncBarSink.srcFire  := r0SyncBarSrc.outFire
     r0SyncBarSink.srcValid := r0SyncBarSrc.outValid
 
-    val r1SyncBarSrc = Module(new SyncBarSource(fifoSize, 4, R1Port))
-    r1SyncBarSrc.inValid := VecInit.tabulate(R1Port)(inReqId => VecInit.tabulate(4)(streamId => {
-      r1req_i(inReqId)(syncBarId * 4 + streamId).ready := r1SyncBarSrc.inReady(inReqId)
-      r1req_i(inReqId)(syncBarId * 4 + streamId).valid
+    for(outRespId <- 0 until R0Port) {
+      r0resp_o(outRespId)(syncBarId).valid := r0SyncBarSink.out(outRespId).valid
+      r0SyncBarSink.out(outRespId).ready := r0resp_o(outRespId)(syncBarId).ready
+      r0resp_o(outRespId)(syncBarId).bits := r0SyncBarSink.out(outRespId).bits
+    }
+
+    val r1SyncBarSrc = Module(new SyncBarSource(fifoSize, GroupCount, R1Port))
+    r1SyncBarSrc.inValid := VecInit.tabulate(R1Port)(inReqId => VecInit.tabulate(GroupCount)(streamId => {
+      r1req_i(inReqId)(syncBarId * GroupCount + streamId).ready := r1SyncBarSrc.inReady(inReqId)
+      r1req_i(inReqId)(syncBarId * GroupCount + streamId).valid
     }))
-    for(streamId <- 0 until 4) {
-      r1SyncReq(syncBarId * 4 + streamId).valid := r1SyncBarSrc.outValid(streamId)
-      r1SyncBarSrc.outReady(streamId) := r1SyncReq(syncBarId * 4 + streamId).ready
-      r1SyncReq(syncBarId * 4 + streamId).bits := r1req_i(r1SyncBarSrc.outSel)(syncBarId * 4 + streamId).bits
+    for(streamId <- 0 until GroupCount) {
+      r1SyncReq(syncBarId * GroupCount + streamId).valid := r1SyncBarSrc.outValid(streamId)
+      r1SyncBarSrc.outReady(streamId) := r1SyncReq(syncBarId * GroupCount + streamId).ready
+      r1SyncReq(syncBarId * GroupCount + streamId).bits :=
+        r1req_i(r1SyncBarSrc.outSel)(syncBarId * GroupCount + streamId).bits
+    }
+
+    val r1SyncBarSink = Module(new SyncBarSink(fifoSize, GroupCount, R1Port, new AdvURAMResp(addrWidth, idWidth, dataWidth)))
+    r1SyncBarSink.in := VecInit.tabulate(GroupCount)(streamId => {
+      val r = new AdvURAMResp(addrWidth, idWidth, dataWidth)
+      r1SyncBarSink.inValid := r1ValidResp(syncBarId * GroupCount + streamId)
+      r.valid := r1ValidResp(syncBarId * GroupCount + streamId)
+      r.data  := r1Resp(syncBarId * GroupCount + streamId)
+      r.id    := r1IDResp(syncBarId * GroupCount + streamId)
+      r
+    })
+    r1SyncBarSrc.inFlit    := r1SyncBarSink.outFlit
+    r1SyncBarSink.srcSel   := r1SyncBarSrc.outSel
+    r1SyncBarSink.srcFire  := r1SyncBarSrc.outFire
+    r1SyncBarSink.srcValid := r1SyncBarSrc.outValid
+
+    for(outRespId <- 0 until R1Port) {
+      r1resp_o(outRespId)(syncBarId).valid := r1SyncBarSink.out(outRespId).valid
+      r1SyncBarSink.out(outRespId).ready := r1resp_o(outRespId)(syncBarId).ready
+      r1resp_o(outRespId)(syncBarId).bits := r1SyncBarSink.out(outRespId).bits
     }
   }
 
   // R Port XBar
   val r0XBar = Module(new GroupXBar(log2N, Seq(0, log2N, 0), (i: UInt) => i(log2N - 1, 0),
-    new AdvURAMResp(addrWidth, idWidth, dataWidth)))
+    new AdvURAMReq(addrWidth, idWidth, dataWidth)))
   val r1XBar = Module(new GroupXBar(log2N, Seq(0, log2N, 0), (i: UInt) => i(log2N - 1, 0),
-    new AdvURAMResp(addrWidth, idWidth, dataWidth)))
+    new AdvURAMReq(addrWidth, idWidth, dataWidth)))
 
   r0XBar.in <> r0SyncReq
   r1XBar.in <> r1SyncReq
@@ -133,8 +161,63 @@ class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int,
   val wBankedValidReq  = Wire(Vec(N, Bool()))
 
   // W Port Reverse Routing
+  val wRRoute = Wire(Vec(N, UInt(log2N.W)))
+  val wRValid = Wire(Vec(N, Bool()))
 
-  // W Port Sync Bar Sink
+  // W Response Switch
+  val wIDResp = RegNext(VecInit(wBankedReq.map(_.ctrl.id)))
+  val wValidResp = RegNext(wRValid)
+
+  val wresp_o = IO(Vec(W0Port, Vec(N / GroupCount,
+    Decoupled(Vec(GroupCount, new AdvURAMWResp(addrWidth, idWidth, dataWidth))))))
+
+  // W Port Sync Bar Generation
+
+  for(syncBarId <- 0 until (N / GroupCount)) {
+    val wSyncBarSrc = Module(new SyncBarSource(fifoSize, GroupCount, W0Port))
+    wSyncBarSrc.inValid := VecInit.tabulate(W0Port)(inReqId => VecInit.tabulate(GroupCount)(streamId => {
+      wreq_i(inReqId)(syncBarId * GroupCount + streamId).ready := wSyncBarSrc.inReady(inReqId)
+      wreq_i(inReqId)(syncBarId * GroupCount + streamId).valid
+    }))
+    for(streamId <- 0 until GroupCount) {
+      val r = Wire(new WReq())
+      r.ctrl := wreq_i(wSyncBarSrc.outSel)(syncBarId * GroupCount + streamId).bits
+      r.data := wdata_i(wSyncBarSrc.outSel)(syncBarId * GroupCount + streamId)
+      wSyncReq(syncBarId * GroupCount + streamId).valid := wSyncBarSrc.outValid(streamId)
+      wSyncBarSrc.outReady(streamId) := wSyncReq(syncBarId * GroupCount + streamId).ready
+      wSyncReq(syncBarId * GroupCount + streamId).bits := r
+    }
+
+    val wSyncBarSink = Module(new SyncBarSink(fifoSize, GroupCount, W0Port,
+      new AdvURAMWResp(addrWidth, idWidth, dataWidth)))
+    wSyncBarSink.in := VecInit.tabulate(GroupCount)(streamId => {
+      val r = new AdvURAMWResp(addrWidth, idWidth, dataWidth)
+      wSyncBarSink.inValid := wValidResp(syncBarId * GroupCount + streamId)
+      r.valid := wValidResp(syncBarId * GroupCount + streamId)
+      r.id    := wIDResp(syncBarId * GroupCount + streamId)
+      r
+    })
+    wSyncBarSrc.inFlit    := wSyncBarSink.outFlit
+    wSyncBarSink.srcSel   := wSyncBarSrc.outSel
+    wSyncBarSink.srcFire  := wSyncBarSrc.outFire
+    wSyncBarSink.srcValid := wSyncBarSrc.outValid
+
+    for(outRespId <- 0 until W0Port) {
+      wresp_o(outRespId)(syncBarId).valid := wSyncBarSink.out(outRespId).valid
+      wSyncBarSink.out(outRespId).ready := wresp_o(outRespId)(syncBarId).ready
+      wresp_o(outRespId)(syncBarId).bits := wSyncBarSink.out(outRespId).bits
+    }
+  }
+
+  // W Port XBar
+  val wXBar = Module(new GroupXBar(log2N, Seq(0, log2N, 0), (i: UInt) => i(log2N - 1, 0), new WReq()))
+
+  wXBar.in <> wSyncReq
+  wXBar.out.ready := 1.B
+  wBankedReq := wXBar.out.bits
+  wBankedValidReq := wXBar.outVld
+  wRRoute := wXBar.outReverseRoute
+  wRValid := wXBar.outRVld
 
   // URAM Generation
   for(b <- 0 until N) {

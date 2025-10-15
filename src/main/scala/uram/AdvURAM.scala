@@ -24,3 +24,9 @@ class AdvURAMResp(addrWidth: Int, idWidth: Int, dataWidth: Int) extends Bundle {
   val id = UInt(idWidth.W)
 }
 
+class AdvURAMWResp(addrWidth: Int, idWidth: Int, dataWidth: Int) extends Bundle {
+  val valid   = Bool()
+  val id = UInt(idWidth.W)
+}
+
+
