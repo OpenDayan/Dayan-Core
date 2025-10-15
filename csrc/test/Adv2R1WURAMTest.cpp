@@ -47,6 +47,10 @@ static inline void mainLoop()
     RNDREQ(1, 1_1);
     RNDREQ(1, 1_2);
     RNDREQ(1, 1_3);
+    dut->r0resp_o_0_0_ready = 1;
+    dut->r0resp_o_0_1_ready = 1;
+    dut->r0resp_o_1_0_ready = 1;
+    dut->r0resp_o_1_1_ready = 1;
 }
 
 int main(int argc, char **argv)

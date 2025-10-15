@@ -79,9 +79,11 @@ class SyncBarSink[T <: Data](fifoSize: Int, streamCount: Int, sourceCount: Int, 
   val outValid = IO(Output(Vec(sourceCount, Vec(streamCount, Bool()))))
   val outGValid = curMatch & vldQ.io.deq.valid
   val outReady = out(selQ.io.deq.bits).ready
-  vldQ.io.deq.ready := outReady
-  selQ.io.deq.ready := outReady
   val outFire = outGValid & outReady
+  
+  vldQ.io.deq.ready := outFire
+  selQ.io.deq.ready := outFire
+
   for(s <- 0 until streamCount) {
     channelQ(s).ready := vldQ.io.deq.bits(s) & outFire
   }

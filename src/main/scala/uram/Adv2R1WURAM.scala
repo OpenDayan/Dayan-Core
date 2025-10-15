@@ -91,6 +91,10 @@ class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int, GroupCount: Int = 4, fifo
       r0resp_o(outRespId)(syncBarId).valid := r0SyncBarSink.out(outRespId).valid
       r0SyncBarSink.out(outRespId).ready := r0resp_o(outRespId)(syncBarId).ready
       r0resp_o(outRespId)(syncBarId).bits := r0SyncBarSink.out(outRespId).bits
+      for(streamId <- 0 until GroupCount) {
+        r0resp_o(outRespId)(syncBarId).bits(streamId).valid :=
+          r0SyncBarSink.out(outRespId).bits(streamId).valid & r0SyncBarSink.out(outRespId).valid
+      }
     }
 
     val r1SyncBarSrc = Module(new SyncBarSource(fifoSize, GroupCount, R1Port))
@@ -123,6 +127,10 @@ class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int, GroupCount: Int = 4, fifo
       r1resp_o(outRespId)(syncBarId).valid := r1SyncBarSink.out(outRespId).valid
       r1SyncBarSink.out(outRespId).ready := r1resp_o(outRespId)(syncBarId).ready
       r1resp_o(outRespId)(syncBarId).bits := r1SyncBarSink.out(outRespId).bits
+      for(streamId <- 0 until GroupCount) {
+        r1resp_o(outRespId)(syncBarId).bits(streamId).valid :=
+          r1SyncBarSink.out(outRespId).bits(streamId).valid & r1SyncBarSink.out(outRespId).valid
+      }
     }
   }
 
@@ -206,6 +214,10 @@ class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int, GroupCount: Int = 4, fifo
       wresp_o(outRespId)(syncBarId).valid := wSyncBarSink.out(outRespId).valid
       wSyncBarSink.out(outRespId).ready := wresp_o(outRespId)(syncBarId).ready
       wresp_o(outRespId)(syncBarId).bits := wSyncBarSink.out(outRespId).bits
+      for(streamId <- 0 until GroupCount) {
+        wresp_o(outRespId)(syncBarId).bits(streamId).valid :=
+          wSyncBarSink.out(outRespId).bits(streamId).valid & wSyncBarSink.out(outRespId).valid
+      }
     }
   }
 
