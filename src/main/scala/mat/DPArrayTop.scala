@@ -143,14 +143,12 @@ class DPArrayTop(
 
   // Connecting wPort / rPort of all buffer to uram
   val flattenUramRData0 = VecInit(rresp0.map(c => {
-    VecInit(c.map(p => {
-      VecInit(p.map(_.data))
-    }))
+    c.ready := 1.B
+    VecInit(c.bits.map(_.data))
   })).asTypeOf(Vec(busWidth, UInt(8.W)))
   val flattenUramRData1 = VecInit(rresp1.map(c => {
-    VecInit(c.map(p => {
-      VecInit(p.map(_.data))
-    }))
+    c.ready := 1.B
+    VecInit(c.bits.map(_.data))
   })).asTypeOf(Vec(busWidth, UInt(8.W)))
   aBuffer.wData    := flattenUramRData1
   bBuffer.wData    := flattenUramRData0
@@ -183,7 +181,6 @@ class DPArrayTop(
   bLoadTaskSpilter.cmdIn  :<>= ldBCmd
   cLoadTaskSpilter.cmdIn  :<>= ldCCmd
   cStoreTaskSpilter.cmdIn :<>= stCmd
-  val cStoreURAMReq = Queue(cStoreTaskSpilter.cmdURAM)
 
   // URAM RP0: MAT.B,  VEC.L
   // URAM RP1: MAT.AC, LSU.L
@@ -193,35 +190,38 @@ class DPArrayTop(
   val uramRP1Arb = Module(new RRArbiter(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth,
     addressWidth, cMNK, idWidth), 2))
   uramRP1Arb.io.in <> VecInit(Seq(aLoadTaskSpilter.cmdURAM, cLoadTaskSpilter.cmdURAM))
-  aLoadTaskSpilter.cmdTile.ready := 0.B
-  cLoadTaskSpilter.cmdTile.ready := 0.B
-  val tileRP1Arb = VecInit(Seq(aLoadTaskSpilter.cmdTile, cLoadTaskSpilter.cmdTile))(uramRP1Arb.io.chosen)
+  val tileRP1ArbRdy = Wire(Bool())
+  val tileRP1ArbVld = VecInit(Seq(aLoadTaskSpilter.cmdTile.valid, cLoadTaskSpilter.cmdTile.valid))(uramRP1Arb.io.chosen)
+  val tileRP1Arb    = VecInit(Seq(aLoadTaskSpilter.cmdTile.bits,  cLoadTaskSpilter.cmdTile.bits))(uramRP1Arb.io.chosen)
+  val tileRP1ArbFire = tileRP1ArbVld & tileRP1ArbRdy
+  aLoadTaskSpilter.cmdTile.ready := tileRP1ArbRdy & (uramRP1Arb.io.chosen === 0.U)
+  cLoadTaskSpilter.cmdTile.ready := tileRP1ArbRdy & (uramRP1Arb.io.chosen === 1.U)
 
   // Barrier signals
-  val aLdCompChannel = Wire(Vec(channelCount, Bool()))
+  val aLdCompChannel  = Wire(Vec(channelCount, Bool()))
+  val bLdCompChannel  = Wire(Vec(channelCount, Bool()))
+  val cLdCompChannel  = Wire(Vec(channelCount, Bool()))
+  val cStCompChannel  = Wire(Vec(channelCount, Bool()))
   val aLdCompChannelR = aLdCompChannel.asUInt.andR
-  val aLdCompReady   = Wire(Bool())
-  val bLdCompChannel = Wire(Vec(channelCount, Bool()))
-  val bLdCompReady   = Wire(Bool())
   val bLdCompChannelR = bLdCompChannel.asUInt.andR
-  val cLdCompChannel = Wire(Vec(channelCount, Bool()))
-  val cLdCompReady   = Wire(Bool())
   val cLdCompChannelR = cLdCompChannel.asUInt.andR
-  val cStCompChannel = Wire(Vec(channelCount, Bool()))
-  val cStCompReady   = Wire(Bool())
   val cStCompChannelR = cStCompChannel.asUInt.andR
+  val aLdCompReady    = Wire(Bool())
+  val bLdCompReady    = Wire(Bool())
+  val cLdCompReady    = Wire(Bool())
+  val cStCompReady    = Wire(Bool())
 
   // Split Uram Cmd to Separate Buffer.
   val uramRP0QReady = Wire(Vec(channelCount, Bool()))
   val uramRP1QReady = Wire(Vec(channelCount, Bool()))
-  val uramWPQReady = Wire(Vec(channelCount, Bool()))
+  val uramWPQReady  = Wire(Vec(channelCount, Bool()))
   val tileRP0QReady = Wire(Vec(channelCount, Bool()))
   val tileRP1QReady = Wire(Vec(channelCount, Bool()))
-  val tileWPQReady = Wire(Vec(channelCount, Bool()))
-  bLoadTaskSpilter.cmdURAM.ready := uramRP0QReady.asUInt.andR
-  bLoadTaskSpilter.cmdTile.ready := tileRP0QReady.asUInt.andR
-  uramRP1Arb.io.out.ready := uramRP1QReady.asUInt.andR
-  tileRP1Arb.ready := tileRP1QReady.asUInt.andR
+  val tileWPQReady  = Wire(Vec(channelCount, Bool()))
+  bLoadTaskSpilter.cmdURAM.ready  := uramRP0QReady.asUInt.andR
+  bLoadTaskSpilter.cmdTile.ready  := tileRP0QReady.asUInt.andR
+  uramRP1Arb.io.out.ready         := uramRP1QReady.asUInt.andR
+  tileRP1ArbRdy                   := tileRP1QReady.asUInt.andR
   cStoreTaskSpilter.cmdURAM.ready := uramWPQReady.asUInt.andR
   cStoreTaskSpilter.cmdTile.ready := tileWPQReady.asUInt.andR
   for(channel <- 0 until channelCount) {
@@ -261,9 +261,9 @@ class DPArrayTop(
     }
     val s2Deny = s2Valid & !wreq(channel * portsPerChannel).ready
     tileWPQ.io.deq.ready := !s2Valid | wreq(channel * portsPerChannel).ready
-    cBuffer.extRe := s2Deny | cStoreTaskSpilter.cmdTile.valid
-    cBuffer.extRAddr := Mux(s2Deny, s2RAddr, s1RAddr)
-    cBuffer.extRBeat := Mux(s2Deny, s2RBeat, s1RBeat)
+    cBuffer.extRe(channel) := s2Deny | cStoreTaskSpilter.cmdTile.valid
+    cBuffer.extRAddr(channel) := Mux(s2Deny, s2RAddr, s1RAddr)
+    cBuffer.extRBeat(channel) := Mux(s2Deny, s2RBeat, s1RBeat)
 
     (0 until portsPerChannel).foreach(p => {
       // Get Mapped
@@ -333,8 +333,8 @@ class DPArrayTop(
     val tileRP1Q = Module(new Queue(
       new DPALoadStoreTileMicroCommand(storageRatio, maxBeat, idWidth), outStanding, false, false))
     tileRP1QReady(channel)  := tileRP1Q.io.enq.ready
-    tileRP1Q.io.enq.valid   := tileRP1Arb.fire
-    tileRP1Q.io.enq.bits    := tileRP1Arb.bits
+    tileRP1Q.io.enq.valid   := tileRP1ArbFire
+    tileRP1Q.io.enq.bits    := tileRP1Arb
 
     // TODO: 4 maybe too huge or too small?
     val compRP1AQ = Module(new Queue(Bool(), 4, false, false))
@@ -383,6 +383,7 @@ class DPArrayTop(
   aLdCompReady := ldComp.valid & loadBar.bits(0)
   bLdCompReady := ldComp.valid & loadBar.bits(1)
   cLdCompReady := ldComp.valid & loadBar.bits(2)
+  loadBar.ready := ldComp.valid
 
   // store Completion Handling
   //  stComp.valid := wreq(0).ready & s2LastLoad & s2Valid

@@ -88,7 +88,7 @@ class MatTop(
   // DPArray Top
   val dpa = Module(new DPArrayTop(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cM = cM, cN = cN, cK = cK, sK = kPerScale, idWidth = idWidth, wE = wE, wF = wF
+    cM = cM, cN = cN, cK = cK, sK = kPerScale, idWidth = idWidth, wE = wE, wF = wF, outStanding = 16
   ))
 
   dpa.ldACmd <> Queue(matSpilt.ldACmd, 8)
@@ -109,9 +109,9 @@ class MatTop(
   matSpilt.fComp.ready := 1.B
 
   // URAM Interface
+  val ports = busWidth / 8
   val channelCount    = busWidth / cK
   val portsPerChannel = ports    / channelCount
-  val ports = busWidth / 8
   val rreq0  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
   val rreq1  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
   val wreq   = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
@@ -132,7 +132,10 @@ class MatTestTop(
               storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int,
               cM: Int, cN: Int, cK: Int, kPerScale: Int,
               wE: Int = 9, wF: Int = 25) extends Module {
-  val mat = Module(new MatTop(storageRatio, busWidth, mnkWidth, addressWidth, cM, cN, cK, kPerScale, wE, wF))
+  val mat = Module(new MatTop(
+    storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth,
+    addressWidth = addressWidth, cM = cM, cN = cN, cK = cK, kPerScale = kPerScale,
+    wE = wE, wF = wF))
   val ports = busWidth / 8
   // URAM Instance
   val uram = Module(new Adv2R1WURAM(
@@ -157,8 +160,8 @@ class MatTestTop(
 object MatTestTop extends App {
   ChiselStage.emitSystemVerilog(
     new MatTestTop(storageRatio = 32,
-      busWidth = 256, mnkWidth = 20, addressWidth = 32,
-      cM = 16, cN = 8, cK = 32, kPerScale = 32),
+      busWidth = 64, mnkWidth = 20, addressWidth = 32,
+      cM = 8, cN = 4, cK = 16, kPerScale = 16),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",

@@ -27,7 +27,6 @@ class DPALoadStoreTileMicroCommand(storageRatio: Int, maxBeat: Int, idWidth: Int
   val beat = UInt(log2Ceil(maxBeat).W)
   val last = Bool()
   val bufferAddr = UInt((1+log2Ceil(storageRatio)).W)
-  val reqId = UInt(idWidth.W)
 }
 
 class DPALoadStoreURAMMicroCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cMNK: Int, idWidth: Int) extends Bundle {
@@ -37,7 +36,6 @@ class DPALoadStoreURAMMicroCommand(storageRatio: Int, mnkWidth: Int, addressWidt
   val baseDimMinorByte = UInt(mnkWidth.W)
   val pMajor = UInt(log2Ceil(cMNK).W) // pM <= sM
   val pMinor = UInt(log2Ceil(cMNK).W) // pN <= sN
-  val reqId = UInt(idWidth.W)
 }
 
 // Mat RAM Shape -> Address
@@ -67,7 +65,6 @@ class DPArrayLoadStoreBeatHandler(
   val cmdIn = IO(Flipped(Decoupled(new DPALoadStoreInnerCommand(storageRatio, mnkWidth, addressWidth, cMNK))))
   val cmdBuffer = IO(Decoupled(new DPALoadStoreTileMicroCommand(storageRatio, maxBeat, idWidth)))
   val cmdURAM = IO(Decoupled(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth, addressWidth, cMNK, idWidth)))
-  val idIn = IO(Flipped(Decoupled(UInt(idWidth.W))))
 
   val cmdQ = Queue(cmdIn)
 
@@ -82,21 +79,19 @@ class DPArrayLoadStoreBeatHandler(
   val curBeat = Reg(UInt(log2Ceil(maxBeat).W))
   val finish = curBeat === 0.U
   val bothReady = cmdBuffer.ready & cmdURAM.ready
-  cmdQ.ready := (idIn.valid & bothReady & finish) | !valid
+  cmdQ.ready := (bothReady & finish) | !valid
 
   when(cmdQ.fire) {
     valid := 1.B
     firstBeat := 1.B
     curBeat := cmdQ.bits.pMajor >> curLog2MajorSliceSize
-  }.elsewhen(valid & bothReady & idIn.valid) {
+  }.elsewhen(valid & bothReady) {
     valid := !finish
     curBeat := curBeat - 1.B
     firstBeat := 0.B
   }
 
-  idIn.ready := valid & bothReady
-
-  cmdBuffer.valid := valid & cmdURAM.ready & idIn.valid
+  cmdBuffer.valid := valid & cmdURAM.ready
   cmdBuffer.bits.isALoad := cmd.isALoad
   cmdBuffer.bits.isBLoad := cmd.isBLoad
   cmdBuffer.bits.isCLoad := cmd.isCLoad
@@ -104,8 +99,7 @@ class DPArrayLoadStoreBeatHandler(
   cmdBuffer.bits.last := cmd.last & finish
 //  cmdBuffer.bits.waitLoadC := cmd.waitLoadC
   cmdBuffer.bits.bufferAddr := cmd.bufferAddr
-  cmdBuffer.bits.reqId := idIn.bits
-  cmdURAM.valid := valid & cmdBuffer.ready & idIn.valid
+  cmdURAM.valid := valid & cmdBuffer.ready
   cmdURAM.bits.baseUramAddr := cmd.baseUramAddr
   cmdURAM.bits.majorStride  := cmd.majorStride
   cmdURAM.bits.baseDimMajor := cmd.baseDimMajor + (curBeat << curLog2MajorSliceSize)
@@ -115,7 +109,6 @@ class DPArrayLoadStoreBeatHandler(
     cmdURAM.bits.baseDimMinorByte := cmd.baseDimMinor
   }
   cmdURAM.bits.pMinor := cmd.pMinor
-  cmdURAM.bits.reqId := idIn.bits
 
   when(firstBeat) {
     if(abTask) {

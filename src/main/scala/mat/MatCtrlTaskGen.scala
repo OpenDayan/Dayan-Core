@@ -341,8 +341,8 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val sTask = sTaskQ.io.deq.bits
   stCmd.valid := sVld & sTask.cStore
   stCmd.bits.bank := sTask.cBank
-  stCmd.bits.lastLoadAB := 0.B
-  stCmd.bits.waitLoadC := 0.B
+//  stCmd.bits.lastLoadAB := 0.B
+//  stCmd.bits.waitLoadC := 0.B
   stCmd.bits.ctrl := DPArrayStorageCmd.loadC
   stCmd.bits.log2SDimMajor := sTask.log2SubM
   stCmd.bits.log2SDimMinor := sTask.log2SubN
