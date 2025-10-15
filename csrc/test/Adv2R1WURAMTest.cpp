@@ -25,8 +25,8 @@ extern "C" long long UltraRamWrite(int id, int waddr, long long wdata)
 #define RNDREQ(Group, Port) \
     do { \
         REQ(Group, Port, valid) = 1; \
-        REQ(Group, Port, bits_address) = rand(); \
-        REQ(Group, Port, bits_id)      = rand(); \
+        REQ(Group, Port, bits_address) = rand() & ((1 << 14) - 1); \
+        REQ(Group, Port, bits_id)      = 0; \
     } while(0)
 
 static inline void mainLoop()
