@@ -35,6 +35,7 @@ module DPIUltraRAM2R1WBase #(
 
     /* verilator lint_off WIDTHEXPAND */
     reg [DWIDTH-1:0] readreg0, readreg1;
+    reg [DWIDTH-1:0] readreg0_q, readreg1_q;
     reg [63:0] wret;
     always @(posedge core_clk) begin
         if(read_enable0) readreg0 = UltraRamRead(id, addrb0);
@@ -46,8 +47,10 @@ module DPIUltraRAM2R1WBase #(
     always @(posedge core_clk) begin
         read_enable0_q <= read_enable0;
         read_enable1_q <= read_enable1;
-        if(read_enable0_q) doutb0 <= readreg0;
-        if(read_enable1_q) doutb1 <= readreg1;
+        readreg0_q <= readreg0;
+        readreg1_q <= readreg1;
+        if(read_enable0_q) doutb0 <= readreg0_q;
+        if(read_enable1_q) doutb1 <= readreg1_q;
     end
     /* verilator lint_on WIDTHEXPAND */
 
