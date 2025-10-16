@@ -18,16 +18,16 @@ unsigned int stopFlag = 0;
 // #define URAM_SYNC_WRITE
 
 // Global Settings
-int rndInt = 0;
+int rndInt = 1;
 int enableTrace = 1;
 int M = 16;
 int N = 16;  // Aligned to  8
 int rawN = 16;
-int K = 128; // Aligned to 32
-int rawK = 128;
-int AAddr = 0xA0000;
-int BAddr = 0xB0000;
-int CAddr = 0xC0000;
+int K = 32; // Aligned to 32
+int rawK = 32;
+int AAddr =  0x00 << 3;
+int BAddr =  0x80 << 3;
+int CAddr = 0x100 << 3;
 
 int sM = 2, sN = 2, sK = 2;
 int persistentMode = 0;
@@ -38,13 +38,14 @@ int randomRange = 480;
 // Bank Count
 // 1: 2, 2: 4, 3: 8, 4: 16, 5: 32
 #define LOG2BANK 3
-#define URAMSIZE (32 * 32 * 1024ull)
+#define URAMSIZE ((1 << LOG2BANK) * 32 * 1024ull)
 long int uram[URAMSIZE / 8]; // 1024KBytes URAM
 static char* uramBase = (char*)&uram;
 
 extern "C" long long UltraRamRead(int id, int raddr)
 {
-    return uram[id | (raddr << LOG2BANK)];
+    long long rtValue = uram[id | (raddr << LOG2BANK)];
+    return rtValue;
 }
 
 extern "C" long long UltraRamWrite(int id, int waddr, long int wdata)
@@ -131,7 +132,7 @@ static int handleCCompare(int m, int n, float ref) {
         pass = diffAbs / refAbs <= MAX_ERROR;
     }
     if(!pass) {
-        fprintf(stderr, "URAM Addr: 0x%x\n", CAddr + (m * N + n) * 4);
+        fprintf(stderr, "URAM Addr: 0x%x\n", (CAddr + (m * N + n) * 4) >> 3);
         fprintf(stderr, "Error in M%d N%d, ref: %f, dut: %f\n", m, n, ref, dut);
     }
     return 0;
@@ -281,7 +282,7 @@ int main(int argc, char **argv)
     Verilated::traceEverOn(true);
     VerilatedFstC *m_trace = new VerilatedFstC;
     if(enableTrace) dut->trace(m_trace, 99);
-    if(enableTrace) m_trace->open(rndInt ? "wave/VMatTestTopFast.fst" : "wave/VMatTestTop.fst");
+    if(enableTrace) m_trace->open((argc >= 4) ? "wave/VMatTestTopFast.fst" : "wave/VMatTestTop.fst");
     dut->clock = 0;
     dut->reset = 1;
     dut->eval();

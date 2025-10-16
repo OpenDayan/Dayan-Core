@@ -57,6 +57,7 @@ class DPArrayTop(
  storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int,
  cM: Int, cN: Int, cK: Int, sK: Int, idWidth: Int,
  wE: Int = 9, wF: Int = 25, outStanding: Int = 16) extends Module {
+  require(cN * 4 == cK)
   val cMNK = Array(cM, cN, cK).max
   val maxTileSize = Array(cM * cK, cN * cK, cM * cN * 4).max
   val maxBeat = maxTileSize / busWidth
@@ -268,7 +269,7 @@ class DPArrayTop(
     }
     val s2Deny = s2Valid & !wreq(channel * portsPerChannel).ready
     tileWPQ.io.deq.ready := !s2Valid | wreq(channel * portsPerChannel).ready
-    cBuffer.extRe(channel) := s2Deny | cStoreTaskSpilter.cmdTile.valid
+    cBuffer.extRe(channel) := s2Deny | tileWPQ.io.deq.valid
     cBuffer.extRAddr(channel) := Mux(s2Deny, s2RAddr, s1RAddr)
     cBuffer.extRBeat(channel) := Mux(s2Deny, s2RBeat, s1RBeat)
 
@@ -379,7 +380,7 @@ class DPArrayTop(
       // Get Mapped
       val fixedMajor = channel
       val fixedMinorByte = 8 * p
-      val major = fixedMajor.U     + RP1Arb.io.out.bits.baseDimMajor
+      val major     = fixedMajor.U     + RP1Arb.io.out.bits.baseDimMajor
       val minorByte = fixedMinorByte.U + RP1Arb.io.out.bits.baseDimMinorByte
       // 对应偏移
       val addr = major * RP1Arb.io.out.bits.majorStride + minorByte + RP1Arb.io.out.bits.baseUramAddr
