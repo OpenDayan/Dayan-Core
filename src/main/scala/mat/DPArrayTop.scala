@@ -399,11 +399,11 @@ class DPArrayTop(
     cBuffer.extWAddr(channel) := tileRP1CQ.io.deq.bits.bufferAddr
     cBuffer.extWBeat(channel) := tileRP1CQ.io.deq.bits.beat
     cBuffer.extWe(channel)    := tileRP1CQ.io.deq.fire
-    tileRP1AQ.io.deq.ready := rresp1(channel).valid & RP1SelQ.io.deq.bits === 0.U
-    tileRP1CQ.io.deq.ready := rresp1(channel).valid & RP1SelQ.io.deq.bits === 1.U
-    RP1SelQ.io.deq.ready := rresp1(channel).valid
-    rresp1(channel).ready := (tileRP1CQ.io.deq.valid & RP1SelQ.io.deq.bits === 1.U) |
-                             (tileRP1AQ.io.deq.valid & RP1SelQ.io.deq.bits === 0.U)
+    tileRP1AQ.io.deq.ready := rresp1(channel).valid & (RP1SelQ.io.deq.bits === 0.U)
+    tileRP1CQ.io.deq.ready := rresp1(channel).valid & (RP1SelQ.io.deq.bits === 1.U)
+    RP1SelQ.io.deq.ready   := rresp1(channel).fire
+    rresp1(channel).ready  := (tileRP1CQ.io.deq.valid & (RP1SelQ.io.deq.bits === 1.U)) |
+                              (tileRP1AQ.io.deq.valid & (RP1SelQ.io.deq.bits === 0.U))
   }
 
   // Load Bar

@@ -18,7 +18,7 @@ unsigned int stopFlag = 0;
 // #define URAM_SYNC_WRITE
 
 // Global Settings
-int rndInt = 1;
+int rndInt = 0;
 int enableTrace = 1;
 // int M = 16;
 // int N = 16;  // Aligned to  8
@@ -28,7 +28,7 @@ int enableTrace = 1;
 // int AAddr =  0x00 << 3;
 // int BAddr =  0x80 << 3;
 // int CAddr = 0x100 << 3;
-int M = 32;
+int M = 41;
 int N = 256;  // Aligned to  8
 int rawN = 256;
 int K = 128; // Aligned to 32
