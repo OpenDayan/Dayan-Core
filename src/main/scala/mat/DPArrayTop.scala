@@ -144,11 +144,9 @@ class DPArrayTop(
 
   // Connecting wPort / rPort of all buffer to uram
   val flattenUramRData0 = VecInit(rresp0.map(c => {
-    c.ready := 1.B
     VecInit(c.bits.map(_.data))
   })).asTypeOf(Vec(busWidth, UInt(8.W)))
   val flattenUramRData1 = VecInit(rresp1.map(c => {
-    c.ready := 1.B
     VecInit(c.bits.map(_.data))
   })).asTypeOf(Vec(busWidth, UInt(8.W)))
   aBuffer.wData    := flattenUramRData1
@@ -251,12 +249,13 @@ class DPArrayTop(
     tileIsLastWPQ.io.enq.bits  := tileWPQ.io.deq.bits.last
     tileIsLastWPQ.io.deq.ready := wresp(channel).valid
 
-    // TODO: 4 maybe too huge or too small?
+    // TODO: 4 maybe too small?
     val compWPQ = Module(new Queue(Bool(), 4, false, false))
     compWPQ.io.enq.valid := wresp(channel).valid & tileIsLastWPQ.io.deq.bits
     compWPQ.io.enq.bits  := 0.B
     cStCompChannel(channel) := compWPQ.io.deq.valid
     compWPQ.io.deq.ready := cStCompReady
+    chisel3.assert(!(compWPQ.io.enq.valid & !compWPQ.io.enq.ready))
 
     // Two-stage rdata handling
     val s1RAddr = tileWPQ.io.deq.bits.bufferAddr
@@ -288,7 +287,7 @@ class DPArrayTop(
       wreq(channel * portsPerChannel + p).valid := uramWPQ.io.deq.valid & s2Valid
     })
     uramWPQ.io.deq.ready := wreq(channel * portsPerChannel).ready & s2Valid
-    wresp(channel).ready := 1.B
+    wresp(channel).ready := tileIsLastWPQ.io.deq.valid
 
     // RP0
     val uramRP0Q = Module(new Queue(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth,
@@ -309,6 +308,7 @@ class DPArrayTop(
     compRP0Q.io.enq.bits  := 0.B
     bLdCompChannel(channel) := compRP0Q.io.deq.valid
     compRP0Q.io.deq.ready := bLdCompReady
+    chisel3.assert(!(compRP0Q.io.enq.valid & !compRP0Q.io.enq.ready))
 
     (0 until portsPerChannel).foreach(p => {
       // Get Mapped
@@ -329,7 +329,7 @@ class DPArrayTop(
     bBuffer.we(channel) := tileRP0Q.io.deq.valid /* & tileRP0Q.io.deq.bits.isBLoad */ & rresp0(channel).valid
     tileRP0Q.io.deq.ready := rresp0(channel).valid
     uramRP0Q.io.deq.ready := rreq0(channel * portsPerChannel).ready
-    rresp0(channel).ready := 1.B
+    rresp0(channel).ready := tileRP0Q.io.deq.valid
 
     // RP1
     val uramRP1AQ = Module(new Queue(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth,
@@ -362,11 +362,13 @@ class DPArrayTop(
     compRP1AQ.io.enq.bits  := 0.B
     aLdCompChannel(channel) := compRP1AQ.io.deq.valid
     compRP1AQ.io.deq.ready := aLdCompReady
+    chisel3.assert(!(compRP1AQ.io.enq.valid & !compRP1AQ.io.enq.ready))
     val compRP1CQ = Module(new Queue(Bool(), 4, false, false))
     compRP1CQ.io.enq.valid := tileRP1CQ.io.deq.fire & tileRP1CQ.io.deq.bits.last
     compRP1CQ.io.enq.bits  := 0.B
     cLdCompChannel(channel) := compRP1CQ.io.deq.valid
     compRP1CQ.io.deq.ready := cLdCompReady
+    chisel3.assert(!(compRP1CQ.io.enq.valid & !compRP1CQ.io.enq.ready))
 
     val RP1Arb = Module(new RRArbiter(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth,
       addressWidth, cMNK, idWidth), 2))
@@ -400,7 +402,8 @@ class DPArrayTop(
     tileRP1AQ.io.deq.ready := rresp1(channel).valid & RP1SelQ.io.deq.bits === 0.U
     tileRP1CQ.io.deq.ready := rresp1(channel).valid & RP1SelQ.io.deq.bits === 1.U
     RP1SelQ.io.deq.ready := rresp1(channel).valid
-    rresp1(channel).ready := 1.B
+    rresp1(channel).ready := (tileRP1CQ.io.deq.valid & RP1SelQ.io.deq.bits === 1.U) |
+                             (tileRP1AQ.io.deq.valid & RP1SelQ.io.deq.bits === 0.U)
   }
 
   // Load Bar

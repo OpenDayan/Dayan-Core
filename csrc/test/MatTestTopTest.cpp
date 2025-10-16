@@ -20,14 +20,22 @@ unsigned int stopFlag = 0;
 // Global Settings
 int rndInt = 1;
 int enableTrace = 1;
-int M = 16;
-int N = 16;  // Aligned to  8
-int rawN = 16;
-int K = 32; // Aligned to 32
-int rawK = 32;
-int AAddr =  0x00 << 3;
-int BAddr =  0x80 << 3;
-int CAddr = 0x100 << 3;
+// int M = 16;
+// int N = 16;  // Aligned to  8
+// int rawN = 16;
+// int K = 32; // Aligned to 32
+// int rawK = 32;
+// int AAddr =  0x00 << 3;
+// int BAddr =  0x80 << 3;
+// int CAddr = 0x100 << 3;
+int M = 32;
+int N = 256;  // Aligned to  8
+int rawN = 256;
+int K = 128; // Aligned to 32
+int rawK = 128;
+int AAddr = 0x0000 << 3;
+int BAddr = 0x1000 << 3;
+int CAddr = 0x2000 << 3;
 
 int sM = 2, sN = 2, sK = 2;
 int persistentMode = 0;
@@ -37,7 +45,7 @@ int randomRange = 480;
 
 // Bank Count
 // 1: 2, 2: 4, 3: 8, 4: 16, 5: 32
-#define LOG2BANK 3
+#define LOG2BANK 5
 #define URAMSIZE ((1 << LOG2BANK) * 32 * 1024ull)
 long int uram[URAMSIZE / 8]; // 1024KBytes URAM
 static char* uramBase = (char*)&uram;
