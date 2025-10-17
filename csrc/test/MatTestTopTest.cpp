@@ -37,7 +37,7 @@ int AAddr = 0x0000 << 3;
 int BAddr = 0x2000 << 3;
 int CAddr = 0x4000 << 3;
 
-int sM = 2, sN = 2, sK = 2;
+int sM = 2, sN = 2, sK = 3;
 int persistentMode = 0;
 
 // Random Range

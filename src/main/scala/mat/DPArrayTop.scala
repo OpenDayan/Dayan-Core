@@ -98,11 +98,11 @@ class DPArrayTop(
   ))
 
   // Tensor Buffer
-  val aBuffer = Module(new DPArrayBufferAB(busWidth, 32, cM, cK))
-  val bBuffer = Module(new DPArrayBufferAB(busWidth, 32, cN, cK))
-  val cBuffer = Module(new DPArrayBufferC (busWidth, 32, cM, cN, wE, wF))
+  val aBuffer = Module(new DPArrayBufferAB(busWidth, storageRatio * 2, cM, cK))
+  val bBuffer = Module(new DPArrayBufferAB(busWidth, storageRatio * 2, cN, cK))
+  val cBuffer = Module(new DPArrayBufferC (busWidth, storageRatio, cM, cN, wE, wF))
 
-  val abBankSft = log2Ceil(storageRatio / 2)
+  val abBankSft = log2Ceil(storageRatio)
   val cBankSft  = log2Ceil(storageRatio)
   // DPArray Calculating Task Spilt
   val calcTaskSpilt = Module(new DPArrayCalcTaskSpilt(storageRatio, calcCore.r0Latency,
