@@ -34,8 +34,8 @@ int rawN = 256;
 int K = 128; // Aligned to 32
 int rawK = 128;
 int AAddr = 0x0000 << 3;
-int BAddr = 0x1000 << 3;
-int CAddr = 0x2000 << 3;
+int BAddr = 0x2000 << 3;
+int CAddr = 0x4000 << 3;
 
 int sM = 2, sN = 2, sK = 2;
 int persistentMode = 0;
@@ -290,7 +290,7 @@ int main(int argc, char **argv)
     Verilated::traceEverOn(true);
     VerilatedFstC *m_trace = new VerilatedFstC;
     if(enableTrace) dut->trace(m_trace, 99);
-    if(enableTrace) m_trace->open((argc >= 4) ? "wave/VMatTestTopFast.fst" : "wave/VMatTestTop.fst");
+    if(enableTrace) m_trace->open("wave/VMatTestTop.fst");
     dut->clock = 0;
     dut->reset = 1;
     dut->eval();

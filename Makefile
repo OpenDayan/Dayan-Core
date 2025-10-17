@@ -21,14 +21,7 @@ CodeStatisticsScala:
 generated/testbenchTemplate:
 	mkdir -p generated/testbenchTemplate
 
-build/VMatTestTopFast:
-	mkdir -p build/VMatTestTopFast
-
-.PHONY: build/VMatTestTopFast/VMatTestTop
-build/VMatTestTopFast/VMatTestTop: build/VMatTestTopFast
-	cp build/VMatTestTop/VMatTestTop build/VMatTestTopFast/VMatTestTop
-
-run_mattest: build/VMatTestTopFast/VMatTestTop
+run_mattest:
 	python3 GenerateMatTest.py > MatTest.mk
 	$(MAKE) -f MatTest.mk testall
 	python3 MergeReports.py

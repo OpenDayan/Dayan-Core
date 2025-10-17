@@ -159,22 +159,22 @@ class DPArrayTop(
   // A Load Task Spilt Unit
   val aLoadTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = true, cTask = false, storeTask = false, abBankSft, idWidth
+    cMNK = cMNK, cM = cM, cN = cN, cK = cK, aTask = true, bTask = false ,cTask = false, storeTask = false, abBankSft, idWidth
   ))
   // B Load Task Spilt Unit
   val bLoadTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = true, cTask = false, storeTask = false, abBankSft, idWidth
+    cMNK = cMNK, cM = cM, cN = cN, cK = cK, aTask = false, bTask = true, cTask = false, storeTask = false, abBankSft, idWidth
   ))
   // C Load Task Spilt Unit
   val cLoadTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = false, cTask = true, storeTask = false, cBankSft, idWidth
+    cMNK = cMNK, cM = cM, cN = cN, cK = cK, aTask = false, bTask = false, cTask = true, storeTask = false, cBankSft, idWidth
   ))
   // C Store Task Spilt Unit
   val cStoreTaskSpilter = Module(new DPArrayLoadStoreTaskSpilt(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cMNK = cMNK, cM = cM, cN = cN, cK = cK, abTask = false, cTask = true, storeTask = true, cBankSft, idWidth
+    cMNK = cMNK, cM = cM, cN = cN, cK = cK, aTask = false, bTask = false, cTask = true, storeTask = true, cBankSft, idWidth
   ))
   aLoadTaskSpilter.cmdIn  :<>= ldACmd
   bLoadTaskSpilter.cmdIn  :<>= ldBCmd
@@ -258,7 +258,7 @@ class DPArrayTop(
     chisel3.assert(!(compWPQ.io.enq.valid & !compWPQ.io.enq.ready))
 
     // Two-stage rdata handling
-    val s1RAddr = tileWPQ.io.deq.bits.bufferAddr
+    val s1RAddr = tileWPQ.io.deq.bits.tileAddr
     val s1RBeat = tileWPQ.io.deq.bits.beat
     val s2RAddr = RegEnable(s1RAddr, tileWPQ.io.deq.fire)
     val s2RBeat = RegEnable(s1RBeat, tileWPQ.io.deq.fire)
@@ -324,7 +324,7 @@ class DPArrayTop(
       rreq0(channel * portsPerChannel + p).bits.address := addr >> 3
       rreq0(channel * portsPerChannel + p).valid := uramRP0Q.io.deq.valid
     })
-    bBuffer.wAddr(channel) := tileRP0Q.io.deq.bits.bufferAddr
+    bBuffer.wAddr(channel) := tileRP0Q.io.deq.bits.tileAddr
     bBuffer.wBeat(channel) := tileRP0Q.io.deq.bits.beat
     bBuffer.we(channel) := tileRP0Q.io.deq.valid /* & tileRP0Q.io.deq.bits.isBLoad */ & rresp0(channel).valid
     tileRP0Q.io.deq.ready := rresp0(channel).valid
@@ -370,7 +370,7 @@ class DPArrayTop(
     compRP1CQ.io.deq.ready := cLdCompReady
     chisel3.assert(!(compRP1CQ.io.enq.valid & !compRP1CQ.io.enq.ready))
 
-    val RP1Arb = Module(new RRArbiter(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth,
+    val RP1Arb = Module(new Arbiter(new DPALoadStoreURAMMicroCommand(storageRatio, mnkWidth,
       addressWidth, cMNK, idWidth), 2))
     RP1Arb.io.in(0) <> uramRP1AQ.io.deq
     RP1Arb.io.in(1) <> uramRP1CQ.io.deq
@@ -393,10 +393,10 @@ class DPArrayTop(
       rreq1(channel * portsPerChannel + p).valid := RP1Arb.io.out.valid
     })
     RP1Arb.io.out.ready    := rreq1(channel * portsPerChannel).ready
-    aBuffer.wAddr(channel) := tileRP1AQ.io.deq.bits.bufferAddr
+    aBuffer.wAddr(channel) := tileRP1AQ.io.deq.bits.tileAddr
     aBuffer.wBeat(channel) := tileRP1AQ.io.deq.bits.beat
     aBuffer.we(channel)    := tileRP1AQ.io.deq.fire
-    cBuffer.extWAddr(channel) := tileRP1CQ.io.deq.bits.bufferAddr
+    cBuffer.extWAddr(channel) := tileRP1CQ.io.deq.bits.tileAddr
     cBuffer.extWBeat(channel) := tileRP1CQ.io.deq.bits.beat
     cBuffer.extWe(channel)    := tileRP1CQ.io.deq.fire
     tileRP1AQ.io.deq.ready := rresp1(channel).valid & (RP1SelQ.io.deq.bits === 0.U)

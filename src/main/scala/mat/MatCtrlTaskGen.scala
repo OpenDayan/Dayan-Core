@@ -212,6 +212,14 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   when(spFirstK & spCPersist) { lTaskQ.io.enq.bits.loadCnt := 3.U }
   when(spFirstN & spAPersist) { lTaskQ.io.enq.bits.loadCnt := 3.U }
   when(spFirstM & spBPersist) { lTaskQ.io.enq.bits.loadCnt := 3.U }
+  // TODO: Check new Cached A, B, C Load represent.
+//  val lastSpCached = RegNext(!taskQ.fire, lTaskQ.io.enq.fire)
+//  val lastSpCurM   = RegNext(spCurM, lTaskQ.io.enq.fire)
+//  val lastSpCurN   = RegNext(spCurN, lTaskQ.io.enq.fire)
+//  val lastSpCurK   = RegNext(spCurK, lTaskQ.io.enq.fire)
+//  lTaskQ.io.enq.bits.aLoad  := !lastSpCached | lastSpCurM =/= spCurM | lastSpCurK =/= spCurK
+//  lTaskQ.io.enq.bits.bLoad  := !lastSpCached | lastSpCurN =/= spCurN | lastSpCurK =/= spCurK
+//  lTaskQ.io.enq.bits.cLoad  := !lastSpCached | lastSpCurM =/= spCurM | lastSpCurN =/= spCurN
   lTaskQ.io.enq.bits.aLoad  := !spAPersist | spFirstN
   lTaskQ.io.enq.bits.bLoad  := !spBPersist | spFirstM
   lTaskQ.io.enq.bits.cLoad  := !spCPersist | spFirstK
