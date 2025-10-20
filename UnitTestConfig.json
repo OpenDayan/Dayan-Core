@@ -46,5 +46,8 @@
     },
     "Adv2R1WURAM": {
         "Package": "uram"
+    },
+    "Transposer": {
+        "Package": "utils"
     }
 }
