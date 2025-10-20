@@ -75,7 +75,8 @@ class Transposer[T <: Data](N: Int, gen: T) extends Module{
     mem(p).waddr := inBase + inRound
     mem(p).wdata := inStreamRotate(p).asUInt
 
-    mem(p).raddr := outBase + ((p.U(log2Ceil(N).W) >> ctrlOut.bits).asUInt - outRound)(log2Ceil(N) - 1, 0)
+    mem(p).raddr := outBase +
+      (((p.U(log2Ceil(N).W) >> ctrlOut.bits).asUInt - outRound) & ((N.U >> ctrlOut.bits).asUInt - 1.U))
     outStream(p) := mem((p.U + outRorQ.asUInt)(log2Ceil(N) - 1, 0)).rdata
   }
 }

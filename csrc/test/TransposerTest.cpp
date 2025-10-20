@@ -13,8 +13,8 @@ unsigned int stopFlag = 0;
 
 static inline void mainLoop()
 {
+    static long long lastTime = 0;
     dut->inValid = 1;
-    dut->inElemSize = 0; // Byte-Level
     dut->inStream_0 = (0x00 | ((sim_time & 0x7) << 4)) & 0xff;
     dut->inStream_1 = (0x01 | ((sim_time & 0x7) << 4)) & 0xff;
     dut->inStream_2 = (0x02 | ((sim_time & 0x7) << 4)) & 0xff;
@@ -23,6 +23,10 @@ static inline void mainLoop()
     dut->inStream_5 = (0x05 | ((sim_time & 0x7) << 4)) & 0xff;
     dut->inStream_6 = (0x06 | ((sim_time & 0x7) << 4)) & 0xff;
     dut->inStream_7 = (0x07 | ((sim_time & 0x7) << 4)) & 0xff;
+    if((sim_time - lastTime) == (8 >> (dut->inElemSize))) {
+        dut->inElemSize = rand() & 0x3;
+        lastTime = sim_time;
+    }
 }
 int main(int argc, char **argv)
 {
