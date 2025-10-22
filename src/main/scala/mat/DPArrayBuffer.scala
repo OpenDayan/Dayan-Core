@@ -4,7 +4,7 @@ import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
 import fpmath.{FPRoundingModule, FPUnpackModule}
-import utils.RF1R1WRamBase
+import utils.RF1R1WRam
 
 // Memory Wrapper For DPArray Buffer
 // Read  as entries, Vec(mn, Vec(k, UInt(8.W)))
@@ -32,14 +32,12 @@ class DPArrayBufferAB(busWidth: Int, entries: Int, mn: Int, k: Int) extends Modu
   for (line <- 0 until mn) {
     val extLine = line % (mn / maxBeat)
     val curBeat = line / (mn / maxBeat)
-    val backingStorage = Module(new RF1R1WRamBase(ptrW, k * 8))
-    backingStorage.io.clk := clock
-    backingStorage.io.reset := reset
-    backingStorage.io.raddr := rAddr
-    tiledRData(line) := backingStorage.io.rdata
-    backingStorage.io.we := we(extLine) && wBeat(extLine) === curBeat.U
-    backingStorage.io.waddr := wAddr(extLine)
-    backingStorage.io.wdata := wData.asUInt((extLine + 1) * k * 8 - 1, extLine * k * 8)
+    val backingStorage = Module(new RF1R1WRam(ptrW, k * 8))
+    backingStorage.raddr := rAddr
+    tiledRData(line) := backingStorage.rdata
+    backingStorage.we := we(extLine) && wBeat(extLine) === curBeat.U
+    backingStorage.waddr := wAddr(extLine)
+    backingStorage.wdata := wData.asUInt((extLine + 1) * k * 8 - 1, extLine * k * 8)
   }
 }
 
@@ -126,23 +124,19 @@ class DPArrayBufferC(busWidth: Int, entries: Int, m: Int, n: Int, wE: Int, wF: I
   for(line <- 0 until m) {
     val extLine = line % (m / maxBeat)
     val curBeat = line / (m / maxBeat)
-    val backingStorage0 = Module(new RF1R1WRamBase(ptrW, n * (wE + wF)))
-    val backingStorage1 = Module(new RF1R1WRamBase(ptrW, n * (wE + wF)))
-    backingStorage0.io.clk := clock
-    backingStorage1.io.clk := clock
-    backingStorage0.io.reset := reset
-    backingStorage1.io.reset := reset
-    backingStorage0.io.raddr := Mux(extRBank0(extLine), extRAddr(extLine)(ptrW - 1, 0), cRAddr(ptrW - 1, 0))
-    backingStorage1.io.raddr := Mux(extRBank1(extLine), extRAddr(extLine)(ptrW - 1, 0), cRAddr(ptrW - 1, 0))
-    backingStorage0.io.we := (extWBank0(extLine) & curBeat.U === extWBeat(extLine)) | cWBank0
-    backingStorage1.io.we := (extWBank1(extLine) & curBeat.U === extWBeat(extLine)) | cWBank1
-    backingStorage0.io.waddr := Mux(extWBank0(extLine), extWAddr(extLine)(ptrW - 1, 0), cWAddr(ptrW - 1, 0))
-    backingStorage1.io.waddr := Mux(extWBank1(extLine), extWAddr(extLine)(ptrW - 1, 0), cWAddr(ptrW - 1, 0))
-    backingStorage0.io.wdata := Mux(extWBank0(extLine), realExtWData(extLine).asUInt, cWData(line).asUInt)
-    backingStorage1.io.wdata := Mux(extWBank1(extLine), realExtWData(extLine).asUInt, cWData(line).asUInt)
-    realExtRData(line) := Mux(s1ExtRBank0(extLine), backingStorage0.io.rdata, backingStorage1.io.rdata)
+    val backingStorage0 = Module(new RF1R1WRam(ptrW, n * (wE + wF)))
+    val backingStorage1 = Module(new RF1R1WRam(ptrW, n * (wE + wF)))
+    backingStorage0.raddr := Mux(extRBank0(extLine), extRAddr(extLine)(ptrW - 1, 0), cRAddr(ptrW - 1, 0))
+    backingStorage1.raddr := Mux(extRBank1(extLine), extRAddr(extLine)(ptrW - 1, 0), cRAddr(ptrW - 1, 0))
+    backingStorage0.we := (extWBank0(extLine) & curBeat.U === extWBeat(extLine)) | cWBank0
+    backingStorage1.we := (extWBank1(extLine) & curBeat.U === extWBeat(extLine)) | cWBank1
+    backingStorage0.waddr := Mux(extWBank0(extLine), extWAddr(extLine)(ptrW - 1, 0), cWAddr(ptrW - 1, 0))
+    backingStorage1.waddr := Mux(extWBank1(extLine), extWAddr(extLine)(ptrW - 1, 0), cWAddr(ptrW - 1, 0))
+    backingStorage0.wdata := Mux(extWBank0(extLine), realExtWData(extLine).asUInt, cWData(line).asUInt)
+    backingStorage1.wdata := Mux(extWBank1(extLine), realExtWData(extLine).asUInt, cWData(line).asUInt)
+    realExtRData(line) := Mux(s1ExtRBank0(extLine), backingStorage0.rdata, backingStorage1.rdata)
     cRData(line)       := Mux(s1CRBank0,
-      backingStorage0.io.rdata, backingStorage1.io.rdata).asTypeOf(Vec(n, UInt((wE + wF).W)))
+      backingStorage0.rdata, backingStorage1.rdata).asTypeOf(Vec(n, UInt((wE + wF).W)))
   }
 }
 

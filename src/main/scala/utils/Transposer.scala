@@ -23,11 +23,10 @@ class Transposer[T <: Data](S: Int, N: Int, gen: T) extends Module{
   val outStream  = IO(Output(Vec(S, Vec(N, gen))))
 
   // Core Memory Generation
-  val mem = VecInit.tabulate(S)(s => VecInit.tabulate(N)(i => {
-    val m = Module(new RF1R1WRamBase(log2Ceil(2 * N), gen.getWidth))
-    m.io
-  }))
-
+  val mem = (0 until S).map(s => (0 until N).map(
+    n => Module(new RF1R1WRam(log2Ceil(2 * N), gen.getWidth))
+  ))
+  val memRdata = mem.map(s => VecInit(s.map(_.rdata)))
   val ctrlIn = Wire(DecoupledIO(inElemSize.cloneType))
   val ctrlOut = Queue(ctrlIn, 2 * N, false, false)
   outValid := RegNext(ctrlOut.valid)
@@ -74,15 +73,13 @@ class Transposer[T <: Data](S: Int, N: Int, gen: T) extends Module{
 
   for(s <- 0 until S) {
     for(p <- 0 until N) {
-      mem(s)(p).clk   := clock
-      mem(s)(p).reset := reset
       mem(s)(p).we    := inValid
       mem(s)(p).waddr := inBase + inRound
       mem(s)(p).wdata := inStreamRotate(s)(p).asUInt
 
       mem(s)(p).raddr := outBase +
         (((p.U(log2Ceil(N).W) >> ctrlOut.bits).asUInt - outRound) & ((N.U >> ctrlOut.bits).asUInt - 1.U))
-      outStream(s)(p) := mem(s)((p.U + outRorQ.asUInt)(log2Ceil(N) - 1, 0)).rdata
+      outStream(s)(p) := memRdata(s)((p.U + outRorQ.asUInt)(log2Ceil(N) - 1, 0))
     }
   }
 }
