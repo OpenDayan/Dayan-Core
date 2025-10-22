@@ -94,7 +94,7 @@ class DPArrayTop(
   // Non-Blocking calculating array
   val calcCore = Module(new FP8BF16FusedDPArray((tM, tN, tK) => new U8m2n2k1U4m2n2k2Mul(tM, tN, tK),
     M = cM, N = cN, K = cK, sK = sK,
-    debugFP32Output = true
+    debugFP32Output = true, enableStickBit = false, wMul = 17
   ))
 
   // Tensor Buffer
@@ -281,6 +281,7 @@ class DPArrayTop(
       // 对应偏移
       val addr = major * uramWPQ.io.deq.bits.majorStride + minorByte + uramWPQ.io.deq.bits.baseUramAddr
       // TODO: Swizzling 逻辑
+      // TODO: Timing! addr should be latched before send to uram request bus.
       // 开始连线
       wreq(channel * portsPerChannel + p).bits.id := 0.U
       wreq(channel * portsPerChannel + p).bits.address := addr >> 3
@@ -319,6 +320,7 @@ class DPArrayTop(
       // 对应偏移
       val addr = major * uramRP0Q.io.deq.bits.majorStride + minorByte + uramRP0Q.io.deq.bits.baseUramAddr
       // TODO: Swizzling 逻辑
+      // TODO: Timing! addr should be latched before send to uram request bus.
       // 开始连线
       rreq0(channel * portsPerChannel + p).bits.id := 0.U
       rreq0(channel * portsPerChannel + p).bits.address := addr >> 3
@@ -387,6 +389,7 @@ class DPArrayTop(
       // 对应偏移
       val addr = major * RP1Arb.io.out.bits.majorStride + minorByte + RP1Arb.io.out.bits.baseUramAddr
       // TODO: Swizzling 逻辑
+      // TODO: Timing! addr should be latched before send to uram request bus.
       // 开始连线
       rreq1(channel * portsPerChannel + p).bits.id := 0.U
       rreq1(channel * portsPerChannel + p).bits.address := addr >> 3
