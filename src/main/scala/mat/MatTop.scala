@@ -139,7 +139,7 @@ class MatTestTop(
   val ports = busWidth / 8
   // URAM Instance
   val uram = Module(new Adv2R1WURAM(
-    R0Port = 1, R1Port = 1, W0Port = 1, GroupCount = cK / 8,
+    R0Port = 2, R1Port = 1, W0Port = 2, GroupCount = cK / 8,
     fifoSize = 16, N = busWidth / 8, addrWidth = addressWidth, idWidth = 0, dataWidth = 64
   ))
 
@@ -155,6 +155,20 @@ class MatTestTop(
   mat.rresp0 :<>= uram.r0resp_o(0)
   mat.rresp1 :<>= uram.r1resp_o(0)
   mat.wresp  :<>= uram.wresp_o(0)
+
+  // Export uram Interface to prevent Vivado Optimize it.
+  val uram_r  = IO(Flipped(Vec(busWidth / 8, Decoupled(new AdvURAMReq(addressWidth, 0, 64)))))
+  val uram_w  = IO(Flipped(Vec(busWidth / 8, Decoupled(new AdvURAMReq(addressWidth, 0, 64)))))
+  val uram_rr = IO(Vec((busWidth / 8) / (cK / 8),
+    Decoupled(Vec(cK / 8, new AdvURAMResp(addressWidth, 0, 64)))))
+  val uram_wdata = IO(Input(Vec(busWidth / 8, UInt(64.W))))
+  val uram_wr = IO(Vec((busWidth / 8) / (cK / 8),
+    Decoupled(Vec((cK / 8), new AdvURAMWResp(addressWidth, 0, 64)))))
+  uram.r0req_i(1)  <> uram_r
+  uram.wreq_i(1)   <> uram_w
+  uram.r0resp_o(1) <> uram_rr
+  uram.wresp_o(1)  <> uram_wr
+  uram.wdata_i(1) := uram_wdata
 }
 
 object MatTestTop extends App {

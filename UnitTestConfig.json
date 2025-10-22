@@ -49,5 +49,8 @@
     },
     "Transposer": {
         "Package": "utils"
+    },
+    "ReorderCounter": {
+        "Package": "dma"
     }
 }

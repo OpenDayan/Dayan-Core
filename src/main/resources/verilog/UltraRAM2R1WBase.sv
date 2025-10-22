@@ -22,6 +22,7 @@ module DPIUltraRAM2R1WBase #(
     input wire[31:0] id
 );
 
+`ifndef SYNTHESIS
     import "DPI-C" function longint UltraRamRead(
         input  int id,
         input  int raddr
@@ -53,5 +54,33 @@ module DPIUltraRAM2R1WBase #(
         if(read_enable1_q) doutb1 <= readreg1_q;
     end
     /* verilator lint_on WIDTHEXPAND */
+`else
+    UltraRAMBase #(
+        .AWIDTH(AWIDTH),
+        .DWIDTH(DWIDTH)
+    ) base0 (
+        .core_clk(core_clk),
+        .reset(reset),
+        .write_enable(write_enable),
+        .addra(addra),
+        .dina(dina),
+        .read_enable(read_enable0),
+        .addrb(addrb0),
+        .doutb(doutb0)
+    );
+    UltraRAMBase #(
+        .AWIDTH(AWIDTH),
+        .DWIDTH(DWIDTH)
+    ) base1 (
+        .core_clk(core_clk),
+        .reset(reset),
+        .write_enable(write_enable),
+        .addra(addra),
+        .dina(dina),
+        .read_enable(read_enable1),
+        .addrb(addrb1),
+        .doutb(doutb1)
+    );
+`endif
 
 endmodule

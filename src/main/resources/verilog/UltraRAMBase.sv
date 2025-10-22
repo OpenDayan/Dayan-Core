@@ -22,13 +22,13 @@ module UltraRAMBase #(
 reg [DWIDTH-1:0] mem [(1<<AWIDTH)-1:0];        // Memory Declaration
 reg [DWIDTH-1:0] readreg;
 
-always @(posedge clk) begin
+always @(posedge core_clk) begin
     if(read_enable) readreg <= mem[addrb];
     if(write_enable) mem[addra] <= dina;
 end
 
 reg read_enable_q;
-always @(posedge clk) begin
+always @(posedge core_clk) begin
     if(reset) read_enable_q <= '0;
     else read_enable_q <= read_enable;
     if(read_enable_q) doutb <= readreg;

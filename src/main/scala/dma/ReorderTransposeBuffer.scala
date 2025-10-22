@@ -16,6 +16,6 @@ import chisel3.util._
   本设计需要同时兼容 AXI 及 Tilelink，因此假设 ID 不可复用，每一次 64B（总线宽）请求，均需要占用一个 ID，若干 ID 联合组成一组请求。
 */
 
-class ROTB extends Module {
+class ReorderTransposeBuffer extends Module {
 
 }

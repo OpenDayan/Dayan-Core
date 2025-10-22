@@ -41,7 +41,7 @@ class RF1R1WRam(addressWidth: Int, dataWidth: Int) extends Module {
 
 
 // 0-Cycle Fixed Latency
-class RF1R1WAsyncRamBase(addressWidth: Int, dataWidth: Int, selfReset: Int) extends
+class RF1R1RWAsyncRamBase(addressWidth: Int, dataWidth: Int, selfReset: Int) extends
   BlackBox(Map("addressWidth" -> addressWidth, "dataWidth" -> dataWidth, "selfReset" -> selfReset)) with HasBlackBoxResource {
   val io = IO(new Bundle {
     val clk = Input(Clock())
@@ -55,11 +55,11 @@ class RF1R1WAsyncRamBase(addressWidth: Int, dataWidth: Int, selfReset: Int) exte
     val wdata = Input(UInt(dataWidth.W))
     val rwdata = Output(UInt(dataWidth.W))
   })
-  addResource("/verilog/RF1R1WAsyncRamBase.sv")
+  addResource("/verilog/RF1R1RWAsyncRamBase.sv")
 }
 
 // 0-Cycle Fixed Latency
-class RF1R1WAsyncRam(addressWidth: Int, dataWidth: Int, selfReset: Int) extends Module {
+class RF1R1RWAsyncRam(addressWidth: Int, dataWidth: Int, selfReset: Int) extends Module {
   val raddr = IO(Input(UInt(addressWidth.W)))
   val rdata = IO(Output(UInt(dataWidth.W)))
   val we = IO(Input(UInt(1.W)))
@@ -67,7 +67,7 @@ class RF1R1WAsyncRam(addressWidth: Int, dataWidth: Int, selfReset: Int) extends 
   val wdata = IO(Input(UInt(dataWidth.W)))
   val rwdata = IO(Output(UInt(dataWidth.W)))
 
-  val core = Module(new RF1R1WAsyncRamBase(addressWidth = addressWidth, dataWidth = dataWidth, selfReset = selfReset))
+  val core = Module(new RF1R1RWAsyncRamBase(addressWidth = addressWidth, dataWidth = dataWidth, selfReset = selfReset))
   core.io.clk := clock
   core.io.reset := reset
   core.io.raddr := raddr
@@ -76,5 +76,37 @@ class RF1R1WAsyncRam(addressWidth: Int, dataWidth: Int, selfReset: Int) extends 
   core.io.waddr := waddr
   core.io.wdata := wdata
   rwdata := core.io.rwdata
-
 }
+
+
+// 0-Cycle Fixed Latency
+class RF1RWAsyncRamBase(addressWidth: Int, dataWidth: Int, selfReset: Int) extends
+  BlackBox(Map("addressWidth" -> addressWidth, "dataWidth" -> dataWidth, "selfReset" -> selfReset)) with HasBlackBoxResource {
+  val io = IO(new Bundle {
+    val clk = Input(Clock())
+    val reset = Input(Reset())
+
+    val we = Input(UInt(1.W))
+    val waddr = Input(UInt(addressWidth.W))
+    val wdata = Input(UInt(dataWidth.W))
+    val rwdata = Output(UInt(dataWidth.W))
+  })
+  addResource("/verilog/RF1RWAsyncRamBase.sv")
+}
+
+// 0-Cycle Fixed Latency
+class RF1RWAsyncRam(addressWidth: Int, dataWidth: Int, selfReset: Int) extends Module {
+  val we = IO(Input(UInt(1.W)))
+  val waddr = IO(Input(UInt(addressWidth.W)))
+  val wdata = IO(Input(UInt(dataWidth.W)))
+  val rwdata = IO(Output(UInt(dataWidth.W)))
+
+  val core = Module(new RF1RWAsyncRamBase(addressWidth = addressWidth, dataWidth = dataWidth, selfReset = selfReset))
+  core.io.clk := clock
+  core.io.reset := reset
+  core.io.we := we
+  core.io.waddr := waddr
+  core.io.wdata := wdata
+  rwdata := core.io.rwdata
+}
+

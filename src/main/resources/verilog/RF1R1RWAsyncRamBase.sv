@@ -1,4 +1,4 @@
-module RF1R1WAsyncRamBase#(
+module RF1R1RWAsyncRamBase#(
     parameter addressWidth = 5,
     parameter dataWidth = 2048,
     parameter selfReset = 0
