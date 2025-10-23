@@ -16,70 +16,75 @@ class Transposer[T <: Data](S: Int, N: Int, gen: T) extends Module{
 
   // Log2 Input Element Size
   // 0: 1-T, 1: 2-T, 2: 4-T, 3: 8-T
-  val inValid    = IO(Input(Bool()))
-  val inElemSize = IO(Input(UInt(log2Ceil(log2Ceil(N)).W)))
-  val inStream   = IO(Input(Vec(S, Vec(N, gen))))
-  val outValid   = IO(Output(Bool()))
-  val outStream  = IO(Output(Vec(S, Vec(N, gen))))
+  val in = IO(Flipped(Decoupled(new Bundle {
+    val elemSize = UInt(log2Ceil(log2Ceil(N)).W)
+    val stream   = Vec(S, Vec(N, gen))
+  })))
+  val out = IO(Decoupled(Vec(S, Vec(N, gen))))
 
   // Core Memory Generation
   val mem = (0 until S).map(s => (0 until N).map(
     n => Module(new RF1R1WRam(log2Ceil(2 * N), gen.getWidth))
   ))
   val memRdata = mem.map(s => VecInit(s.map(_.rdata)))
-  val ctrlIn = Wire(DecoupledIO(inElemSize.cloneType))
+  val ctrlIn = Wire(DecoupledIO(in.bits.elemSize.cloneType))
   val ctrlOut = Queue(ctrlIn, 2 * N, false, false)
-  outValid := RegNext(ctrlOut.valid)
 
-  ctrlIn.bits := inElemSize
+  ctrlIn.bits := in.bits.elemSize
 
   // 2 * N - Buffered Implementation
   // Input Control status
   val inBase  = RegInit(0.U(log2Ceil(2 * N).W))
   val inRound = RegInit(0.U(log2Ceil(2 * N).W))
 
-  val inRor   = inRound << inElemSize
-  val inLast  = inRound === ((N.U(log2Ceil(2 * N).W) >> inElemSize).asUInt - 1.U)
+  val inRor   = inRound << in.bits.elemSize
+  val inLast  = inRound === ((N.U(log2Ceil(2 * N).W) >> in.bits.elemSize).asUInt - 1.U)
   // Ror of input
-  val inStreamRotate = VecInit(inStream.map(s => VecInit.tabulate(N)(i => {
+  val inStreamRotate = VecInit(in.bits.stream.map(s => VecInit.tabulate(N)(i => {
     s((i.U - inRor.asUInt)(log2Ceil(N) - 1, 0))
   })))
 
-  ctrlIn.valid := inLast & inValid
-  when(inValid) {
+  ctrlIn.valid := inLast & in.fire
+  when(in.fire) {
     when(inLast) {
       inRound := 0.U
-      inBase  := inBase + (N.U(log2Ceil(2 * N).W) >> inElemSize) // 0: N, 1: N / 2
+      inBase  := inBase + (N.U(log2Ceil(2 * N).W) >> in.bits.elemSize) // 0: N, 1: N / 2
     }.otherwise {
       inRound := inRound + 1.U
     }
   }
 
   // Output Control status
-  val outBase  = RegInit(0.U(log2Ceil(2 * N).W))
-  val outRound = RegInit(0.U(log2Ceil(N).W))
-  val outLast  = outRound === ((N.U(log2Ceil(2 * N).W) >> ctrlOut.bits).asUInt - 1.U)
-  val outRor   = outRound << ctrlOut.bits
-  val outRorQ  = RegNext(outRor)
-  ctrlOut.ready := outLast
-  when(ctrlOut.valid) {
-    when(outLast) {
-      outRound := 0.U
-      outBase  := outBase + (N.U(log2Ceil(2 * N).W) >> ctrlOut.bits)
+  val s1Deny = Wire(Bool())
+  val s0Base  = RegInit(0.U(log2Ceil(2 * N).W))
+  val s0Round = RegInit(0.U(log2Ceil(N).W))
+  val s0Last  = s0Round === ((N.U(log2Ceil(2 * N).W) >> ctrlOut.bits).asUInt - 1.U)
+  val s0Ror = s0Round << ctrlOut.bits
+  ctrlOut.ready := s0Last & out.ready
+  val s1Ror = RegEnable(s0Ror, !s1Deny)
+  val s1Valid = RegEnable(ctrlOut.valid, !s1Deny)
+  when(out.ready & ctrlOut.valid) {
+    when(s0Last) {
+      s0Round := 0.U
+      s0Base  := s0Base + (N.U(log2Ceil(2 * N).W) >> ctrlOut.bits)
     }.otherwise {
-      outRound := outRound + 1.U
+      s0Round := s0Round + 1.U
     }
   }
+  out.valid := s1Valid
+  s1Deny := out.valid & !out.ready
+  in.ready := !s1Deny
 
   for(s <- 0 until S) {
     for(p <- 0 until N) {
-      mem(s)(p).we    := inValid
+      mem(s)(p).we    := in.fire
       mem(s)(p).waddr := inBase + inRound
       mem(s)(p).wdata := inStreamRotate(s)(p).asUInt
 
-      mem(s)(p).raddr := outBase +
-        (((p.U(log2Ceil(N).W) >> ctrlOut.bits).asUInt - outRound) & ((N.U >> ctrlOut.bits).asUInt - 1.U))
-      outStream(s)(p) := memRdata(s)((p.U + outRorQ.asUInt)(log2Ceil(N) - 1, 0))
+      mem(s)(p).raddr := Mux(s1Deny,
+        RegNext(mem(s)(p).raddr),
+        s0Base + (((p.U(log2Ceil(N).W) >> ctrlOut.bits).asUInt - s0Round) & ((N.U >> ctrlOut.bits).asUInt - 1.U)))
+      out.bits(s)(p) := memRdata(s)((p.U + s1Ror.asUInt)(log2Ceil(N) - 1, 0))
     }
   }
 }
