@@ -47,7 +47,7 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
   val BANK = N / CN
   val maxOutStanding = 1 << log2MaxOutStanding
   val groupReq = IO(Flipped(Decoupled(new Bundle {
-    val keepInfo  = genT
+    val keepInfo  = UInt(genT.getWidth.W)
     val groupSz   = UInt(log2MaxOutStanding.W) // GroupSize == [64B / (2^transpose)], Spilt Inside
     val groupPad  = UInt(log2MaxOutStanding.W)
     val reqPad    = UInt(log2N.W)
@@ -55,7 +55,7 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
     val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
   })))
   val blockReq = Wire(DecoupledIO(new Bundle {
-    val keepInfo  = genT
+    val keepInfo  = UInt(genT.getWidth.W)
     val groupSz   = UInt(log2N.W) // GroupSize == [64B / (2^transpose)], Spilt Inside
     val groupPad  = UInt(log2N.W)
     val reqPad    = UInt(log2N.W)
@@ -70,7 +70,7 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
   })
   val outStream = IO(Decoupled(new Bundle {
     val data = Vec(N, genD)
-    val info = genT
+    val info = UInt(genT.getWidth.W)
   }))
   // group Allocate Logic
   val blockReqQ = Queue(blockReq, 2, false, false)
@@ -99,7 +99,7 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
 
   // Block Info Queue
   val blockInfoQ = Module(new Queue(new Bundle {
-    val keepInfo  = genT
+    val keepInfo  = UInt(genT.getWidth.W)
     val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
   }, maxOutStanding, false, false, true)).io
   blockInfoQ.enq.bits.keepInfo := blockReqQ.bits.keepInfo
@@ -135,6 +135,7 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
   padFIFO.enq.bits := inCurAllocateHead
   padFIFO.enq.valid := inCurUseableEntry =/= 0.U & blockReqQ.valid & inCurIsPad
   val nextCurIdx = inCurIdx + 1.U
+  blockReqQ.ready := 0.B
   when(transactionAlloc.fire) {
     when(inCurIdx === blockReqQ.bits.groupSz) {
       // Last Request In Group
@@ -211,6 +212,7 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
   val t0OutCurBlockSz = ((N-1).U >> blockInfoQ.deq.bits.transpose).asUInt
   val t0Outlog2BlockSz = log2N.U - blockInfoQ.deq.bits.transpose
   val t0OutCurLast = t0OutCurIdx === t0OutCurBlockSz
+  blockInfoQ.deq.ready := 0.B
   /*
   * ROR = t0OutCurIdx / (t0OutCurBlockSz / Bank)
   * ROR = (t0OutCurIdx << log2BANK) >> t0Outlog2BlockSz
@@ -219,6 +221,7 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
   when(t0OutCurBlockValid & trInReady) {
     when(t0OutCurLast) {
       t0OutCurIdx := 0.U
+      blockInfoQ.deq.ready := 1.B
     }.otherwise {
       t0OutCurIdx := t0OutCurIdx + 1.U
     }

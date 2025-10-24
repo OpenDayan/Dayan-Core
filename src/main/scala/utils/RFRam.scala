@@ -50,11 +50,11 @@ class RF1R1WRamGen[D <: Data](addressWidth: Int, gen: D) extends Module {
   val core = Module(new RF1R1WRamBase(addressWidth = addressWidth, dataWidth = gen.getWidth))
   core.io.clk := clock
   core.io.reset := reset
-  core.io.raddr := raddr.asUInt
-  rdata := core.io.rdata
+  core.io.raddr := raddr
+  rdata := core.io.rdata.asTypeOf(gen)
   core.io.we := we
   core.io.waddr := waddr
-  core.io.wdata := wdata.asTypeOf(gen)
+  core.io.wdata := wdata.asUInt
 }
 
 
