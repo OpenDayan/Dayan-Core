@@ -134,7 +134,7 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
   inCurUseableEntry := inCurUseableEntry - (transactionAlloc.fire | padFIFO.enq.fire).asUInt + outFreeEntryCount
   padFIFO.enq.bits := inCurAllocateHead
   padFIFO.enq.valid := inCurUseableEntry =/= 0.U & blockReqQ.valid & inCurIsPad
-  val nextCurIdx = inCurIdx + 1.U
+  val nextCurIdx = inCurIdx +& 1.U
   blockReqQ.ready := 0.B
   when(transactionAlloc.fire | padFIFO.enq.fire) {
     when(inCurIdx === blockReqQ.bits.groupSz) {

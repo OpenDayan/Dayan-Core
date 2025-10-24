@@ -47,6 +47,6 @@ class DMAGroupReqSpilt[D <: Data, T <: Data](log2MaxOutStanding: Int, log2N: Int
     curBlockStart := 0.U
   }.elsewhen(blockReq.fire) {
     // only update when fired, lower the bit flip rate.
-    curBlockStart := curBlockStart + curMaxSz
+    curBlockStart := curBlockStart + curMaxSz + 1.U
   }
 }
