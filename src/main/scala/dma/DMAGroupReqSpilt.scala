@@ -29,16 +29,19 @@ class DMAGroupReqSpilt[D <: Data, T <: Data](log2MaxOutStanding: Int, log2N: Int
   val curMaxSz = ((N - 1).U >> inQ.bits.transpose).asUInt
   blockReq.valid := inQ.valid
   blockReq.bits  := inQ.bits
-  blockReq.bits.groupSz  := inQ.bits.groupSz
-  blockReq.bits.groupPad := inQ.bits.groupPad
   inQ.ready := 0.B
-  blockReq.bits.groupPad := curMaxSz
   when((inQ.bits.groupSz - curBlockStart) <= curMaxSz) {
     // Pad to nearest
     blockReq.bits.groupSz  := inQ.bits.groupSz - curBlockStart
     inQ.ready := blockReq.ready
-  }.elsewhen((inQ.bits.groupSz - curBlockStart) > curMaxSz) {
+  }.otherwise {
     blockReq.bits.groupSz  := curMaxSz
+  }
+  when((inQ.bits.groupPad - curBlockStart) <= curMaxSz) {
+    // Pad to nearest
+    blockReq.bits.groupPad := inQ.bits.groupPad - curBlockStart - 1.U
+  }.otherwise {
+    blockReq.bits.groupPad := curMaxSz
   }
   when(inQ.fire) {
     curBlockStart := 0.U

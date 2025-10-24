@@ -130,13 +130,13 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
   val inCurIsPad = inCurIdx > blockReqQ.bits.groupPad
   transactionAlloc.bits := inCurAllocateHead
   transactionAlloc.valid := inCurUseableEntry =/= 0.U & blockReqQ.valid & !inCurIsPad
-  inCurAllocateHead := inCurAllocateHead + transactionAlloc.fire.asUInt + padFIFO.enq.fire.asUInt
-  inCurUseableEntry := inCurUseableEntry - transactionAlloc.fire.asUInt - padFIFO.enq.fire.asUInt + outFreeEntryCount
+  inCurAllocateHead := inCurAllocateHead + (transactionAlloc.fire | padFIFO.enq.fire).asUInt
+  inCurUseableEntry := inCurUseableEntry - (transactionAlloc.fire | padFIFO.enq.fire).asUInt + outFreeEntryCount
   padFIFO.enq.bits := inCurAllocateHead
   padFIFO.enq.valid := inCurUseableEntry =/= 0.U & blockReqQ.valid & inCurIsPad
   val nextCurIdx = inCurIdx + 1.U
   blockReqQ.ready := 0.B
-  when(transactionAlloc.fire) {
+  when(transactionAlloc.fire | padFIFO.enq.fire) {
     when(inCurIdx === blockReqQ.bits.groupSz) {
       // Last Request In Group
       inCurIdx := 0.U
@@ -208,6 +208,8 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
   // T0 Fetch BlockInfo
   val t0OutInfo = blockInfoQ.deq.bits
   val t0OutCurIdx = RegInit(0.U(log2N.W))
+  val t0OutCurBankIdx = RegInit(0.U(log2BANK.W))
+  val t0OutCurCIdx = RegInit(0.U(log2CN.W))
   val t0OutCurBlockValid = reorderCounter.check.reqGroupValid
   val t0OutCurBlockSz = ((N-1).U >> blockInfoQ.deq.bits.transpose).asUInt
   val t0Outlog2BlockSz = log2N.U - blockInfoQ.deq.bits.transpose
@@ -218,19 +220,26 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
   * ROR = (t0OutCurIdx << log2BANK) >> t0Outlog2BlockSz
   * */
   val t0OutRor = (Cat(t0OutCurIdx, 0.U(log2BANK.W)) >> t0Outlog2BlockSz)(log2BANK - 1, 0).asUInt
+  val t0Outlog2CNCycle = log2CN.U - Mux(t0OutInfo.transpose >= log2CN.U, log2CN.U, t0OutInfo.transpose(log2Ceil(log2CN) - 1, 0))
   when(t0OutCurBlockValid & trInReady) {
     when(t0OutCurLast) {
       t0OutCurIdx := 0.U
+      t0OutCurCIdx := 0.U
+      t0OutCurBankIdx := 0.U
       blockInfoQ.deq.ready := 1.B
     }.otherwise {
       t0OutCurIdx := t0OutCurIdx + 1.U
+      val cidxCarry = t0OutCurCIdx === ((1.U(log2CN.W) << t0Outlog2CNCycle).asUInt - 1.U)
+      t0OutCurCIdx := Mux(cidxCarry, 0.U, t0OutCurIdx + 1.U)
+      t0OutCurBankIdx := t0OutCurBankIdx + cidxCarry.asUInt
     }
   }
   // raddr == ((((b * CN) / (transpose)) - idx) & (BlockSz - 1)) + base
   val t1OutDataRaw = VecInit.tabulate(BANK)(b => {
-    dmaBuffer(b).raddr := Mux(trInReady, RegNext(dmaBuffer(b).raddr),
+    dmaBuffer(b).raddr := Mux(!trInReady, RegNext(dmaBuffer(b).raddr),
       // TODO: Check Me
-      ((Cat(b.U(log2BANK.W), 0.U(log2CN.W)) >> t0OutInfo.transpose).asUInt - t0OutCurIdx) & t0OutCurBlockSz
+      t0OutCurBlockHead + (((Cat(b.U(log2BANK.W), 0.U(log2CN.W)) >> t0OutInfo.transpose).asUInt
+        + t0OutCurCIdx - (Cat(0.U(log2CN.W), t0OutCurBankIdx) << t0Outlog2CNCycle).asUInt) & t0OutCurBlockSz)
     )
     dmaBuffer(b).rdata
   })
@@ -258,7 +267,7 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
 
 object DMAReorderTransposeBuffer extends App {
   ChiselStage.emitSystemVerilog(
-    new DMAReorderTransposeBuffer(9, 6, 3, UInt(8.W), UInt(32.W)),
+    new DMAReorderTransposeBuffer(9, 6, 3, UInt(16.W), UInt(32.W)),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",
