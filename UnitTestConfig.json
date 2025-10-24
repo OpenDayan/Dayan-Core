@@ -50,7 +50,7 @@
     "Transposer": {
         "Package": "utils"
     },
-    "ReorderCounter": {
+    "DMAReorderCounter": {
         "Package": "dma"
     }
 }

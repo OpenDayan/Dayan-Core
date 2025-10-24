@@ -26,7 +26,7 @@ import utils._
 *    实现部分的计数器，目前使用 + 1 方案。但如若相应路径处于关键路径，则应考虑使用 LFSR 计数器替代加法器，以降低逻辑延迟和面积。
 *
 */
-class ReorderCounter(depth: Int, maxGroupSize: Int) extends Module {
+class DMAReorderCounter(depth: Int, maxGroupSize: Int) extends Module {
   val comp = IO(new Bundle {
     val valid = Input(Bool())
     val reqGroupID = Input(UInt(log2Ceil(depth).W))
@@ -59,15 +59,15 @@ class ReorderCounter(depth: Int, maxGroupSize: Int) extends Module {
   check.reqGroupValid := validRF.wp(1).rwdata.asBool
 }
 
-object ReorderCounter extends App {
+object DMAReorderCounter extends App {
   ChiselStage.emitSystemVerilog(
-    new ReorderCounter(512, 64),
+    new DMAReorderCounter(512, 64),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",
       "-preserve-aggregate=vec",
       "--split-verilog",
-      "-o=generated/ReorderCounter"
+      "-o=generated/DMAReorderCounter"
     )
   )
 }

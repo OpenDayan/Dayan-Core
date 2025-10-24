@@ -36,14 +36,30 @@ import chisel3.util._
 *  本设计需要同时兼容 AXI 及 Tilelink，因此假设 ID 不可复用，每一次 64B（内存位宽）请求，均需要占用一个 ID，若干 ID 联合组成访存组。
 *
 */
-class groupReqInfo[T <: Data](gen: T) extends Bundle {
-  val keepInfo = gen
 
-}
-class ReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int,
-                                                   log2N: Int, genD: D, genT: T) extends Module {
-  val N = 1 << log2N
-  val groupReq = IO(Flipped(Decoupled(new groupReqInfo(genT))))
+// N-Bytes Input, D Means One Byte.
+class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, log2N: Int, log2CN: Int,
+                                                      genD: D, genT: T) extends Module {
+  val N  = 1 << log2N
+  val CN = 1 << log2CN
+  val Bank = N / CN
+  val maxOutStanding = 1 << log2MaxOutStanding
+  val groupReq = IO(Flipped(Decoupled(new Bundle {
+    val keepInfo  = genT
+    val groupSz   = UInt(log2MaxOutStanding.W) // GroupSize == [64B / (2^transpose)], Spilt Inside
+    val groupPad  = UInt(log2MaxOutStanding.W)
+    val reqPad    = UInt(log2N.W)
+    val padValue  = Vec(CN, genD)
+    val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
+  })))
+  val blockReq = Wire(DecoupledIO(new Bundle {
+    val keepInfo  = genT
+    val groupSz   = UInt(log2N.W) // GroupSize == [64B / (2^transpose)], Spilt Inside
+    val groupPad  = UInt(log2N.W)
+    val reqPad    = UInt(log2N.W)
+    val padValue  = Vec(CN, genD)
+    val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
+  }))
   val transactionAlloc = IO(Decoupled(UInt(log2MaxOutStanding.W)))
   val transactionComp  = IO(new Bundle {
     val data  = Input(Vec(N, genD))
@@ -54,4 +70,61 @@ class ReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int,
     val data = Vec(N, genD)
     val info = genT
   }))
+  // group Allocate Logic
+  val groupReqQ = Queue(blockReq, 2, false, false)
+
+  // transaction ID Alloc Logic
+  val curGroupHead    = RegInit(0.U(log2MaxOutStanding.W))
+  val curAllocateHead = RegInit(0.U(log2MaxOutStanding.W))
+  val curUseableEntry = RegInit(maxOutStanding.U((log2MaxOutStanding + 1).W))
+  val freeEntryCount  = Wire(UInt(log2N.W))
+  val curIsFirst      = curGroupHead === curAllocateHead
+
+  // transaction Info Ram
+  val transactionInfoRam = SyncReadMem(maxOutStanding, new Bundle {
+    val reqPad    = UInt(log2N.W)
+    val padValue  = Vec(CN, genD)
+    val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
+    val firstId   = UInt(log2MaxOutStanding.W)
+  })
+  when(transactionAlloc.fire) {
+    val wp = transactionInfoRam(transactionAlloc.bits)
+    wp.reqPad    := groupReqQ.bits.reqPad
+    wp.padValue  := groupReqQ.bits.padValue
+    wp.transpose := groupReqQ.bits.transpose
+    wp.firstId   := curGroupHead
+  }
+
+  // Group Info Ram
+  val groupInfoRam = SyncReadMem(maxOutStanding, new Bundle {
+    val keepInfo  = genT
+    val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
+  })
+  when(transactionAlloc.fire & curIsFirst) {
+    val wp = groupInfoRam(curGroupHead)
+    wp.keepInfo := groupReqQ.bits.keepInfo
+    wp.transpose := groupReqQ.bits.transpose
+  }
+
+  // DMA Buffer
+  val dmaBuffer = (0 until Bank).map(i => {
+    SyncReadMem(maxOutStanding, Vec(CN, genD))
+  })
+
+  // Padding FIFO
+  val padFIFO = Module(new Queue(UInt(log2MaxOutStanding.W), maxOutStanding / 2, false, false, true)).io
+
+  // Reorder Counter
+  val reorderCounter = Module(new DMAReorderCounter(maxOutStanding, N))
+
+  // Input Stream Controlling Logic
+  val curIdx = Reg(UInt(log2MaxOutStanding.W))
+  val curAllocatePad = curIdx > groupReqQ.bits.groupPad
+  transactionAlloc.bits := curAllocateHead
+  transactionAlloc.valid := curUseableEntry =/= 0.U & groupReqQ.valid & !curAllocatePad
+  curAllocateHead := curAllocateHead + transactionAlloc.fire.asUInt + padFIFO.enq.fire.asUInt
+  curUseableEntry := curUseableEntry - transactionAlloc.fire.asUInt - padFIFO.enq.fire.asUInt + freeEntryCount
+  padFIFO.enq.bits := curAllocateHead
+  padFIFO.enq.valid := curUseableEntry =/= 0.U & groupReqQ.valid & curAllocatePad
+
 }
