@@ -85,7 +85,8 @@ static inline void mainLoop()
         // dut->inElemSize = rand() & 0x3;
         lastTime = fireTime;
     }
-    dut->out_ready = rand() & 1;
+    dut->out_ready = // rand() &
+    1;
 }
 int main(int argc, char **argv)
 {

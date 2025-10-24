@@ -39,6 +39,24 @@ class RF1R1WRam(addressWidth: Int, dataWidth: Int) extends Module {
   core.io.wdata := wdata
 }
 
+// 1-Cycle Fixed Latency
+class RF1R1WRamGen[D <: Data](addressWidth: Int, gen: D) extends Module {
+  val raddr = IO(Input(UInt(addressWidth.W)))
+  val rdata = IO(Output(gen))
+  val we = IO(Input(UInt(1.W)))
+  val waddr = IO(Input(UInt(addressWidth.W)))
+  val wdata = IO(Input(gen))
+
+  val core = Module(new RF1R1WRamBase(addressWidth = addressWidth, dataWidth = gen.getWidth))
+  core.io.clk := clock
+  core.io.reset := reset
+  core.io.raddr := raddr.asUInt
+  rdata := core.io.rdata
+  core.io.we := we
+  core.io.waddr := waddr
+  core.io.wdata := wdata.asTypeOf(gen)
+}
+
 
 // 0-Cycle Fixed Latency
 class RF1R1RWAsyncRamBase(addressWidth: Int, dataWidth: Int, selfReset: Int) extends
