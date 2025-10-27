@@ -1,12 +1,12 @@
 {
     "U8m2n2k1U4m2n2k2Mul": {
-        "Package": "fpmath"
+        "Package": "rvtng.fpmath"
     },
     "FP8BF16FusedDPUnit": {
-        "Package": "fpmath"
+        "Package": "rvtng.fpmath"
     },
     "FP8BF16FusedDPArray": {
-        "Package": "fpmath",
+        "Package": "rvtng.fpmath",
         "AdditionDeps": {
             "csrc/test/FP8BF16FusedDPArrayTestBF16Gen.hpp csrc/test/FP8BF16FusedDPArrayTestCheckGen.hpp": {
                 "deps": "csrc/test/FP8BF16FusedDPArrayTestMatrixGen.py",
@@ -15,45 +15,45 @@
         }
     },
     "DPArrayCalcTaskSpilt": {
-        "Package": "mat"
+        "Package": "rvtng.mat"
     },
     "TestFPUnpackPack": {
-        "Package": "fpmath"
+        "Package": "rvtng.fpmath"
     },
     "DPArrayBufferAB": {
-        "Package": "mat"
+        "Package": "rvtng.mat"
     },
     "DPArrayBufferC": {
-        "Package": "mat"
+        "Package": "rvtng.mat"
     },
     "FakeURAM": {
-        "Package": "uram"
+        "Package": "rvtng.uram"
     },
     "MatCtrlTaskGen": {
-        "Package": "mat"
+        "Package": "rvtng.mat"
     },
     "DPArrayLoadStoreTaskSpilt": {
-        "Package": "mat"
+        "Package": "rvtng.mat"
     },
     "DPArrayTop": {
-        "Package": "mat"
+        "Package": "rvtng.mat"
     },
     "MatTestTop": {
-        "Package": "mat"
+        "Package": "rvtng.mat"
     },
     "GroupXBar": {
-        "Package": "utils"
+        "Package": "rvtng.utils"
     },
     "Adv2R1WURAM": {
-        "Package": "uram"
+        "Package": "rvtng.uram"
     },
     "Transposer": {
-        "Package": "utils"
+        "Package": "rvtng.utils"
     },
     "DMAReorderCounter": {
-        "Package": "dma"
+        "Package": "rvtng.dma"
     },
     "DMAReorderTransposeBuffer": {
-        "Package": "dma"
+        "Package": "rvtng.dma"
     }
 }
