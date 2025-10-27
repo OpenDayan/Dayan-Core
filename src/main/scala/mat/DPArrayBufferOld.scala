@@ -1,9 +1,9 @@
 package mat
 
+import RVTNG.fpmath.{FPRoundingModule, FPUnpackModule}
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
-import fpmath.{FPUnpackModule, FPRoundingModule}
 import utils.RF1R1WRamBase
 
 // Memory Wrapper For DPArray Buffer

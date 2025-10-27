@@ -1,9 +1,9 @@
 package mat
 
+import RVTNG.fpmath.{FP8BF16FusedDPArray, U8m2n2k1U4m2n2k2Mul}
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
-import fpmath.{FP8BF16FusedDPArray, U8m2n2k1U4m2n2k2Mul}
 import uram._
 import utils._
 

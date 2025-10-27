@@ -11,13 +11,6 @@ import uram._
 // B: 16 >= NK 4 2
 // C: 32 >= MN 8 4
 
-class MatInst extends Bundle {
-  val instWord = UInt(32.W)
-  val src0 = UInt(64.W) // Based Address of A
-  val src1 = UInt(64.W) // Based Address of B
-  val dst  = UInt(64.W) // Based Address of C
-}
-
 // Requirement for URAM:
 //   busWidth === cK * AnyValue
 //   busGroupSize === cK
@@ -25,7 +18,7 @@ class MatTop(
               storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int,
               cM: Int, cN: Int, cK: Int, kPerScale: Int, idWidth: Int = 5,
               wE: Int = 9, wF: Int = 25) extends Module {
-  val matInst = IO(Flipped(Decoupled(new MatInst)))
+  val matInst = IO(Flipped(Decoupled(new TensorInst)))
   val matInstResp = IO(Decoupled(UInt(64.W)))
 
   // Internal Configure Register
@@ -143,7 +136,7 @@ class MatTestTop(
     fifoSize = 16, N = busWidth / 8, addrWidth = addressWidth, idWidth = 0, dataWidth = 64
   ))
 
-  val matInst = IO(Flipped(Decoupled(new MatInst)))
+  val matInst = IO(Flipped(Decoupled(new TensorInst)))
   val finish = IO(Output(Bool()))
   mat.matInst :<>= matInst
   mat.matInstResp.ready := 1.B
