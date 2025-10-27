@@ -1,9 +1,10 @@
 package RVTNG.fpmath
 
+import RVTNG.utils
+import RVTNG.utils.genPipe
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
-import utils.pipe
 
 // M: M Dim for FP8/BF16
 // N: N Dim for FP8/BF16
