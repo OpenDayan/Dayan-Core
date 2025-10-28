@@ -88,6 +88,9 @@ class DMAReorderTransposeBuffer[T <: Data](params: DMAParams, genT: T) extends M
   val outFreeEntryCount = Wire(UInt(log2N.W))
   outFreeEntryCount := 0.U // Default: No Release
 
+  // Padding FIFO
+  val padFIFO = Module(new Queue(UInt(log2MaxOutStanding.W), maxOutStanding / 2, false, false, true)).io
+
   // transaction Info Ram
   val transactionInfoRam = Module(new RF1R1WRamGen(log2MaxOutStanding, new Bundle {
     val reqPad    = UInt(log2N.W)
@@ -95,7 +98,8 @@ class DMAReorderTransposeBuffer[T <: Data](params: DMAParams, genT: T) extends M
     val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
     val firstId   = UInt(log2MaxOutStanding.W)
   }))
-  transactionInfoRam.we := transactionAlloc.fire
+  val transactionIssued = transactionAlloc.fire | padFIFO.enq.fire
+  transactionInfoRam.we := transactionIssued
   transactionInfoRam.waddr := transactionAlloc.bits
   transactionInfoRam.wdata.reqPad    := blockReqQ.bits.reqPad
   transactionInfoRam.wdata.padValue  := blockReqQ.bits.padValue
@@ -109,15 +113,12 @@ class DMAReorderTransposeBuffer[T <: Data](params: DMAParams, genT: T) extends M
   }, maxOutStanding, false, false, true)).io
   blockInfoQ.enq.bits.keepInfo := blockReqQ.bits.keepInfo
   blockInfoQ.enq.bits.transpose := blockReqQ.bits.transpose
-  blockInfoQ.enq.valid := transactionAlloc.fire & inCurIsFirst
+  blockInfoQ.enq.valid := transactionIssued & inCurIsFirst
 
   // DMA Buffer
   val dmaBuffer = (0 until BANK).map(i => {
     Module(new RF1R1WRamGen(log2MaxOutStanding, Vec(CN, genD)))
   })
-
-  // Padding FIFO
-  val padFIFO = Module(new Queue(UInt(log2MaxOutStanding.W), maxOutStanding / 2, false, false, true)).io
 
   // Reorder Counter
   val reorderCounter = Module(new DMAReorderCounter(maxOutStanding, N))
@@ -127,13 +128,13 @@ class DMAReorderTransposeBuffer[T <: Data](params: DMAParams, genT: T) extends M
   val inCurIsPad = inCurIdx > blockReqQ.bits.groupPad
   transactionAlloc.bits := inCurAllocateHead
   transactionAlloc.valid := inCurUseableEntry =/= 0.U & blockReqQ.valid & !inCurIsPad
-  inCurAllocateHead := inCurAllocateHead + (transactionAlloc.fire | padFIFO.enq.fire).asUInt
-  inCurUseableEntry := inCurUseableEntry - (transactionAlloc.fire | padFIFO.enq.fire).asUInt + outFreeEntryCount
+  inCurAllocateHead := inCurAllocateHead + transactionIssued.asUInt
+  inCurUseableEntry := inCurUseableEntry - transactionIssued.asUInt + outFreeEntryCount
   padFIFO.enq.bits := inCurAllocateHead
   padFIFO.enq.valid := inCurUseableEntry =/= 0.U & blockReqQ.valid & inCurIsPad
   val nextCurIdx = inCurIdx +& 1.U
   blockReqQ.ready := 0.B
-  when(transactionAlloc.fire | padFIFO.enq.fire) {
+  when(transactionIssued) {
     when(inCurIdx === blockReqQ.bits.groupSz) {
       // Last Request In Group
       inCurIdx := 0.U
