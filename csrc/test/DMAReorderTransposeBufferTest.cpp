@@ -17,7 +17,7 @@ std::set<int> ids;
 static inline void mainLoop()
 {
     dut->groupReq_valid = 1;
-    dut->groupReq_bits_keepInfo = sim_time & 0xffffffff;
+    // dut->groupReq_bits_keepInfo = sim_time & 0xffffffff;
     dut->groupReq_bits_groupSz = 127; // MaxSize
     dut->groupReq_bits_groupPad = 95;
     dut->groupReq_bits_reqPad = 31;

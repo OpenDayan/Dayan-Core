@@ -39,7 +39,7 @@ import chisel3.util._
 */
 
 // N-Bytes Input, D Means One Byte.
-class DMAReorderTransposeBuffer[T <: Data](params: DMAParams, genT: T) extends Module {
+class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
   val log2MaxOutStanding: Int = params.sourceBits - 1
   val log2N: Int = log2Ceil(params.dataBits / params.byteType.getWidth)
   val log2CN: Int = params.transposeLog2CNSize // Fixed for now?
@@ -50,19 +50,10 @@ class DMAReorderTransposeBuffer[T <: Data](params: DMAParams, genT: T) extends M
   val log2BANK = log2N - log2CN
   val BANK = N / CN
   val maxOutStanding = 1 << log2MaxOutStanding
-  val groupReq = IO(Flipped(Decoupled(new Bundle {
-    val keepInfo  = UInt(genT.getWidth.W)
-    val groupSz   = UInt(log2MaxOutStanding.W) // GroupSize == [64B / (2^transpose)], Spilt Inside
-    val groupPad  = UInt(log2MaxOutStanding.W)
-    val reqPad    = UInt(log2N.W)
-    val padValue  = Vec(CN, genD)
-    val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
-  })))
 
+  val groupReq = IO(Flipped(Decoupled(new DMAGroupReq(params))))
   // Input Group Spilt to Block
-  val groupSpilter = Module(new DMAGroupReqSpilt(log2MaxOutStanding = log2MaxOutStanding,
-    log2N = log2N, log2CN = log2CN,
-    genD = genD, genT = genT))
+  val groupSpilter = Module(new DMAGroupReqSpilt(params))
 
   groupSpilter.groupReq <> groupReq
 
@@ -76,7 +67,7 @@ class DMAReorderTransposeBuffer[T <: Data](params: DMAParams, genT: T) extends M
   })
   val outStream = IO(Decoupled(new Bundle {
     val data = Vec(N, genD)
-    val info = UInt(genT.getWidth.W)
+    val info = new DMAWriteTaskInfo(params)
   }))
 
   // group Allocate Logic
@@ -108,7 +99,7 @@ class DMAReorderTransposeBuffer[T <: Data](params: DMAParams, genT: T) extends M
 
   // Block Info Queue
   val blockInfoQ = Module(new Queue(new Bundle {
-    val keepInfo  = UInt(genT.getWidth.W)
+    val keepInfo  = new DMAWriteTaskInfo(params)
     val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
   }, maxOutStanding, false, false, true)).io
   blockInfoQ.enq.bits.keepInfo := blockReqQ.bits.keepInfo
@@ -250,7 +241,7 @@ class DMAReorderTransposeBuffer[T <: Data](params: DMAParams, genT: T) extends M
     t1OutDataRaw((b.U + t1OutRor.asUInt)(log2BANK - 1, 0))
   })
   // TODO: Smaller fifo maybe, since max latency is CN?
-  val trInfoQ = Module(new Queue(genT, 2 * CN, false, false)).io
+  val trInfoQ = Module(new Queue(new DMAWriteTaskInfo(params), 2 * CN, false, false)).io
   trInfoQ.enq.bits := t1OutInfo.keepInfo
   trInfoQ.enq.valid := t1OutValid & trInReady
   val tr = Module(new Transposer(BANK, CN, genD))
@@ -271,7 +262,7 @@ object DMAReorderTransposeBuffer extends App {
       dataBits = 2048,
       transposeLog2CNSize = 3,
       byteType = UInt(32.W)
-    ), UInt(32.W)),
+    )),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",

@@ -3,20 +3,21 @@ package rvtng.dma
 import chisel3._
 import chisel3.util._
 
-class DMAGroupReqSpilt[D <: Data, T <: Data](log2MaxOutStanding: Int, log2N: Int, log2CN: Int,
-                                             genD: D, genT: T) extends Module {
+class DMAGroupReqSpilt[D <: Data, T <: Data](params: DMAParams) extends Module {
+  val log2MaxOutStanding: Int = params.sourceBits - 1
+  val log2N: Int = log2Ceil(params.dataBits / params.byteType.getWidth)
+  val log2CN: Int = params.transposeLog2CNSize // Fixed for now?
+  val genD: UInt = params.byteType
+
+  val N  = 1 << log2N
   val CN = 1 << log2CN
-  val N = 1 << log2N
-  val groupReq = IO(Flipped(Decoupled(new Bundle {
-    val keepInfo  = UInt(genT.getWidth.W)
-    val groupSz   = UInt(log2MaxOutStanding.W) // GroupSize == [64B / (2^transpose)], Spilt Inside
-    val groupPad  = UInt(log2MaxOutStanding.W)
-    val reqPad    = UInt(log2N.W)
-    val padValue  = Vec(CN, genD)
-    val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
-  })))
+  val log2BANK = log2N - log2CN
+  val BANK = N / CN
+  val maxOutStanding = 1 << log2MaxOutStanding
+
+  val groupReq = IO(Flipped(Decoupled(new DMAGroupReq(params))))
   val blockReq = IO(Decoupled(new Bundle {
-    val keepInfo  = UInt(genT.getWidth.W)
+    val keepInfo  = new DMAWriteTaskInfo(params)
     val groupSz   = UInt(log2N.W) // GroupSize == [64B / (2^transpose)], Spilt Inside
     val groupPad  = UInt(log2N.W)
     val reqPad    = UInt(log2N.W)
