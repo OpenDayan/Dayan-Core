@@ -7,7 +7,7 @@ import chisel3.util._
 import rvtng.top.{TensorInst, TensorResp}
 
 class DMACSRStorage extends Bundle {
-  val Block = UInt(24.W)
+  val Block = UInt(8.W)
   val Dim0  = UInt(24.W)
   val Dim1  = UInt(24.W)
   val Dim2  = UInt(24.W)
@@ -24,7 +24,7 @@ class DMACSRStorage extends Bundle {
   val BlockTranspose    = UInt(8.W)
   val BlockPadding      = UInt(8.W)
   val RequestPadding    = UInt(8.W)
-  val PaddingValue      = UInt(8.W)
+  val PaddingValue      = UInt(64.W)
   val UramWriteSwizzleS = UInt(8.W)
   val UramWriteSwizzleB = UInt(8.W)
   val UramWriteSwizzleM = UInt(8.W)
