@@ -1,6 +1,7 @@
 package rvtng.dma
 
 import chisel3._
+import chisel3.util._
 import rvtng.bus.TLUH
 /*
 * 需求：
@@ -20,5 +21,5 @@ case class DMAParams(
 
 class DMATop(params: DMAParams) extends Module {
   val tluh = TLUH(addressBits = params.addressBits, dataBits = params.dataBits,
-    sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = 6)
+    sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = log2Ceil(params.dataBits))
 }

@@ -24,34 +24,34 @@ class MatTop(
 
   // Internal Configure Register
   // Note: problemK Should Align to cK
-  val problemM = Reg(UInt(32.W))   // tcsrID: 0
-  val problemN = Reg(UInt(32.W))   // tcsrID: 1
-  val problemK = Reg(UInt(32.W))   // tcsrID: 2
-  val strideA = Reg(UInt(32.W))    // tcsrID: 3
-  val strideB = Reg(UInt(32.W))    // tcsrID: 4
-  val strideC = Reg(UInt(32.W))    // tcsrID: 5
-  val sM = RegInit(UInt(3.W), 2.U) // tcsrID: 6
-  val sN = RegInit(UInt(3.W), 2.U) // tcsrID: 7
-  val sK = RegInit(UInt(3.W), 2.U) // tcsrID: 8
+  private val problemM = Reg(UInt(32.W))   // tcsrID: 0
+  private val problemN = Reg(UInt(32.W))   // tcsrID: 1
+  private val problemK = Reg(UInt(32.W))   // tcsrID: 2
+  private val strideA = Reg(UInt(32.W))    // tcsrID: 3
+  private val strideB = Reg(UInt(32.W))    // tcsrID: 4
+  private val strideC = Reg(UInt(32.W))    // tcsrID: 5
+  private val sM = RegInit(UInt(3.W), 2.U) // tcsrID: 6
+  private val sN = RegInit(UInt(3.W), 2.U) // tcsrID: 7
+  private val sK = RegInit(UInt(3.W), 2.U) // tcsrID: 8
   val persistentMode = RegInit(UInt(2.W), 0.U) // tcsrID: 9
 
   // Configure Instruction Handling
-  val isCfgInst = matInst.bits.instWord(31, 25) === 0.U
-  val isMatInst = matInst.bits.instWord(31, 25) === 0b0001000.U
-  val isCfgWrite = isCfgInst & !matInst.bits.instWord(14)
-  val tcsrID = matInst.bits.instWord(24, 15)
+  private val isCfgInst = matInst.bits.instWord(31, 25) === 0.U
+  private val isMatInst = matInst.bits.instWord(31, 25) === 0b0001000.U
+  private val isCfgWrite = isCfgInst & !matInst.bits.instWord(14)
+  private val tcsrID = matInst.bits.instWord(24, 15)
 
   when(isCfgWrite & matInst.fire) {
-    when(tcsrID === 0.U) { problemM := matInst.bits.dst }
-    when(tcsrID === 1.U) { problemN := matInst.bits.dst }
-    when(tcsrID === 2.U) { problemK := matInst.bits.dst }
-    when(tcsrID === 3.U) { strideA := matInst.bits.dst }
-    when(tcsrID === 4.U) { strideB := matInst.bits.dst }
-    when(tcsrID === 5.U) { strideC := matInst.bits.dst }
-    when(tcsrID === 6.U) { sM := matInst.bits.dst }
-    when(tcsrID === 7.U) { sN := matInst.bits.dst }
-    when(tcsrID === 8.U) { sK := matInst.bits.dst }
-    when(tcsrID === 9.U) { persistentMode := matInst.bits.dst }
+    when(tcsrID === 0.U) { problemM := matInst.bits.rd }
+    when(tcsrID === 1.U) { problemN := matInst.bits.rd }
+    when(tcsrID === 2.U) { problemK := matInst.bits.rd }
+    when(tcsrID === 3.U) { strideA := matInst.bits.rd }
+    when(tcsrID === 4.U) { strideB := matInst.bits.rd }
+    when(tcsrID === 5.U) { strideC := matInst.bits.rd }
+    when(tcsrID === 6.U) { sM := matInst.bits.rd }
+    when(tcsrID === 7.U) { sN := matInst.bits.rd }
+    when(tcsrID === 8.U) { sK := matInst.bits.rd }
+    when(tcsrID === 9.U) { persistentMode := matInst.bits.rd }
   }
   // TODO: tcfg Read Handling
   matInstResp.bits := 0.U
@@ -59,15 +59,15 @@ class MatTop(
   // TODO: ScoreBoard Logic Handling
 
   // Mat Instruction Spilt logic
-  val matSpilt = Module(new MatCtrlTaskGen(
+  private val matSpilt = Module(new MatCtrlTaskGen(
     storageRatio, mnkWidth, addressWidth, cM, cN, cK
   ))
   matSpilt.task.valid := isMatInst & matInst.valid
   matInst.ready := isCfgInst | (isMatInst & matSpilt.task.ready)
   matSpilt.task.bits.bf16 := 0.B // Fixme: BF16/FP8
-  matSpilt.task.bits.aBaseAddr := matInst.bits.src0
-  matSpilt.task.bits.bBaseAddr := matInst.bits.src1
-  matSpilt.task.bits.cBaseAddr := matInst.bits.dst
+  matSpilt.task.bits.aBaseAddr := matInst.bits.rs1
+  matSpilt.task.bits.bBaseAddr := matInst.bits.rs2
+  matSpilt.task.bits.cBaseAddr := matInst.bits.rd
   matSpilt.task.bits.aStride := strideA
   matSpilt.task.bits.bStride := strideB
   matSpilt.task.bits.cStride := strideC
@@ -80,7 +80,7 @@ class MatTop(
   matSpilt.task.bits.persistentMode := persistentMode
 
   // DPArray Top
-  val dpa = Module(new DPArrayTop(
+  private val dpa = Module(new DPArrayTop(
     storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
     cM = cM, cN = cN, cK = cK, sK = kPerScale, idWidth = idWidth, wE = wE, wF = wF, outStanding = 16
   ))

@@ -55,5 +55,8 @@
     },
     "DMAReorderTransposeBuffer": {
         "Package": "rvtng.dma"
+    },
+    "DMAControlStatusRegisters": {
+        "Package": "rvtng.dma"
     }
 }
