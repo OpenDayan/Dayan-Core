@@ -13,13 +13,15 @@ import rvtng.bus.TLUH
 *
 */
 case class DMAParams(
-                      addressBits: Int,
-                      dataBits: Int,
-                      sourceBits: Int,
-                      sinkBits: Int,
-                      tcsrBanks: Int = 8)
+                      addressBits: Int = 48,
+                      dataBits: Int = 512,
+                      sourceBits: Int = 10,
+                      sinkBits: Int = 4,
+                      tcsrBanks: Int = 8,
+                      transposeLog2CNSize: Int = 3,
+                      byteType: UInt = UInt(8.W))
 
 class DMATop(params: DMAParams) extends Module {
   val tluh = TLUH(addressBits = params.addressBits, dataBits = params.dataBits,
-    sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = log2Ceil(params.dataBits))
+    sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = log2Ceil(params.dataBits / 8))
 }

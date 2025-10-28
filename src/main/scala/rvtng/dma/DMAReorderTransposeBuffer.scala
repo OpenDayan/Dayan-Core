@@ -39,8 +39,12 @@ import chisel3.util._
 */
 
 // N-Bytes Input, D Means One Byte.
-class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, log2N: Int, log2CN: Int,
-                                                      genD: D, genT: T) extends Module {
+class DMAReorderTransposeBuffer[T <: Data](params: DMAParams, genT: T) extends Module {
+  val log2MaxOutStanding: Int = params.sourceBits - 1
+  val log2N: Int = log2Ceil(params.dataBits / params.byteType.getWidth)
+  val log2CN: Int = params.transposeLog2CNSize // Fixed for now?
+  val genD: UInt = params.byteType
+
   val N  = 1 << log2N
   val CN = 1 << log2CN
   val log2BANK = log2N - log2CN
@@ -54,14 +58,16 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
     val padValue  = Vec(CN, genD)
     val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
   })))
-  val blockReq = Wire(DecoupledIO(new Bundle {
-    val keepInfo  = UInt(genT.getWidth.W)
-    val groupSz   = UInt(log2N.W) // GroupSize == [64B / (2^transpose)], Spilt Inside
-    val groupPad  = UInt(log2N.W)
-    val reqPad    = UInt(log2N.W)
-    val padValue  = Vec(CN, genD)
-    val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
-  }))
+
+  // Input Group Spilt to Block
+  val groupSpilter = Module(new DMAGroupReqSpilt(log2MaxOutStanding = log2MaxOutStanding,
+    log2N = log2N, log2CN = log2CN,
+    genD = genD, genT = genT))
+
+  groupSpilter.groupReq <> groupReq
+
+  val blockReqQ = Queue(groupSpilter.blockReq, 2, false, false)
+
   val transactionAlloc = IO(Decoupled(UInt(log2MaxOutStanding.W)))
   val transactionComp  = IO(new Bundle {
     val data  = Input(Vec(N, genD))
@@ -72,9 +78,8 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
     val data = Vec(N, genD)
     val info = UInt(genT.getWidth.W)
   }))
-  // group Allocate Logic
-  val blockReqQ = Queue(blockReq, 2, false, false)
 
+  // group Allocate Logic
   // transaction ID Alloc Logic
   val inCurGroupHead    = RegInit(0.U(log2MaxOutStanding.W))
   val inCurAllocateHead = RegInit(0.U(log2MaxOutStanding.W))
@@ -116,14 +121,6 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
 
   // Reorder Counter
   val reorderCounter = Module(new DMAReorderCounter(maxOutStanding, N))
-
-  // Input Group Spilt to Block
-  val groupSpilter = Module(new DMAGroupReqSpilt(log2MaxOutStanding = log2MaxOutStanding,
-    log2N = log2N, log2CN = log2CN,
-    genD = genD, genT = genT))
-
-  groupSpilter.groupReq <> groupReq
-  blockReq <> groupSpilter.blockReq
 
   // Input Allocate Stream Controlling Logic
   val inCurIdx = Reg(UInt(log2N.W))
@@ -221,16 +218,18 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
   * */
   val t0OutRor = (Cat(t0OutCurIdx, 0.U(log2BANK.W)) >> t0Outlog2BlockSz)(log2BANK - 1, 0).asUInt
   val t0Outlog2CNCycle = log2CN.U - Mux(t0OutInfo.transpose >= log2CN.U, log2CN.U, t0OutInfo.transpose(log2Ceil(log2CN) - 1, 0))
+  val t0OutCurIdxP1 = t0OutCurIdx + 1.U
   when(t0OutCurBlockValid & trInReady) {
     when(t0OutCurLast) {
       t0OutCurIdx := 0.U
       t0OutCurCIdx := 0.U
       t0OutCurBankIdx := 0.U
+      t0OutCurBlockHead := t0OutCurBlockHead + t0OutCurIdxP1
       blockInfoQ.deq.ready := 1.B
     }.otherwise {
-      t0OutCurIdx := t0OutCurIdx + 1.U
+      t0OutCurIdx := t0OutCurIdxP1
       val cidxCarry = t0OutCurCIdx === ((1.U(log2CN.W) << t0Outlog2CNCycle).asUInt - 1.U)
-      t0OutCurCIdx := Mux(cidxCarry, 0.U, t0OutCurIdx + 1.U)
+      t0OutCurCIdx := Mux(cidxCarry, 0.U, t0OutCurIdxP1)
       t0OutCurBankIdx := t0OutCurBankIdx + cidxCarry.asUInt
     }
   }
@@ -267,7 +266,11 @@ class DMAReorderTransposeBuffer[D <: Data, T <: Data](log2MaxOutStanding: Int, l
 
 object DMAReorderTransposeBuffer extends App {
   ChiselStage.emitSystemVerilog(
-    new DMAReorderTransposeBuffer(9, 6, 3, UInt(16.W), UInt(32.W)),
+    new DMAReorderTransposeBuffer(DMAParams(
+      dataBits = 2048,
+      transposeLog2CNSize = 3,
+      byteType = UInt(32.W)
+    ), UInt(32.W)),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",
