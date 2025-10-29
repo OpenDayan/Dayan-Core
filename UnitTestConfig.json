@@ -50,8 +50,8 @@
     "Transposer": {
         "Package": "rvtng.utils"
     },
-    "DMAReorderCounter": {
-        "Package": "rvtng.dma"
+    "ReorderScoreboard": {
+        "Package": "rvtng.utils"
     },
     "DMAReorderTransposeBuffer": {
         "Package": "rvtng.dma"
