@@ -8,9 +8,10 @@ import rvtng.top.TensorInst
 class DMAWriteTaskInfo(params: DMAParams) extends Bundle{
   private val log2MaxOutStanding: Int = params.sourceBits - 1
   val addr = UInt(params.addressBits.W) // Block Base Address
-  val block = UInt(log2MaxOutStanding.W)
+  val block = UInt(8.W)
   val stride = UInt(24.W) // Request Stride
   val isDRAM = Bool()
+  val isLastInst = Bool()    // Last Block Request for a inst
   // For URAMReader Swizzle algorithm
   val UramSwizzleS = UInt(8.W)
   val UramSwizzleB = UInt(8.W)
@@ -191,8 +192,10 @@ class DMATaskGen(params: DMAParams) extends Module {
   groupReq.bits.transpose := curInfo.csr.BlockTranspose
   // Write Request Generator
   groupReq.bits.keepInfo.addr := curOutDim0Base
+  groupReq.bits.keepInfo.block  := curInfo.csr.Block
   groupReq.bits.keepInfo.stride := curInfo.csr.OutBlockStride
   groupReq.bits.keepInfo.isDRAM := curInfo.dstDRAM
+  groupReq.bits.keepInfo.isLastInst := curDim2Cr
   groupReq.bits.keepInfo.UramSwizzleS := curInfo.csr.UramWriteSwizzleS
   groupReq.bits.keepInfo.UramSwizzleB := curInfo.csr.UramWriteSwizzleB
   groupReq.bits.keepInfo.UramSwizzleM := curInfo.csr.UramWriteSwizzleM

@@ -33,9 +33,9 @@ class DMAURAMReader(params: DMAParams) extends Module {
       issuedVec(i / uramPortPerChannel) := issuedMask | uramReq((i / uramPortPerChannel) * uramPortPerChannel).fire
     }
     issuedMask := (issuedMask | uramReq((i / uramPortPerChannel) * uramPortPerChannel).fire) & !issuedAll
-    val addr = readCmd.bits.addr + i.U
+    val addr = readCmd.bits.addr + (i * 8).U
     uramReq(i).bits.address := SwizzleAddr(addr,
-      readCmd.bits.UramSwizzleS, readCmd.bits.UramSwizzleB, readCmd.bits.UramSwizzleM)
+      readCmd.bits.UramSwizzleS, readCmd.bits.UramSwizzleB, readCmd.bits.UramSwizzleM) >> 3
     uramReq(i).bits.id := readCmd.bits.id
   }
 

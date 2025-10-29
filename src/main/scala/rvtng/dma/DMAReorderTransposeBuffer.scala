@@ -47,18 +47,26 @@ class DMAReadComp(params: DMAParams) extends Bundle {
   val tid   = UInt(log2MaxOutStanding.W)
 }
 
+class DMAStreamDataOut(params: DMAParams) extends Bundle {
+  private val log2N: Int = log2Ceil(params.dataBits / params.byteType.getWidth)
+  private val genD: UInt = params.byteType
+  private val N  = 1 << log2N
+  val data = Vec(N, genD)
+  val info = new DMAWriteTaskInfo(params)
+}
+
 // N-Bytes Input, D Means One Byte.
 class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
-  val log2MaxOutStanding: Int = params.sourceBits - 1
-  val log2N: Int = log2Ceil(params.dataBits / params.byteType.getWidth)
-  val log2CN: Int = params.transposeLog2CNSize // Fixed for now?
-  val genD: UInt = params.byteType
+  private val log2MaxOutStanding: Int = params.sourceBits - 1
+  private val log2N: Int = log2Ceil(params.dataBits / params.byteType.getWidth)
+  private val log2CN: Int = params.transposeLog2CNSize // Fixed for now?
+  private val genD: UInt = params.byteType
 
-  val N  = 1 << log2N
-  val CN = 1 << log2CN
-  val log2BANK = log2N - log2CN
-  val BANK = N / CN
-  val maxOutStanding = 1 << log2MaxOutStanding
+  private val N  = 1 << log2N
+  private val CN = 1 << log2CN
+  private val log2BANK = log2N - log2CN
+  private val BANK = N / CN
+  private val maxOutStanding = 1 << log2MaxOutStanding
 
   val groupReq = IO(Flipped(Decoupled(new DMAGroupReq(params))))
   // Input Group Spilt to Block
@@ -70,10 +78,8 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
 
   val transactionAlloc = IO(Decoupled(UInt(log2MaxOutStanding.W)))
   val transactionComp  = IO(Flipped(Decoupled(new DMAReadComp(params))))
-  val outStream = IO(Decoupled(new Bundle {
-    val data = Vec(N, genD)
-    val info = new DMAWriteTaskInfo(params)
-  }))
+  transactionComp.ready := 1.B
+  val outStream = IO(Decoupled(new DMAStreamDataOut(params)))
 
   // group Allocate Logic
   // transaction ID Alloc Logic
@@ -117,7 +123,7 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
   })
 
   // Reorder Counter
-  val reorderCounter = Module(new ReorderScoreboard(maxOutStanding, N))
+  val scoreboard = Module(new ReorderScoreboard(maxOutStanding, N))
 
   // Input Allocate Stream Controlling Logic
   val inCurIdx = Reg(UInt(log2N.W))
@@ -189,22 +195,22 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
     dmaBuffer(b).waddr := t2CompInfo.tid
     dmaBuffer(b).wdata := t2RorData(b)
   })
-  reorderCounter.comp.valid := t2Valid
-  reorderCounter.comp.reqGroupID := t2TransInfo.firstId
-  reorderCounter.comp.reqGroupSize := t2BlockSz
+  scoreboard.comp.valid := t2Valid
+  scoreboard.comp.reqGroupID := t2TransInfo.firstId
+  scoreboard.comp.reqGroupSize := t2BlockSz
 
   // Output Stream Handling Logic
   val trInReady = Wire(Bool())
   val t0OutCurBlockHead = RegInit(0.U(log2MaxOutStanding.W))
-  reorderCounter.check.reqGroupID := t0OutCurBlockHead
-  reorderCounter.check.fire := blockInfoQ.deq.fire
+  scoreboard.check.reqGroupID := t0OutCurBlockHead
+  scoreboard.check.fire := blockInfoQ.deq.fire
   // Note: Output->Transposer is Hard-Wired Pipeline
   // T0 Fetch BlockInfo
   val t0OutInfo = blockInfoQ.deq.bits
   val t0OutCurIdx = RegInit(0.U(log2N.W))
   val t0OutCurBankIdx = RegInit(0.U(log2BANK.W))
   val t0OutCurCIdx = RegInit(0.U(log2CN.W))
-  val t0OutCurBlockValid = reorderCounter.check.reqGroupValid
+  val t0OutCurBlockValid = scoreboard.check.reqGroupValid
   val t0OutCurBlockSz = ((N-1).U >> blockInfoQ.deq.bits.transpose).asUInt
   val t0Outlog2BlockSz = log2N.U - blockInfoQ.deq.bits.transpose
   val t0OutCurLast = t0OutCurIdx === t0OutCurBlockSz
@@ -222,6 +228,7 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
       t0OutCurCIdx := 0.U
       t0OutCurBankIdx := 0.U
       t0OutCurBlockHead := t0OutCurBlockHead + t0OutCurIdxP1
+      outFreeEntryCount := t0OutCurIdxP1
       blockInfoQ.deq.ready := 1.B
     }.otherwise {
       t0OutCurIdx := t0OutCurIdxP1
