@@ -47,25 +47,20 @@ class DMAWriterPublic(params: DMAParams) extends Module{
   private val maxOutStanding = 1 << log2MaxOutStanding
 
   // Bypass InStream to OutStream, Prevent any Queue / FIFO Here.
-  val outStream = IO(Decoupled(new DMAWriteReq(params)))
-  val inStream = IO(Flipped(Decoupled(new DMAStreamDataOut(params))))
+  val inReqStream = IO(Flipped(Decoupled(new DMAStreamDataOut(params))))
   val instFinish = IO(Output(Bool()))
 
-  // Last request FIFO
-  private val lrQ = Module(new Queue(Bool(), maxOutStanding, false, false)).io
-
-  // Reorder Scoreboard
-  private val scoreboard = Module(new ReorderScoreboard(maxOutStanding, 1))
-
-  outStream.bits.data := inStream.bits.data
-
+  val outReqStream = IO(Decoupled(new DMAWriteReq(params)))
   val outCompStream = IO(Flipped(Decoupled(UInt(log2MaxOutStanding.W)))) // Return ID
+
+  outReqStream.bits.data := inReqStream.bits.data
+  outCompStream.ready := 1.B
 
   // Address Calculation Logic
   private val curBlock   = RegInit(0.U(8.W))
   private val latchAddr  = Reg(UInt(params.addressBits.W))
   private val firstBlock = curBlock === 0.U
-  private val lastBlock  = curBlock === inStream.bits.info.block
+  private val lastBlock  = curBlock === inReqStream.bits.info.block
 
   // ID Allocation Logic
   private val curIdAllocateHead = RegInit(0.U(log2MaxOutStanding.W))
@@ -73,14 +68,17 @@ class DMAWriterPublic(params: DMAParams) extends Module{
   private val curIdFree = RegInit(maxOutStanding.U((1 + log2MaxOutStanding).W))
   private val curIdEmpty = curIdFree === 0.U
 
-  outStream.bits.id := curIdAllocateHead
-  outStream.valid := inStream.valid & !curIdEmpty
-  inStream.ready := outStream.ready & !curIdEmpty
+  outReqStream.bits.id := curIdAllocateHead
+  outReqStream.valid := inReqStream.valid & !curIdEmpty
+  inReqStream.ready := outReqStream.ready & !curIdEmpty
+  when(outReqStream.fire) {
+    curIdAllocateHead := curIdAllocateHead + 1.U
+  }
 
   // Generator Address
-  private val curAddr = Mux(firstBlock, inStream.bits.info.addr, latchAddr)
-  private val nxtAddr = curAddr + inStream.bits.info.stride
-  when(inStream.fire) {
+  private val curAddr = Mux(firstBlock, inReqStream.bits.info.addr, latchAddr)
+  private val nxtAddr = curAddr + inReqStream.bits.info.stride
+  when(inReqStream.fire) {
     latchAddr := nxtAddr
     when(lastBlock) {
       curBlock := 0.U
@@ -88,10 +86,29 @@ class DMAWriterPublic(params: DMAParams) extends Module{
       curBlock := curBlock + 1.U
     }
   }
-  outStream.bits.addr := curAddr
-  outStream.bits.isDRAM := inStream.bits.info.isDRAM
-  outStream.bits.UramSwizzleS := inStream.bits.info.UramSwizzleS
-  outStream.bits.UramSwizzleB := inStream.bits.info.UramSwizzleB
-  outStream.bits.UramSwizzleM := inStream.bits.info.UramSwizzleM
+  outReqStream.bits.addr := curAddr
+  outReqStream.bits.isDRAM := inReqStream.bits.info.isDRAM
+  outReqStream.bits.UramSwizzleS := inReqStream.bits.info.UramSwizzleS
+  outReqStream.bits.UramSwizzleB := inReqStream.bits.info.UramSwizzleB
+  outReqStream.bits.UramSwizzleM := inReqStream.bits.info.UramSwizzleM
+
+  // Completion Logic
+  // Last request FIFO
+  private val lrQ = Module(new Queue(Bool(), maxOutStanding, false, false)).io
+  lrQ.enq.bits := lastBlock & inReqStream.bits.info.isLastInst
+  lrQ.enq.valid := outReqStream.fire
+
+  // Reorder Scoreboard
+  private val scoreboard = Module(new ReorderScoreboard(maxOutStanding, 1))
+  scoreboard.comp.valid := outCompStream.valid
+  scoreboard.comp.reqGroupID := outCompStream.bits
+  scoreboard.check.reqGroupID := curIdReleaseHead
+  lrQ.deq.ready := scoreboard.check.reqGroupValid
+  scoreboard.check.fire := scoreboard.check.reqGroupValid
+  instFinish := lrQ.deq.bits & scoreboard.check.reqGroupValid
+  when(scoreboard.check.reqGroupValid) {
+    curIdReleaseHead := curIdReleaseHead + 1.U
+  }
+  curIdFree := curIdFree + scoreboard.check.reqGroupValid.asUInt - outReqStream.fire
 
 }
