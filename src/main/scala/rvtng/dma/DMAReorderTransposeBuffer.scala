@@ -70,11 +70,11 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
 
   val groupReq = IO(Flipped(Decoupled(new DMAGroupReq(params))))
   // Input Group Spilt to Block
-  val groupSpilter = Module(new DMAGroupReqSpilt(params))
+  private val groupSpilter = Module(new DMAGroupReqSpilt(params))
 
   groupSpilter.groupReq <> groupReq
 
-  val blockReqQ = Queue(groupSpilter.blockReq, 2, false, false)
+  private val blockReqQ = Queue(groupSpilter.blockReq, 2, false, false)
 
   val transactionAlloc = IO(Decoupled(UInt(log2MaxOutStanding.W)))
   val transactionComp  = IO(Flipped(Decoupled(new DMAReadComp(params))))
@@ -83,18 +83,18 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
 
   // group Allocate Logic
   // transaction ID Alloc Logic
-  val inCurGroupHead    = RegInit(0.U(log2MaxOutStanding.W))
-  val inCurAllocateHead = RegInit(0.U(log2MaxOutStanding.W))
-  val inCurUseableEntry = RegInit(maxOutStanding.U((log2MaxOutStanding + 1).W))
-  val inCurIsFirst      = inCurGroupHead === inCurAllocateHead
-  val outFreeEntryCount = Wire(UInt(log2N.W))
+  private val inCurGroupHead    = RegInit(0.U(log2MaxOutStanding.W))
+  private val inCurAllocateHead = RegInit(0.U(log2MaxOutStanding.W))
+  private val inCurUseableEntry = RegInit(maxOutStanding.U((log2MaxOutStanding + 1).W))
+  private val inCurIsFirst      = inCurGroupHead === inCurAllocateHead
+  private val outFreeEntryCount = Wire(UInt(log2N.W))
   outFreeEntryCount := 0.U // Default: No Release
 
   // Padding FIFO
-  val padFIFO = Module(new Queue(UInt(log2MaxOutStanding.W), maxOutStanding / 2, false, false, true)).io
+  private val padFIFO = Module(new Queue(UInt(log2MaxOutStanding.W), maxOutStanding / 2, false, false, true)).io
 
   // transaction Info Ram
-  val transactionInfoRam = Module(new RF1R1WRamGen(log2MaxOutStanding, new Bundle {
+  private val transactionInfoRam = Module(new RF1R1WRamGen(log2MaxOutStanding, new Bundle {
     val reqPad    = UInt(log2N.W)
     val padValue  = Vec(CN, genD)
     val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
@@ -109,7 +109,7 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
   transactionInfoRam.wdata.firstId   := inCurGroupHead
 
   // Block Info Queue
-  val blockInfoQ = Module(new Queue(new Bundle {
+  private val blockInfoQ = Module(new Queue(new Bundle {
     val keepInfo  = new DMAWriteTaskInfo(params)
     val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
   }, maxOutStanding, false, false, true)).io
@@ -118,23 +118,23 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
   blockInfoQ.enq.valid := transactionIssued & inCurIsFirst
 
   // DMA Buffer
-  val dmaBuffer = (0 until BANK).map(i => {
+  private val dmaBuffer = (0 until BANK).map(i => {
     Module(new RF1R1WRamGen(log2MaxOutStanding, Vec(CN, genD)))
   })
 
   // Reorder Counter
-  val scoreboard = Module(new ReorderScoreboard(maxOutStanding, N))
+  private val scoreboard = Module(new ReorderScoreboard(maxOutStanding, N))
 
   // Input Allocate Stream Controlling Logic
-  val inCurIdx = Reg(UInt(log2N.W))
-  val inCurIsPad = inCurIdx > blockReqQ.bits.groupPad
+  private val inCurIdx = Reg(UInt(log2N.W))
+  private val inCurIsPad = inCurIdx > blockReqQ.bits.groupPad
   transactionAlloc.bits := inCurAllocateHead
   transactionAlloc.valid := inCurUseableEntry =/= 0.U & blockReqQ.valid & !inCurIsPad
   inCurAllocateHead := inCurAllocateHead + transactionIssued.asUInt
   inCurUseableEntry := inCurUseableEntry - transactionIssued.asUInt + outFreeEntryCount
   padFIFO.enq.bits := inCurAllocateHead
   padFIFO.enq.valid := inCurUseableEntry =/= 0.U & blockReqQ.valid & inCurIsPad
-  val nextCurIdx = inCurIdx +& 1.U
+  private val nextCurIdx = inCurIdx +& 1.U
   blockReqQ.ready := 0.B
   when(transactionIssued) {
     when(inCurIdx === blockReqQ.bits.groupSz) {
@@ -148,45 +148,45 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
   }
 
   // Input Completion Stream Handling Logic
-  val t0CompInfo = Wire(new Bundle{
+  private val t0CompInfo = Wire(new Bundle{
     val isPad = Bool()
     val data  = Vec(BANK, Vec(CN, genD))
     val tid   = UInt(log2MaxOutStanding.W)
   })
-  val t0Valid = transactionComp.valid | padFIFO.deq.valid
+  private val t0Valid = transactionComp.valid | padFIFO.deq.valid
   padFIFO.deq.ready := !transactionComp.valid
   t0CompInfo.isPad := !transactionComp.valid
   t0CompInfo.data  := transactionComp.bits.data.asTypeOf(t0CompInfo.data)
   t0CompInfo.tid   := Mux(transactionComp.valid, transactionComp.bits.tid, padFIFO.deq.bits)
-  val t1CompInfo = RegNext(t0CompInfo)
-  val t1Valid    = RegNext(t0Valid)
+  private val t1CompInfo = RegNext(t0CompInfo)
+  private val t1Valid    = RegNext(t0Valid)
   // Fetching Transaction Info Ram
 //  val t1TransInfo = transactionInfoRam.read(t0CompInfo.tid, t0Valid)
-  val t1TransInfo = transactionInfoRam.rdata
+  private val t1TransInfo = transactionInfoRam.rdata
   transactionInfoRam.raddr := t0CompInfo.tid
   // Calculate Ror of Input Data
   /*
   * ROR = t1TransIdx / (blockSz / Bank)
   * ROR = (t1TransIdx << log2BANK) >> log2BlockSz
   * */
-  val t1TransIndex = (t1CompInfo.tid - t1TransInfo.firstId)(log2N - 1, 0) // log2MaxOutStanding bits -> Log2BlockSz bits
-  val t1TransLog2BlockSz = log2N.U - t1TransInfo.transpose // 0, ..., log2N
-  val t1Ror = (Cat(t1TransIndex, 0.U(log2BANK.W)) >> t1TransLog2BlockSz).asUInt // Log2BlockSz + log2Bank - Log2BlockSz = log2Bank
+  private val t1TransIndex = (t1CompInfo.tid - t1TransInfo.firstId)(log2N - 1, 0) // log2MaxOutStanding bits -> Log2BlockSz bits
+  private val t1TransLog2BlockSz = log2N.U - t1TransInfo.transpose // 0, ..., log2N
+  private val t1Ror = (Cat(t1TransIndex, 0.U(log2BANK.W)) >> t1TransLog2BlockSz).asUInt // Log2BlockSz + log2Bank - Log2BlockSz = log2Bank
 
-  val t2Valid = RegNext(t1Valid)
-  val t2CompInfo = RegNext(t1CompInfo)
-  val t2TransInfo = RegNext(t1TransInfo)
-  val t2Ror = RegNext(t1Ror)
-  val t2BlockSz = RegNext(((1.U((log2N + 1).W) << t1TransLog2BlockSz).asUInt - 1.U)(log2N - 1, 0))
+  private val t2Valid = RegNext(t1Valid)
+  private val t2CompInfo = RegNext(t1CompInfo)
+  private val t2TransInfo = RegNext(t1TransInfo)
+  private val t2Ror = RegNext(t1Ror)
+  private val t2BlockSz = RegNext(((1.U((log2N + 1).W) << t1TransLog2BlockSz).asUInt - 1.U)(log2N - 1, 0))
 
   // Write to DMA Buffer
-  val t2PadData = VecInit.tabulate(BANK)(b => {
+  private val t2PadData = VecInit.tabulate(BANK)(b => {
     VecInit.tabulate(CN)(c => {
       val needMask = ((b * CN + c).U > t2TransInfo.reqPad) | t2CompInfo.isPad
       Mux(needMask, t2TransInfo.padValue(c), t2CompInfo.data(b)(c))
     })
   })
-  val t2RorData = VecInit.tabulate(BANK)(b => {
+  private val t2RorData = VecInit.tabulate(BANK)(b => {
     t2PadData((b.U - t2Ror.asUInt)(log2BANK - 1, 0))
   })
   (0 until BANK).foreach(b => {
@@ -200,28 +200,28 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
   scoreboard.comp.reqGroupSize := t2BlockSz
 
   // Output Stream Handling Logic
-  val trInReady = Wire(Bool())
-  val t0OutCurBlockHead = RegInit(0.U(log2MaxOutStanding.W))
+  private val trInReady = Wire(Bool())
+  private val t0OutCurBlockHead = RegInit(0.U(log2MaxOutStanding.W))
   scoreboard.check.reqGroupID := t0OutCurBlockHead
   scoreboard.check.fire := blockInfoQ.deq.fire
   // Note: Output->Transposer is Hard-Wired Pipeline
   // T0 Fetch BlockInfo
-  val t0OutInfo = blockInfoQ.deq.bits
-  val t0OutCurIdx = RegInit(0.U(log2N.W))
-  val t0OutCurBankIdx = RegInit(0.U(log2BANK.W))
-  val t0OutCurCIdx = RegInit(0.U(log2CN.W))
-  val t0OutCurBlockValid = scoreboard.check.reqGroupValid
-  val t0OutCurBlockSz = ((N-1).U >> blockInfoQ.deq.bits.transpose).asUInt
-  val t0Outlog2BlockSz = log2N.U - blockInfoQ.deq.bits.transpose
-  val t0OutCurLast = t0OutCurIdx === t0OutCurBlockSz
+  private val t0OutInfo = blockInfoQ.deq.bits
+  private val t0OutCurIdx = RegInit(0.U(log2N.W))
+  private val t0OutCurBankIdx = RegInit(0.U(log2BANK.W))
+  private val t0OutCurCIdx = RegInit(0.U(log2CN.W))
+  private val t0OutCurBlockValid = scoreboard.check.reqGroupValid
+  private val t0OutCurBlockSz = ((N-1).U >> blockInfoQ.deq.bits.transpose).asUInt
+  private val t0Outlog2BlockSz = log2N.U - blockInfoQ.deq.bits.transpose
+  private val t0OutCurLast = t0OutCurIdx === t0OutCurBlockSz
   blockInfoQ.deq.ready := 0.B
   /*
   * ROR = t0OutCurIdx / (t0OutCurBlockSz / Bank)
   * ROR = (t0OutCurIdx << log2BANK) >> t0Outlog2BlockSz
   * */
-  val t0OutRor = (Cat(t0OutCurIdx, 0.U(log2BANK.W)) >> t0Outlog2BlockSz)(log2BANK - 1, 0).asUInt
-  val t0Outlog2CNCycle = log2CN.U - Mux(t0OutInfo.transpose >= log2CN.U, log2CN.U, t0OutInfo.transpose(log2Ceil(log2CN) - 1, 0))
-  val t0OutCurIdxP1 = t0OutCurIdx + 1.U
+  private val t0OutRor = (Cat(t0OutCurIdx, 0.U(log2BANK.W)) >> t0Outlog2BlockSz)(log2BANK - 1, 0).asUInt
+  private val t0Outlog2CNCycle = log2CN.U - Mux(t0OutInfo.transpose >= log2CN.U, log2CN.U, t0OutInfo.transpose(log2Ceil(log2CN) - 1, 0))
+  private val t0OutCurIdxP1 = t0OutCurIdx + 1.U
   when(t0OutCurBlockValid & trInReady) {
     when(t0OutCurLast) {
       t0OutCurIdx := 0.U
@@ -238,7 +238,7 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
     }
   }
   // raddr == ((((b * CN) / (transpose)) - idx) & (BlockSz - 1)) + base
-  val t1OutDataRaw = VecInit.tabulate(BANK)(b => {
+  private val t1OutDataRaw = VecInit.tabulate(BANK)(b => {
     dmaBuffer(b).raddr := Mux(!trInReady, RegNext(dmaBuffer(b).raddr),
       // TODO: Check Me
       t0OutCurBlockHead + (((Cat(b.U(log2BANK.W), 0.U(log2CN.W)) >> t0OutInfo.transpose).asUInt
@@ -246,17 +246,17 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
     )
     dmaBuffer(b).rdata
   })
-  val t1OutValid = RegEnable(t0OutCurBlockValid, trInReady)
-  val t1OutRor   = RegEnable(t0OutRor, trInReady)
-  val t1OutInfo  = RegEnable(blockInfoQ.deq.bits, trInReady)
-  val t1OutData  = VecInit.tabulate(BANK)(b => {
+  private val t1OutValid = RegEnable(t0OutCurBlockValid, trInReady)
+  private val t1OutRor   = RegEnable(t0OutRor, trInReady)
+  private val t1OutInfo  = RegEnable(blockInfoQ.deq.bits, trInReady)
+  private val t1OutData  = VecInit.tabulate(BANK)(b => {
     t1OutDataRaw((b.U + t1OutRor.asUInt)(log2BANK - 1, 0))
   })
   // TODO: Smaller fifo maybe, since max latency is CN?
-  val trInfoQ = Module(new Queue(new DMAWriteTaskInfo(params), 2 * CN, false, false)).io
+  private val trInfoQ = Module(new Queue(new DMAWriteTaskInfo(params), 2 * CN, false, false)).io
   trInfoQ.enq.bits := t1OutInfo.keepInfo
   trInfoQ.enq.valid := t1OutValid & trInReady
-  val tr = Module(new Transposer(BANK, CN, genD))
+  private val tr = Module(new Transposer(BANK, CN, genD))
   tr.in.bits.elemSize := Mux(t1OutInfo.transpose >= log2CN.U, log2CN.U, t1OutInfo.transpose(log2Ceil(log2CN) - 1, 0))
   tr.in.bits.stream := t1OutData
   tr.in.valid := t1OutValid

@@ -75,20 +75,17 @@ class DMAMergedInst(params: DMAParams) extends Bundle {
 }
 
 class DMATaskGen(params: DMAParams) extends Module {
-  val log2MaxOutStanding: Int = params.sourceBits - 1
-  val log2N: Int = log2Ceil(params.dataBits / params.byteType.getWidth)
-  val log2CN: Int = params.transposeLog2CNSize // Fixed for now?
-  val genD: UInt = params.byteType
+  private val log2MaxOutStanding: Int = params.sourceBits - 1
+  private val log2N: Int = log2Ceil(params.dataBits / params.byteType.getWidth)
+  private val log2CN: Int = params.transposeLog2CNSize // Fixed for now?
+  private val genD: UInt = params.byteType
 
-  val N  = 1 << log2N
-  val CN = 1 << log2CN
-  val log2BANK = log2N - log2CN
-  val BANK = N / CN
-  val maxOutStanding = 1 << log2MaxOutStanding
-  val groupCtrlIf = IO(new Bundle {
-    val addr = Output(UInt(log2Ceil(params.tcsrBanks).W))
-    val ctrl = Input(new DMACSRStorage)
-  })
+  private val N  = 1 << log2N
+  private val CN = 1 << log2CN
+  private val log2BANK = log2N - log2CN
+  private val BANK = N / CN
+  private val maxOutStanding = 1 << log2MaxOutStanding
+  val groupCtrlIf = IO(Flipped(new DMACSRGroupFetchIF(params)))
   val instReq = IO(Flipped(Decoupled(new TensorInst())))
 
   val groupReq = IO(Decoupled(new DMAGroupReq(params)))
@@ -96,7 +93,7 @@ class DMATaskGen(params: DMAParams) extends Module {
   val transactionAlloc = IO(Flipped(Decoupled(UInt(log2MaxOutStanding.W))))
 
   // TODO: FIFO Size
-  val noIdReadReqQ = Module(new Queue(new DMAReadReq(params), 16, false, false)).io
+  private val noIdReadReqQ = Module(new Queue(new DMAReadReq(params), 16, false, false)).io
   readReq.bits := noIdReadReqQ.deq.bits
   readReq.bits.id := transactionAlloc.bits
   // Channel Mixing
@@ -106,7 +103,7 @@ class DMATaskGen(params: DMAParams) extends Module {
 
   // TODO: FIFO Entry Optimization.
   // Merge Raw Inst(Direction and base address) and TCSR Info
-  val mergeInstQ = Module(new Queue(new DMAMergedInst(params), 8, false, false)).io
+  private val mergeInstQ = Module(new Queue(new DMAMergedInst(params), 8, false, false)).io
 
   // Connection Of Inst Issued Port
   mergeInstQ.enq.bits.csr := groupCtrlIf.ctrl
@@ -119,26 +116,26 @@ class DMATaskGen(params: DMAParams) extends Module {
   groupCtrlIf.addr := instReq.bits.instWord(22, 20)
 
   // Main Loop: Address Generator
-  val curInfo  = RegEnable(mergeInstQ.deq.bits, mergeInstQ.deq.fire)
-  val curValid = RegInit(0.B) // Fully pipelined
+  private val curInfo  = RegEnable(mergeInstQ.deq.bits, mergeInstQ.deq.fire)
+  private val curValid = RegInit(0.B) // Fully pipelined
 
-  val curBlock   = Reg(UInt(8.W))
-  val curBlockCr = curBlock === curInfo.csr.Block
-  val curBlockFirst = curBlock === 0.U
-  val curDim0    = Reg(UInt(24.W))
-  val curDim0Cr  = curBlock === curInfo.csr.Dim0 & curBlockCr
-  val curDim1    = Reg(UInt(24.W))
-  val curDim1Cr  = curBlock === curInfo.csr.Dim1 & curDim0Cr
-  val curDim2    = Reg(UInt(24.W))
-  val curDim2Cr  = curBlock === curInfo.csr.Dim2 & curDim1Cr // Last Signal
-  val curInBlockBase = Reg(UInt(params.addressBits.W)); val nxtInBlockBase = curInBlockBase + curInfo.csr.InBlockStride
-  val curInDim0Base  = Reg(UInt(params.addressBits.W)); val nxtInDim0Base  = curInDim0Base  + curInfo.csr.InDim0Stride
-  val curInDim1Base  = Reg(UInt(params.addressBits.W)); val nxtInDim1Base  = curInDim1Base  + curInfo.csr.InDim1Stride
-  val curInDim2Base  = Reg(UInt(params.addressBits.W)); val nxtInDim2Base  = curInDim2Base  + curInfo.csr.InDim2Stride
-  val curOutBlockBase = Reg(UInt(params.addressBits.W)); val nxtOutBlockBase = curOutBlockBase + curInfo.csr.OutBlockStride
-  val curOutDim0Base  = Reg(UInt(params.addressBits.W)); val nxtOutDim0Base  = curOutDim0Base  + curInfo.csr.OutDim0Stride
-  val curOutDim1Base  = Reg(UInt(params.addressBits.W)); val nxtOutDim1Base  = curOutDim1Base  + curInfo.csr.OutDim1Stride
-  val curOutDim2Base  = Reg(UInt(params.addressBits.W)); val nxtOutDim2Base  = curOutDim2Base  + curInfo.csr.OutDim2Stride
+  private val curBlock   = Reg(UInt(8.W))
+  private val curBlockCr = curBlock === curInfo.csr.Block
+  private val curBlockFirst = curBlock === 0.U
+  private val curDim0    = Reg(UInt(24.W))
+  private val curDim0Cr  = curBlock === curInfo.csr.Dim0 & curBlockCr
+  private val curDim1    = Reg(UInt(24.W))
+  private val curDim1Cr  = curBlock === curInfo.csr.Dim1 & curDim0Cr
+  private val curDim2    = Reg(UInt(24.W))
+  private val curDim2Cr  = curBlock === curInfo.csr.Dim2 & curDim1Cr // Last Signal
+  private val curInBlockBase = Reg(UInt(params.addressBits.W)); private val nxtInBlockBase = curInBlockBase + curInfo.csr.InBlockStride
+  private val curInDim0Base  = Reg(UInt(params.addressBits.W)); private val nxtInDim0Base  = curInDim0Base  + curInfo.csr.InDim0Stride
+  private val curInDim1Base  = Reg(UInt(params.addressBits.W)); private val nxtInDim1Base  = curInDim1Base  + curInfo.csr.InDim1Stride
+  private val curInDim2Base  = Reg(UInt(params.addressBits.W)); private val nxtInDim2Base  = curInDim2Base  + curInfo.csr.InDim2Stride
+  private val curOutBlockBase = Reg(UInt(params.addressBits.W)); private val nxtOutBlockBase = curOutBlockBase + curInfo.csr.OutBlockStride
+  private val curOutDim0Base  = Reg(UInt(params.addressBits.W)); private val nxtOutDim0Base  = curOutDim0Base  + curInfo.csr.OutDim0Stride
+  private val curOutDim1Base  = Reg(UInt(params.addressBits.W)); private val nxtOutDim1Base  = curOutDim1Base  + curInfo.csr.OutDim1Stride
+  private val curOutDim2Base  = Reg(UInt(params.addressBits.W)); private val nxtOutDim2Base  = curOutDim2Base  + curInfo.csr.OutDim2Stride
   when(mergeInstQ.deq.fire) {
     // New Request.
     curBlock := 0.U

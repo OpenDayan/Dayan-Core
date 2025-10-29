@@ -10,7 +10,7 @@ import rvtng.uram.{AdvURAMReq, AdvURAMResp, SwizzleAddr}
 // URAM Adapter
 
 class DMAURAMReader(params: DMAParams) extends Module {
-  val readCmd = IO(Flipped(Decoupled(new DMAReadReq(params))))
+  val readReq = IO(Flipped(Decoupled(new DMAReadReq(params))))
   val readResp = IO(Decoupled(new DMAReadComp(params)))
 
   private val uramPort = params.dataBits / 64
@@ -24,19 +24,19 @@ class DMAURAMReader(params: DMAParams) extends Module {
 
   val issuedVec = Wire(Vec(uramChannel, Bool()))
   val issuedAll = issuedVec.asUInt.andR
-  readCmd.ready := issuedAll
+  readReq.ready := issuedAll
   for(i <- 0 until uramPort) {
     val issuedMask = RegInit(0.B)
-    uramReq(i).valid := readCmd.valid & !issuedMask
+    uramReq(i).valid := readReq.valid & !issuedMask
     if((i % uramPortPerChannel) == 0) {
       // TODO: I Think the handshake logic here can be further simplified.
       issuedVec(i / uramPortPerChannel) := issuedMask | uramReq((i / uramPortPerChannel) * uramPortPerChannel).fire
     }
     issuedMask := (issuedMask | uramReq((i / uramPortPerChannel) * uramPortPerChannel).fire) & !issuedAll
-    val addr = readCmd.bits.addr + (i * 8).U
+    val addr = readReq.bits.addr + (i * 8).U
     uramReq(i).bits.address := SwizzleAddr(addr,
-      readCmd.bits.UramSwizzleS, readCmd.bits.UramSwizzleB, readCmd.bits.UramSwizzleM) >> 3
-    uramReq(i).bits.id := readCmd.bits.id
+      readReq.bits.UramSwizzleS, readReq.bits.UramSwizzleB, readReq.bits.UramSwizzleM) >> 3
+    uramReq(i).bits.id := readReq.bits.id
   }
 
   val respVec = Wire(Vec(uramChannel, Bool()))

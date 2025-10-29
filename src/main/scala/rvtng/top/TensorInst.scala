@@ -13,3 +13,8 @@ class TensorResp extends Bundle {
   val data = UInt(64.W)
   val rd   = UInt(5.W)
 }
+
+class ScoreboardComp extends Bundle {
+  val entryId = UInt(32.W)
+}
+

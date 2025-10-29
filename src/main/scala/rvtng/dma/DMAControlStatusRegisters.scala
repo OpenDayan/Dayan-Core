@@ -33,10 +33,10 @@ class DMACSRStorage extends Bundle {
   val UramReadSwizzleM  = UInt(8.W)
 }
 
-class DMACSR extends DMACSRStorage {
-  val CheckSum = UInt(20.W)
+class DMACSRGroupFetchIF(params: DMAParams) extends Bundle {
+  val addr = Input(UInt(log2Ceil(params.tcsrBanks).W))
+  val ctrl = Output(new DMACSRStorage)
 }
-
 
 /*
 * 需求：
@@ -52,10 +52,7 @@ class DMAControlStatusRegisters(params: DMAParams) extends Module {
   val instResp = IO(Decoupled(new TensorResp()))
   private val instRespRaw = Wire(DecoupledIO(new TensorResp()))
   instResp <> Queue(instRespRaw, 2, false, false)
-  val groupCtrlIf = IO(new Bundle {
-    val addr = Input(UInt(log2Ceil(params.tcsrBanks).W))
-    val ctrl = Output(new DMACSRStorage)
-  })
+  val groupCtrlIf = IO(new DMACSRGroupFetchIF(params))
 
   private val instDecode = new Bundle {
     val re      = instReq.valid & instReq.bits.instWord(14)

@@ -31,7 +31,7 @@ class DMAWriteReq(params: DMAParams) extends Bundle {
 *
 * */
 
-class DMAWriterPublic(params: DMAParams) extends Module{
+class DMAPublicWriter(params: DMAParams) extends Module{
   private val log2MaxOutStanding: Int = params.log2MaxOutStanding
   private val log2N: Int = params.log2N
   private val log2CN: Int = params.transposeLog2CNSize // Fixed for now?
