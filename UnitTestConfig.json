@@ -58,5 +58,8 @@
     },
     "DMAControlStatusRegisters": {
         "Package": "rvtng.dma"
+    },
+    "DMATestTop": {
+        "Package": "rvtng.dma"
     }
 }

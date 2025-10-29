@@ -100,7 +100,7 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
     val transpose = UInt(log2Ceil(log2N).W) // 64 -> 0, 1, 2, 3, 4, 5
     val firstId   = UInt(log2MaxOutStanding.W)
   }))
-  val transactionIssued = transactionAlloc.fire | padFIFO.enq.fire
+  private val transactionIssued = transactionAlloc.fire | padFIFO.enq.fire
   transactionInfoRam.we := transactionIssued
   transactionInfoRam.waddr := transactionAlloc.bits
   transactionInfoRam.wdata.reqPad    := blockReqQ.bits.reqPad

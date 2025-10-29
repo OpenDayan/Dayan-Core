@@ -47,7 +47,7 @@ class DMAIssueQueue(params: DMAParams) extends Module {
   private val compReq = Wire(DecoupledIO(new TensorInst()))
   private val compResp = Wire(DecoupledIO(new TensorResp()))
 
-  private val respArb = Module(new RRArbiter(instResp.cloneType, 2)).io
+  private val respArb = Module(new RRArbiter(instResp.bits.cloneType, 2)).io
   instResp <> respArb.out
   respArb.in(0) <> csrResp
   respArb.in(1) <> compResp
