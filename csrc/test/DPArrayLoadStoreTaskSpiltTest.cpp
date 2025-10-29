@@ -13,21 +13,21 @@ unsigned int stopFlag = 0;
 
 static inline void mainLoop()
 {
-    dut->cmdIn_valid = 1;
-    dut->cmdIn_bits_bank = 1;
-    dut->cmdIn_bits_baseAddr = 0x10000;
-    dut->cmdIn_bits_baseDimMajor = 0;
-    dut->cmdIn_bits_baseDimMinor = 0;
-    dut->cmdIn_bits_ctrl = 0;
-    dut->cmdIn_bits_lastLoadAB = 1;
-    dut->cmdIn_bits_log2SDimMajor = 2;
-    dut->cmdIn_bits_log2SDimMinor = 2;
-    dut->cmdIn_bits_pMajor = 51;
-    dut->cmdIn_bits_pMinor = 127;
-    dut->cmdIn_bits_waitLoadC = 0;
+    // dut->cmdIn_valid = 1;
+    // dut->cmdIn_bits_bank = 1;
+    // dut->cmdIn_bits_baseAddr = 0x10000;
+    // dut->cmdIn_bits_baseDimMajor = 0;
+    // dut->cmdIn_bits_baseDimMinor = 0;
+    // dut->cmdIn_bits_ctrl = 0;
+    // dut->cmdIn_bits_lastLoadAB = 1;
+    // dut->cmdIn_bits_log2SDimMajor = 2;
+    // dut->cmdIn_bits_log2SDimMinor = 2;
+    // dut->cmdIn_bits_pMajor = 51;
+    // dut->cmdIn_bits_pMinor = 127;
+    // dut->cmdIn_bits_waitLoadC = 0;
 
-    dut->cmdBuffer_ready = 1;
-    dut->cmdURAM_ready = 1;
+    // dut->cmdBuffer_ready = 1;
+    // dut->cmdURAM_ready = 1;
 }
 int main(int argc, char **argv)
 {

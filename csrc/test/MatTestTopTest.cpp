@@ -177,48 +177,48 @@ static inline void mainLoop()
     dut->matInst_valid = (startTime == 0) || (finishTime != 0);
     if(sim_time == 0) {
         // problemM
-        dut->matInst_bits_dst = M;
+        dut->matInst_bits_rd = M;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (0 << 15);
     } else if(sim_time == 1) {
         // problemN
-        dut->matInst_bits_dst = N;
+        dut->matInst_bits_rd = N;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (1 << 15);
     } else if(sim_time == 2) {
         // problemK
-        dut->matInst_bits_dst = K;
+        dut->matInst_bits_rd = K;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (2 << 15);
     } else if(sim_time == 3) {
         // strideA
-        dut->matInst_bits_dst = K;
+        dut->matInst_bits_rd = K;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (3 << 15);
     } else if(sim_time == 4) {
         // strideB
-        dut->matInst_bits_dst = K;
+        dut->matInst_bits_rd = K;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (4 << 15);
     } else if(sim_time == 5) {
         // strideC
-        dut->matInst_bits_dst = N * 4;
+        dut->matInst_bits_rd = N * 4;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (5 << 15);
     } else if(sim_time == 6) {
         // sM
-        dut->matInst_bits_dst = sM;
+        dut->matInst_bits_rd = sM;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (6 << 15);
     } else if(sim_time == 7) {
         // sN
-        dut->matInst_bits_dst = sN;
+        dut->matInst_bits_rd = sN;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (7 << 15);
     } else if(sim_time == 8) {
         // sK
-        dut->matInst_bits_dst = sK;
+        dut->matInst_bits_rd = sK;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (8 << 15);
     } else if(sim_time == 9) {
         // persistentMode
-        dut->matInst_bits_dst = persistentMode;
+        dut->matInst_bits_rd = persistentMode;
         dut->matInst_bits_instWord = (0b0000000 << 25) | (9 << 15);
     } else {
-        dut->matInst_bits_src0 = AAddr;
-        dut->matInst_bits_src1 = BAddr;
-        dut->matInst_bits_dst  = CAddr;
+        dut->matInst_bits_rs1 = AAddr;
+        dut->matInst_bits_rs2 = BAddr;
+        dut->matInst_bits_rd  = CAddr;
         dut->matInst_bits_instWord = (0b0001000 << 25) | (5 << 15);
         if(startTime == 0) startTime = sim_time;
     }
