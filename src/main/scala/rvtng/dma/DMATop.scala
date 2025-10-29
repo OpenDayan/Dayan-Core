@@ -19,7 +19,11 @@ case class DMAParams(
                       sinkBits: Int = 4,
                       tcsrBanks: Int = 8,
                       transposeLog2CNSize: Int = 3,
-                      byteType: UInt = UInt(8.W))
+                      byteType: UInt = UInt(8.W),
+                      uramAddrBits: Int = 20,
+                      uramPortPerChannel: Int = 4) {
+  val sizeBits = log2Ceil(log2Ceil(dataBits / 8))
+}
 
 class DMATop(params: DMAParams) extends Module {
   val tluh = TLUH(addressBits = params.addressBits, dataBits = params.dataBits,

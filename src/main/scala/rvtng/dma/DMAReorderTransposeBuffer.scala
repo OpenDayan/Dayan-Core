@@ -38,6 +38,15 @@ import chisel3.util._
 *
 */
 
+class DMAReadComp(params: DMAParams) extends Bundle {
+  private val log2MaxOutStanding: Int = params.sourceBits - 1
+  private val log2N: Int = log2Ceil(params.dataBits / params.byteType.getWidth)
+  private val N  = 1 << log2N
+  private val genD: UInt = params.byteType
+  val data  = Vec(N, genD)
+  val tid   = UInt(log2MaxOutStanding.W)
+}
+
 // N-Bytes Input, D Means One Byte.
 class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
   val log2MaxOutStanding: Int = params.sourceBits - 1
@@ -60,11 +69,7 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
   val blockReqQ = Queue(groupSpilter.blockReq, 2, false, false)
 
   val transactionAlloc = IO(Decoupled(UInt(log2MaxOutStanding.W)))
-  val transactionComp  = IO(new Bundle {
-    val data  = Input(Vec(N, genD))
-    val tid   = Input(UInt(log2MaxOutStanding.W))
-    val valid = Input(Bool())
-  })
+  val transactionComp  = IO(Flipped(Decoupled(new DMAReadComp(params))))
   val outStream = IO(Decoupled(new Bundle {
     val data = Vec(N, genD)
     val info = new DMAWriteTaskInfo(params)
@@ -145,8 +150,8 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
   val t0Valid = transactionComp.valid | padFIFO.deq.valid
   padFIFO.deq.ready := !transactionComp.valid
   t0CompInfo.isPad := !transactionComp.valid
-  t0CompInfo.data  := transactionComp.data.asTypeOf(t0CompInfo.data)
-  t0CompInfo.tid   := Mux(transactionComp.valid, transactionComp.tid, padFIFO.deq.bits)
+  t0CompInfo.data  := transactionComp.bits.data.asTypeOf(t0CompInfo.data)
+  t0CompInfo.tid   := Mux(transactionComp.valid, transactionComp.bits.tid, padFIFO.deq.bits)
   val t1CompInfo = RegNext(t0CompInfo)
   val t1Valid    = RegNext(t0Valid)
   // Fetching Transaction Info Ram

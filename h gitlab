@@ -1,0 +1,725 @@
+[33mcommit a467757282cefffd595076b268bab861782d7578[m[33m ([m[1;36mHEAD -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Oct 28 17:17:50 2025 +0800
+
+    Finish: Finish DMATaskGen Impl
+
+[33mcommit c886d01f84527e29088178b9ea9da1279ebb60eb[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Oct 28 16:14:41 2025 +0800
+
+    Opt: Better params and better keepInfo Type
+
+[33mcommit a6b7fb43f84e9b6d5aba90960bf140e6290a2dc9[m[33m ([m[1;31mgitlab/main[m[33m)[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Oct 28 15:42:03 2025 +0800
+
+    Fix: Pad issue was not properly handled by reorder Counter
+
+[33mcommit 0ec8e9d66af7e6e50c5cdc6c81b4bf2670d7d0e5[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Oct 28 15:22:24 2025 +0800
+
+    Fix: Fix a bug in DMA ReorderTransposeBuffer
+
+[33mcommit b9e921da0b6f0a1522e418a8e1ded5834926b11b[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Oct 28 11:26:40 2025 +0800
+
+    Add: Add DMA CSR Module
+
+[33mcommit 7654bf1703e18f0232378449100620f869d82eb0[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Oct 27 17:25:17 2025 +0800
+
+    Refractor: better structure
+
+[33mcommit b6ed2d06ede7cc36d72bfc486d0bd9fc04f06fbd[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Oct 27 17:16:41 2025 +0800
+
+    Refractor: directory and package structure
+
+[33mcommit cc19a42ba6abdabb078c190eb68d2a7cd8d75794[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Oct 27 17:13:51 2025 +0800
+
+    Add: DMA Modules; Refractor: move fpmath to RVTNG
+
+[33mcommit d86a3e34c18aa8209b1fec930bbe82be2d438603[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Oct 24 22:19:47 2025 +0800
+
+    Base: Fixed
+
+[33mcommit ec8a3850cd95a29a2c26141e7da7e9c3d0fa31fd[m[33m ([m[1;31mnpu-hw/main[m[33m)[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Oct 24 22:07:47 2025 +0800
+
+    Fix: Basically Worked
+
+[33mcommit 18ad9b272af82d3761424d3525719b82a4c2482d[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Oct 24 20:30:07 2025 +0800
+
+    Fix: DMAReorderTransposeBuffer Compilation
+
+[33mcommit b9ab5d14d17cfccb6a352f985060ff152fadfe42[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Oct 24 20:09:22 2025 +0800
+
+    Add: DMAReorderTransposeBuffer
+
+[33mcommit e4d71d92dd1fae7422ab57246f866c2dd6e74d80[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Oct 24 15:26:25 2025 +0800
+
+    Rename: add DMA prefix
+
+[33mcommit ede19ff3fd98efd7e672f688cd2859f967b61905[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Oct 23 17:45:37 2025 +0800
+
+    Add: Add backward pressure capibility for Transposer
+
+[33mcommit df8b1013a80fd06a99e99c7439ccbb30001911e4[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Oct 22 17:53:49 2025 +0800
+
+    Opt: Using lower accuracy for better utilization
+
+[33mcommit ea62a70007d8f036a0eb686da8568a8451a5e110[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Oct 22 16:39:53 2025 +0800
+
+    Add: ReorderCounter; Add: XorRFRam; Fix: Vivado Compile
+
+[33mcommit 2e9b733c7c8aeb173d391771a3e4a1bb83136a92[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Oct 22 14:51:03 2025 +0800
+
+    Refractor: Optimize RF1R1WRam; Add: RF1R1WAsyncRam & RF1RWAsyncRam for upcomming controlling buffer in DMA
+
+[33mcommit 5a868d5a4d82ceed21a070432ef35206030b01bd[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Oct 21 14:33:30 2025 +0800
+
+    Add: add optimize for multiple same Transposer, reuse control path
+
+[33mcommit 8d403ef17c06dbf95b8c7760a0e3d995c37d99ca[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Oct 20 19:29:31 2025 +0800
+
+    Pass: Random Test
+
+[33mcommit a012759239efd538856402a63b6692738ffd9fc7[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Oct 20 19:14:58 2025 +0800
+
+    Transposer Now work in 8-Byte Mode
+
+[33mcommit fc62792e778b456296e4aaf3a31fa2fd4730adba[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Oct 17 17:38:44 2025 +0800
+
+    Opt: Allow huge size of tile register
+
+[33mcommit e56447e6fcdea9abeb28667048a16a471cb74ee3[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Oct 17 17:15:42 2025 +0800
+
+    Opt: new designed Load Task Spilter
+
+[33mcommit 2da8598bbf8a6c351db8079672454337c4061b0c[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Oct 16 17:10:11 2025 +0800
+
+    Fix: Sel Queue unsync bug
+
+[33mcommit e3184e0c2ccc89012c454c1e169539e0160503b9[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Oct 16 16:26:52 2025 +0800
+
+    Fix: Deadlock in DPArrayTop caused by overflow of rresp stream
+
+[33mcommit c158c65357f40fcb5fe52cd51f20f9bca9399209[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Oct 16 14:21:32 2025 +0800
+
+    Fix: Random Writeback fail bug
+
+[33mcommit 7de2dd506feeaed6d92284aafc9f429ddf6d27c5[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Oct 15 19:54:32 2025 +0800
+
+    Fix: Now pipe flow.
+
+[33mcommit 55aaa6cdc8eee41929b7d620bd9275c9dc85d462[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Oct 15 19:02:59 2025 +0800
+
+    Fix: DPArray Now Can Compile
+
+[33mcommit 31468dfaa085d91fc298aeed9cb4677b82ae45d0[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Oct 15 18:27:31 2025 +0800
+
+    Opt: Use new URAM for Mat
+
+[33mcommit f1eb558aa7887bcfecda8e05e267334a5000bb1b[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Oct 15 13:14:16 2025 +0800
+
+    Finish: Basically finish Adv2R1WURAM RPort debug.
+
+[33mcommit e9162f96112d1847af42a6a60d75150b146c0602[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Oct 15 12:55:24 2025 +0800
+
+    Fix: False value assignment
+
+[33mcommit eaed8be6a06ba213a541c2aa7fc230828bb1c495[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Oct 15 12:22:50 2025 +0800
+
+    Add: Add test; Fix: fix DPI Based UltraRam
+
+[33mcommit 1b29db8aaea403090104f4760e4779ec8204e3e2[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Oct 15 10:59:20 2025 +0800
+
+    Fix: Adv2R1WURAM now can be compiled to Verilog file.
+
+[33mcommit f9bc443bb3f62b70d7ab62e8692621a40efab144[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Oct 15 10:38:07 2025 +0800
+
+    Finish: Adv2R1WURAM
+
+[33mcommit 3cb43136497253f07a7f6007fdf5afb35eb0a100[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Oct 14 19:58:23 2025 +0800
+
+    Add: URAM Near Finish
+
+[33mcommit 4ce900bd86de6877e48082ce0256fa3a2e4303cd[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Oct 14 19:35:18 2025 +0800
+
+    Add: add URAM 2R1W Prototype
+
+[33mcommit 17260c7baf1492145eb25e6a5a3a30f7bc5309c1[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Oct 14 13:37:13 2025 +0800
+
+    SpeedUp: Verilator Spilt file
+
+[33mcommit 56c9695f99b0a34abaf998895119252a4d4b2851[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Oct 14 13:26:25 2025 +0800
+
+    Speedup: Use Clang instead of Gcc to speedup compile process.
+
+[33mcommit 3731a8b90df65df20f158e0b7dc73b0765a1df0a[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Oct 13 19:53:40 2025 +0800
+
+    Pass: GroupXBar Random Test
+
+[33mcommit 672128969dc90061f2776e5f1a90c9fee74b21d5[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Oct 13 19:16:30 2025 +0800
+
+    RM: Useless file
+
+[33mcommit 89c6b895e6592ae1686a10a55eca4bda93868168[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Oct 13 19:14:51 2025 +0800
+
+    Add: Add groupxbar and syncbar
+
+[33mcommit 8e3ecef3331636c0255e67f7069374c993bc2cca[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Sat Oct 11 20:13:45 2025 +0800
+
+    Fix: Async Grouped XBar Tested
+
+[33mcommit f963d5523b42102469982d557cf6fd565c973012[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Sat Oct 11 14:35:20 2025 +0800
+
+    Add: Add GroupXBar
+
+[33mcommit 0b585944ed6103cb8474821bdfc63e074d87f19a[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Oct 10 10:07:51 2025 +0800
+
+    Add: StreamSyncMerge, ReorderIdTable; Opt: divide DPArrayBuffer into Row Based Storage Organization.
+
+[33mcommit d79e66e7542a846eac7657196fb98c6f28b58e12[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 18 20:04:59 2025 +0800
+
+    Add: Generate Mat Test finish
+
+[33mcommit 59441c61504be7c0977d2a8473957d1f11a02725[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 18 17:18:28 2025 +0800
+
+    Add: Parallel Testing Makefile
+
+[33mcommit 4e121b95d90303645dfbfa8013a0881556369eb3[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 18 15:33:35 2025 +0800
+
+    Add: add bf16 support
+
+[33mcommit 9b47dedc799eceaa4ccc0ac3d89831de12a97fa9[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 18 15:31:23 2025 +0800
+
+    Fix: support for configurable tile register size added
+
+[33mcommit 3a6a888c9061049fa1edcf864b1409b6f65bb455[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 18 15:26:12 2025 +0800
+
+    Fix: Performance Issue
+
+[33mcommit 5f714ef96475f52b4b72900eb14074fec86b4473[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 18 15:05:32 2025 +0800
+
+    Fix: fix a bug when read data to cBuffer
+
+[33mcommit 418a6e662ee032c8e8616462486361a32a81680f[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 18 14:18:03 2025 +0800
+
+    Fix: some bug in matmul unit
+
+[33mcommit f3e280221270592e4be6a08f2b8445d6bd48dcf3[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Sep 17 12:52:13 2025 +0800
+
+    Pass: m16n16k128 test @m4n2k8 Unit
+
+[33mcommit 5a8eaca8170069680aa130b1a273b05aa2eb18c9[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Sep 17 11:09:09 2025 +0800
+
+    Fix: Fix some C Timing Error; TODO: Fix C Ghost Write Bug
+
+[33mcommit 3a1804658dab8cb9c8bdac934233ebac3b5c336c[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Sep 17 10:27:03 2025 +0800
+
+    Fix: First good result
+
+[33mcommit a92968e211b39f1b0c0245d057ec07840fb95f5f[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Sep 17 09:47:20 2025 +0800
+
+    Fix: Now MatTop basically Worked
+
+[33mcommit 29b321756bbefff7ada3ea3cbc95525be045a32f[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 16 20:39:55 2025 +0800
+
+    Finish: MatTestTop Compile Pass
+
+[33mcommit dec4158a7f0ef9b3e7b73d69421bc3b5cd5a9824[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 16 19:13:05 2025 +0800
+
+    Add: add DPArrayBufferC Test File
+
+[33mcommit 01facc5cc372c354243f98bda0f1b32e15c1c937[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 16 19:11:48 2025 +0800
+
+    Fix: SystemVerilog Generation setting
+
+[33mcommit a92c6b3de31e5af35dd51d9dbd15a2fe3df561fc[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 16 19:08:35 2025 +0800
+
+    DPArrayTop Passing Compilation
+
+[33mcommit 4509251e63696f406af7fa0b11342d22dff42dc4[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 16 16:17:01 2025 +0800
+
+    Fix: DPArrayLoadStore Task Spilt
+
+[33mcommit 88bfa46f8c3d3890482cbeafbde37c0dfd7dae2e[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 16 15:46:53 2025 +0800
+
+    LoadStore Task Spilt in AB Spilt Mode Work
+
+[33mcommit ab69aa67098219bbf60186302523e7817038c087[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 16 12:45:06 2025 +0800
+
+    Refractor: DPArrayLoadStore Task Spilt
+
+[33mcommit bd9c2461278d39291784a56529f55a85f82c0dbd[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Sep 15 12:45:23 2025 +0800
+
+    Refractor: Refine URAM Interface
+
+[33mcommit 4d5a551048aa253c53ef2d5b33ec2a2ba6cfb73d[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 12 16:48:48 2025 +0800
+
+    Refractor: better DPArrayTop functional spilting
+
+[33mcommit 00f69a6fc02d24f0300e467da2547a1b2c0be0b3[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 12 15:40:39 2025 +0800
+
+    Fix: Mill parallel build all Unit test modules
+
+[33mcommit e4d64b3037c2ab078caa8727aeeaa726ced542d3[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 12 14:51:46 2025 +0800
+
+    Add: FPUnpacking Module; Refractor: Unified Multiple DPArray Related Module to DPArrayTop Module in DPArrayTop.scala
+
+[33mcommit f69717730cdbaccc68c4c829d3b3ea36106b2d9e[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 12 12:10:54 2025 +0800
+
+    Fix: DPArray now can correctly handling macro cmd handshake
+
+[33mcommit e4237e6ca6177c362329cdd1439967084dade4f8[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 12 11:13:58 2025 +0800
+
+    Refractor: renew Mat Storge Management Architecture
+
+[33mcommit f97cdf96572953d4047a3ba1c1335e8950e492ad[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 12 11:10:18 2025 +0800
+
+    Add: Renew DPArray Storage impl
+
+[33mcommit fb3ce2cb5c29dee068bc7d05b845aa7f683cd8b5[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 12 10:09:35 2025 +0800
+
+    Fix: Width & better testbench
+
+[33mcommit 629d1be624d34a0dec69b780444042ea818aefa0[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 11 21:37:39 2025 +0800
+
+    Opt: Display debug info for load Matrix Tile
+
+[33mcommit 89849b781ded170de2cdeea8091f584e41605c75[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 11 20:26:55 2025 +0800
+
+    Fix: Now working
+
+[33mcommit 5d00eee192bc2b55c78ee0dc07d444d2c765f361[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 11 19:49:50 2025 +0800
+
+    Finish: MatCtrlTaskGen test
+
+[33mcommit ba040e53a561765987c1a906cf928e5d9aa3203f[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 11 19:23:19 2025 +0800
+
+    Fix: add the ability to handle fatal in user space
+
+[33mcommit 7201a0540c78bf5d1ed5d5ad1f6085ecbaf6df2d[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 11 19:01:02 2025 +0800
+
+    Add: add test file
+
+[33mcommit 37808a8bbe9adf0be7b8aa6a5aad9002cbf772c9[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 11 18:45:19 2025 +0800
+
+    Fix: Connection error in MatCtrlTaskGen, CompQ
+
+[33mcommit 2ce0ea5604ccb227f967911b9375878c0842380a[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 11 18:41:56 2025 +0800
+
+    Fix: Connection Dir
+
+[33mcommit 6d6fcd24ee57c655df4721ad480cda3dad93454b[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 11 18:37:13 2025 +0800
+
+    Finish: MatCtrlTaskGen
+
+[33mcommit b4f2278ad08b68ca29a4e0fb2c87cd116ddd2304[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 11 16:47:13 2025 +0800
+
+    Basic: MatCtrlTaskGen Imple
+
+[33mcommit e654b15ab49f5a43738282fc0a81ffb3e13f174f[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Sep 10 14:28:13 2025 +0800
+
+    Opt: Split Read/Write Channel
+
+[33mcommit 3809d0bb7adf51d836d8b9f89b20e21fdc01f41d[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Sep 10 14:22:16 2025 +0800
+
+    Add: add fake URAM
+
+[33mcommit 47c134a35c07cbf4dc6e05fd404998c5a4ee7ac2[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 9 19:08:07 2025 +0800
+
+    Opt: better memory in DPArrayStorage
+
+[33mcommit 7a71235358425a9dbeec19e8f39d9b3572e04607[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 9 17:20:04 2025 +0800
+
+    Add: DPArray Storage
+
+[33mcommit 4d957f98ef01366bd673d2ae2bf19f3993060219[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 9 11:07:50 2025 +0800
+
+    Fix: Building Error in DPUnit Testbench
+
+[33mcommit 86f395eaed908dafb9c9990b841e8795a61d70ed[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 9 10:57:41 2025 +0800
+
+    Finish: DPArrayCtrl Unit
+
+[33mcommit ade91e7ff0b8a263cbfb84a556da98b53c6b8464[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 5 18:38:50 2025 +0800
+
+    Refractor: UltraRAM -> Utils
+
+[33mcommit 08bc963ae56d160f4f7d1512485fcd6525f16181[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 5 18:22:34 2025 +0800
+
+    Opt: exp calculation
+
+[33mcommit 0d37ab9d0de6bdc996af61fc130d10dbfcf6c48d[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 5 17:23:00 2025 +0800
+
+    Add: add Variable latency ReduceNetwork Module
+
+[33mcommit 0ab763d910575f099e6207e15945bc323bb86fc7[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 5 16:22:56 2025 +0800
+
+    Opt: Better gitignore
+
+[33mcommit 7592fc930073332634ba9e1cd6740fa4bd55d7bd[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 5 16:22:20 2025 +0800
+
+    Ignore Gen HPP
+
+[33mcommit 2e7c9144de092787f76a19321389e89667880a8d[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 5 16:20:06 2025 +0800
+
+    Update: Test EPS Using Relative Value; Update M4N8K128 Test
+
+[33mcommit d15c1034fb39ac243ee548741185371146af3833[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 5 16:06:11 2025 +0800
+
+    Add: Newly Designed One Reduce DPArray Module
+
+[33mcommit 3cbd4f2182b2eada9aa55d6bce9a0a8be45e055d[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 5 11:15:19 2025 +0800
+
+    Add: add Testbench Pass/Fail notification; Add: Valid Control for FP8/BF16 Compute Unit
+
+[33mcommit d4c3674160003baf804223195c4f4207c3ac991a[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Sep 5 10:55:51 2025 +0800
+
+    Move: move CIN to Stage 4 Instead of Stage 0
+
+[33mcommit 996f0bbe4a49497bedf217ed52697bdfd0435302[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 4 19:35:29 2025 +0800
+
+    Add: Matrix Tiling Exp
+
+[33mcommit e4592c1a554c125c39b7f49c5b975f82acbec405[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 4 16:49:37 2025 +0800
+
+    Add: Simple FP8 Example
+
+[33mcommit af08e45548ef1e6a53b468fb4599c8f1859504f6[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 4 16:43:48 2025 +0800
+
+    Pass: Pass UE8M0 Scale test
+
+[33mcommit 83fed2e30cbc398dc68d6dc0953b97c39afcdbb0[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 4 15:42:23 2025 +0800
+
+    Fix: CIN Now Work Properly
+
+[33mcommit 89553a7d67609cbbf64e3a66c39195c7865eeec7[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 4 13:52:56 2025 +0800
+
+    Update: Makefile
+
+[33mcommit bba11b2b741a4a891e27d6f622aa271e93349156[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 4 13:41:39 2025 +0800
+
+    Rename: Rename Project
+
+[33mcommit 334a42cc1d0f789abcf1ee11b389677e05983b53[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Sep 4 13:36:10 2025 +0800
+
+    Fix: Pass FP8BF16FusedDPArray Test
+
+[33mcommit fef5173c88ff7c5e5ad8d9020f099223ac44237c[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Sep 3 20:49:01 2025 +0800
+
+    opt: FusedDPUnit Now Produce 0-Shifted exp
+
+[33mcommit 642d715fd95b7f0eb326239ad944e46c8dc2d2f7[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Sep 3 16:05:28 2025 +0800
+
+    Fix: Wrong Testbench
+
+[33mcommit 5a6885115753a1dac85b3a10207318bf85dcf4b1[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Sep 3 15:58:36 2025 +0800
+
+    Fix: FP8BF16 Fused Unit
+
+[33mcommit 77814739e0a2b4b65a8aeca33d9824fcaf19c69b[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Sep 3 14:45:13 2025 +0800
+
+    Opt: Better display of Bundle; Add: add fp8 test
+
+[33mcommit 0ec78cdbae79eb39c83e2a47a07f2a211ae85795[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 2 15:39:10 2025 +0800
+
+    Finish: FP8BF16FusedDPArray
+
+[33mcommit f35553b09996ac9b574aba6207c60974f08ee03a[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 2 15:03:01 2025 +0800
+
+    Add: add FP8BF16FusedDPArray
+
+[33mcommit bd2658812ec7176f58ae2f652a8bc7570e1e6261[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Tue Sep 2 09:18:11 2025 +0800
+
+    Fix: FP8BF16 Now work in BF16 Mode with Fraction==24
+
+[33mcommit aa300b487c535783a5577387b6d5d0e2f23ec813[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Sep 1 19:20:07 2025 +0800
+
+    Opt: Use Seperate JSON file to describe Modules
+
+[33mcommit 9f9d33ee55867a13dfe5faa4ea02799c36bb01df[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Sep 1 19:14:27 2025 +0800
+
+    Opt: Better Makefile System
+
+[33mcommit b8a3f722eb768fba91150e66386d14ed1c63520d[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Sep 1 18:46:02 2025 +0800
+
+    Add&Pass: U8m2n2k1U4m2n2k2Mul Test
+
+[33mcommit e48f6ab162348ddcca2bec7be05014ffaf92b689[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Sep 1 16:10:36 2025 +0800
+
+    Opt: Vectored Interface
+
+[33mcommit 855042973508219890197e0822150d31887d70ec[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Mon Sep 1 15:19:32 2025 +0800
+
+    Add: add Fused FP8/BF16 template
+
+[33mcommit 3d23324b5dc1982850a1602391b4401dcb8ffbf4[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Aug 28 21:11:42 2025 +0800
+
+    Finish: URAM Implementation
+
+[33mcommit c62576fd29468fe532749e5997ec3bb3612f7818[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Aug 28 18:44:13 2025 +0800
+
+    Fix: URAM; Add: URAM Network
+
+[33mcommit 7192a785449f045c06d1c43f472b6f757ce4a67f[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Thu Aug 28 16:12:53 2025 +0800
+
+    Add: Add Ultraram && URAMSwitch
+
+[33mcommit 323c9bf312f72395a1ee2d3422844f77503cba84[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Wed Aug 27 00:10:28 2025 +0800
+
+    Opt: Better version of module interface define for RF1RW
+
+[33mcommit fd33d75d55098c688d19a7113e9933b3611e0af8[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Aug 22 17:52:58 2025 +0800
+
+    Opt: naming
+
+[33mcommit 8307f3bf5961a2922129c7a9ed30c63463a4a7bb[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Aug 22 17:25:03 2025 +0800
+
+    Finish: Vectorized RF
+
+[33mcommit 8693ca15d32035f3e4134e573bad4e06d535f631[m
+Author: wz <gmlayer0@outlook.com>
+Date:   Fri Aug 22 16:03:37 2025 +0800
+
+    Update: base
+
+[33mcommit 50fff887d3437ab9356244dab62896decbe1b28f[m
+Author: GitHub Action <action@github.com>
+Date:   Sun Aug 3 10:26:20 2025 +0000
+
+    Template cleanup
+
+[33mcommit 4f171e8654c5a2fcba1b2bb81b9a1a79d4d17288[m
+Author: gmlayer0 <dofingert@gmail.com>
+Date:   Sun Aug 3 18:26:09 2025 +0800
+
+    Initial commit

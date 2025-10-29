@@ -102,7 +102,7 @@ class DMAControlStatusRegisters(params: DMAParams) extends Module {
 object DMAControlStatusRegisters extends App {
   ChiselStage.emitSystemVerilog(
     new DMAControlStatusRegisters(DMAParams(
-      48, 64, 10, 4, 8
+      addressBits = 48, dataBits = 64, sourceBits = 10, sinkBits = 4, tcsrBanks = 8
     )),
     firtoolOpts = Array(
       "-disable-all-randomization",
