@@ -71,7 +71,7 @@ object ReorderScoreboard extends App {
       "-strip-debug-info",
       "-preserve-aggregate=vec",
       "--split-verilog",
-      "-o=generated/DMAReorderCounter"
+      "-o=generated/ReorderScoreboard"
     )
   )
 }
