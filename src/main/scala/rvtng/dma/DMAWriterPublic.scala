@@ -7,13 +7,9 @@ import chisel3._
 import chisel3.util._
 
 class DMAWriteReq(params: DMAParams) extends Bundle {
-  private val log2MaxOutStanding: Int = params.sourceBits - 1
-  private val log2N: Int = log2Ceil(params.dataBits / params.byteType.getWidth)
-  private val genD: UInt = params.byteType
-  private val N  = 1 << log2N
   val addr = UInt(params.addressBits.W) // Address Should be Aligned to 64B in DRAM Access, Aligned to 8B in URAM Access
-  val data = Vec(N, genD)
-  val id   = UInt(log2MaxOutStanding.W) // Outstanding Transaction ID
+  val data = Vec(params.N, params.genD)
+  val id   = UInt(params.log2MaxOutStanding.W) // Outstanding Transaction ID
   val isDRAM = Bool()
   // For URAMWriter Swizzle algorithm
   val UramSwizzleS = UInt(8.W)
@@ -36,11 +32,11 @@ class DMAWriteReq(params: DMAParams) extends Bundle {
 * */
 
 class DMAWriterPublic(params: DMAParams) extends Module{
-  private val log2MaxOutStanding: Int = params.sourceBits - 1
-  private val log2N: Int = log2Ceil(params.dataBits / params.byteType.getWidth)
+  private val log2MaxOutStanding: Int = params.log2MaxOutStanding
+  private val log2N: Int = params.log2N
   private val log2CN: Int = params.transposeLog2CNSize // Fixed for now?
   private val genD: UInt = params.byteType
-  private val N  = 1 << log2N
+  private val N  = params.N
   private val CN = 1 << log2CN
   private val log2BANK = log2N - log2CN
   private val BANK = N / CN

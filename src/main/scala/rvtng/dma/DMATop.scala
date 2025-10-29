@@ -22,6 +22,10 @@ case class DMAParams(
                       byteType: UInt = UInt(8.W),
                       uramAddrBits: Int = 20,
                       uramPortPerChannel: Int = 4) {
+  val log2MaxOutStanding: Int = sourceBits - 1
+  val log2N: Int = log2Ceil(dataBits / byteType.getWidth)
+  val genD: UInt = byteType
+  val N  = 1 << log2N
   val sizeBits = log2Ceil(log2Ceil(dataBits / 8))
 }
 

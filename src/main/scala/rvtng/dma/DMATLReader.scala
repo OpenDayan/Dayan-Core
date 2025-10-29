@@ -11,6 +11,7 @@ import chisel3.util._
 class DMATLReader(params: DMAParams) extends Module{
   val readCmd = IO(Flipped(Decoupled(new DMAReadReq(params))))
   val readResp = IO(Decoupled(new DMAReadComp(params)))
+  // tl Only Map to -> AR;R
   val tl = IO(TLUH(addressBits = params.addressBits, dataBits = params.dataBits,
     sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = params.sizeBits))
 
