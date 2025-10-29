@@ -7,7 +7,7 @@ import chisel3.util._
 import rvtng.top.{TensorInst, TensorResp}
 
 class DMACSRStorage extends Bundle {
-  val Block = UInt(8.W)
+  val Block = UInt(8.W) // < 512 / 2
   val Dim0  = UInt(24.W)
   val Dim1  = UInt(24.W)
   val Dim2  = UInt(24.W)

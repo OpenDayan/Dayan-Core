@@ -6,7 +6,9 @@ import chisel3.util._
 import rvtng.top.TensorInst
 
 class DMAWriteTaskInfo(params: DMAParams) extends Bundle{
+  private val log2MaxOutStanding: Int = params.sourceBits - 1
   val addr = UInt(params.addressBits.W) // Block Base Address
+  val block = UInt(log2MaxOutStanding.W)
   val stride = UInt(24.W) // Request Stride
   val isDRAM = Bool()
   // For URAMReader Swizzle algorithm
@@ -16,8 +18,9 @@ class DMAWriteTaskInfo(params: DMAParams) extends Bundle{
 }
 
 class DMAReadReq(params: DMAParams) extends Bundle {
+  private val log2MaxOutStanding: Int = params.sourceBits - 1
   val addr = UInt(params.addressBits.W) // Address Should be Aligned to 64B in DRAM Access, Aligned to 8B in URAM Access
-  val id   = UInt((params.sourceBits / 2).W) // Outstanding Transaction ID
+  val id   = UInt(log2MaxOutStanding.W) // Outstanding Transaction ID
   val isDRAM = Bool()
   // For URAMReader Swizzle algorithm
   val UramSwizzleS = UInt(8.W)

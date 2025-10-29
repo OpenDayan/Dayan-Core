@@ -1,6 +1,6 @@
 package rvtng.dma
 
-import rvtng.utils.{RF1R1WRamGen, Transposer}
+import rvtng.utils.{RF1R1WRamGen, ReorderScoreboard, Transposer}
 import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
@@ -25,10 +25,10 @@ import chisel3.util._
 *  因此，需要专门设置一个 Transaction Info SRAM（1R1W），在内存事务 ID 分配接口 Fire 的同时，将这些信息填入表中。
 *      对于其它不需要在每次 Transaction 中都使用的信息，可以放入 Group Info SRAM （1R1W），在访存组请求 Fire 的同时，将这些信息填入表中。
 *  输出直达输出流式接口。
-*      由于请求被乱序异步完成，因此我们需要使用 ReorderCounter 来记录每个访存组请求的完成情况。
+*      由于请求被乱序异步完成，因此我们需要使用 ReorderScoreboard 来记录每个访存组请求的完成情况。
 *      当内存事务完成接口 Fire 时，T0 时刻先读取 Transaction Info SRAM，T1 时刻使用获取到的元信息，做 Padding -> ROR -> Write DMA
-*  Buffer、更新 ReorderCounter。
-*      当 ReorderCounter 队首数据有效时，T0 读出相应 DMA Buffer 数据及 Group Info SRAM，T1 对相应数据做 ROR 并送入 Transposer，
+*  Buffer、更新 ReorderScoreboard。
+*      当 ReorderScoreboard 队首数据有效时，T0 读出相应 DMA Buffer 数据及 Group Info SRAM，T1 对相应数据做 ROR 并送入 Transposer，
 *  更新读指针， Group Info SRAM 数据写入 Output Info FIFO，注意该队列容量理论上为 N 即可（ready 级联）。
 *    注意： Transposer 应支持 ready 反压，ready 信号级联回输入。
 *
@@ -117,7 +117,7 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
   })
 
   // Reorder Counter
-  val reorderCounter = Module(new DMAReorderCounter(maxOutStanding, N))
+  val reorderCounter = Module(new ReorderScoreboard(maxOutStanding, N))
 
   // Input Allocate Stream Controlling Logic
   val inCurIdx = Reg(UInt(log2N.W))

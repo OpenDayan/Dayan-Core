@@ -1,6 +1,5 @@
-package rvtng.dma
+package rvtng.utils
 
-import rvtng.utils.{RF1RWAsyncRam, XorRF2RWAsyncRam}
 import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
@@ -26,7 +25,7 @@ import chisel3.util._
 *    实现部分的计数器，目前使用 + 1 方案。但如若相应路径处于关键路径，则应考虑使用 LFSR 计数器替代加法器，以降低逻辑延迟和面积。
 *
 */
-class DMAReorderCounter(depth: Int, maxGroupSize: Int) extends Module {
+class ReorderScoreboard(depth: Int, maxGroupSize: Int) extends Module {
   val comp = IO(new Bundle {
     val valid = Input(Bool())
     val reqGroupID = Input(UInt(log2Ceil(depth).W))
@@ -38,13 +37,18 @@ class DMAReorderCounter(depth: Int, maxGroupSize: Int) extends Module {
     val reqGroupValid = Output(Bool())
   })
 
-  // Counter Register File
-  val counterRF = Module(new RF1RWAsyncRam(addressWidth = log2Ceil(depth), dataWidth = log2Ceil(maxGroupSize), selfReset = 1))
+  val compFinish = Wire(Bool())
 
-  counterRF.waddr := comp.reqGroupID
-  val compFinish = counterRF.rwdata === comp.reqGroupSize
-  counterRF.wdata := Mux(compFinish, 0.U, counterRF.rwdata + 1.U)
-  counterRF.we := comp.valid
+  if(maxGroupSize > 1) {
+    // Counter Register File
+    val counterRF = Module(new RF1RWAsyncRam(addressWidth = log2Ceil(depth), dataWidth = log2Ceil(maxGroupSize), selfReset = 1))
+    counterRF.waddr := comp.reqGroupID
+    counterRF.wdata := Mux(compFinish, 0.U, counterRF.rwdata + 1.U)
+    counterRF.we := comp.valid
+    compFinish := counterRF.rwdata === comp.reqGroupSize
+  } else {
+    compFinish := 1.B
+  }
 
   // Valid Register File
   val validRF = Module(new XorRF2RWAsyncRam(addressWidth = log2Ceil(depth), dataWidth = 1, selfReset = 1))
@@ -59,9 +63,9 @@ class DMAReorderCounter(depth: Int, maxGroupSize: Int) extends Module {
   check.reqGroupValid := validRF.wp(1).rwdata.asBool
 }
 
-object DMAReorderCounter extends App {
+object ReorderScoreboard extends App {
   ChiselStage.emitSystemVerilog(
-    new DMAReorderCounter(512, 64),
+    new ReorderScoreboard(512, 64),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",
