@@ -47,6 +47,7 @@ class DMAURAMWriter(params: DMAParams) extends Module {
   writeResp.valid := respAll
   for(i <- 0 until uramChannel) {
     respVec(i) := uramResp(i).valid
+    uramResp(i).ready := respAll
   }
   writeResp.bits := uramResp(0).bits(0).id
 }

@@ -118,6 +118,8 @@ class DMATop(params: DMAParams) extends Module {
   tlWriter.writeReq.valid := pubWriter.outReqStream.valid & pubWriter.outReqStream.bits.isDRAM
   uramWriter.writeReq.bits := pubWriter.outReqStream.bits
   uramWriter.writeReq.valid := pubWriter.outReqStream.valid & !pubWriter.outReqStream.bits.isDRAM
+  pubWriter.outReqStream.ready := (tlWriter.writeReq.ready & pubWriter.outReqStream.bits.isDRAM) |
+                                  (uramWriter.writeReq.ready & !pubWriter.outReqStream.bits.isDRAM)
 
   // Reader 连线
   tlReader.tl <> tlRd
@@ -145,23 +147,25 @@ class DMATestTop(params: DMAParams) extends Module {
   // DMA Instance
   private val dma = Module(new DMATop(params))
 
-  val dmaReq = IO(Flipped(Decoupled(new TensorInst)))
-  val dmaResp = IO(Decoupled(new TensorResp))
+  val instReq = IO(Flipped(Decoupled(new TensorInst)))
+  val instResp = IO(Decoupled(new TensorResp))
+  val sbComp  = IO(Decoupled(new ScoreboardComp()))
   val tlWr = IO(TLUH(addressBits = params.addressBits, dataBits = params.dataBits,
     sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = log2Ceil(params.dataBits / 8)))
   // tlRd can be mapped to AXI4 - AR+R, with no Burst Transaction, no ID reuse.
   val tlRd = IO(TLUH(addressBits = params.addressBits, dataBits = params.dataBits,
     sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = log2Ceil(params.dataBits / 8)))
 
-  dma.instReq <> dmaReq
-  dma.instResp <> dmaResp
+  dma.instReq <> instReq
+  dma.instResp <> instResp
+  dma.sbComp <> sbComp
   dma.tlWr <> tlWr
   dma.tlRd <> tlRd
   dma.uramRReq <> uram.r0req_i(0)
   dma.uramRResp <> uram.r0resp_o(0)
   dma.uramWReq <> uram.wreq_i(0)
   dma.uramWResp <> uram.wresp_o(0)
-  uram.wdata_i := dma.uramWData
+  uram.wdata_i(0) := dma.uramWData
   uram.r1req_i(0).map(u => {
     u.bits := DontCare
     u.valid := 0.B

@@ -89,8 +89,8 @@ class DMAIssueQueue(params: DMAParams) extends Module {
   compQ.enq.bits.rd     := compReq.bits.instWord(19, 15)
   compQ.enq.bits.rdData := compReq.bits.rd
   compQ.enq.bits.id     := isCounter
-  compQ.enq.ready := compReq.ready
-  compReq.valid := compQ.enq.valid
+  compQ.enq.valid := compReq.valid
+  compReq.ready := compQ.enq.ready
 
   // Dequeue and completion logic
   private val lowBitsCmp  = cmCounter(params.log2MaxOutStanding, 0) >= compQ.deq.bits.id(params.log2MaxOutStanding, 0)

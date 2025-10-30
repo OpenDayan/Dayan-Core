@@ -98,6 +98,7 @@ class DMAPublicWriter(params: DMAParams) extends Module{
   private val scoreboard = Module(new ReorderScoreboard(maxOutStanding, 1))
   scoreboard.comp.valid := outCompStream.valid
   scoreboard.comp.reqGroupID := outCompStream.bits
+  scoreboard.comp.reqGroupSize := DontCare
   scoreboard.check.reqGroupID := curIdReleaseHead
   lrQ.deq.ready := scoreboard.check.reqGroupValid
   scoreboard.check.fire := scoreboard.check.reqGroupValid

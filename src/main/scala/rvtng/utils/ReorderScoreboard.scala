@@ -37,7 +37,7 @@ class ReorderScoreboard(depth: Int, maxGroupSize: Int) extends Module {
     val reqGroupValid = Output(Bool())
   })
 
-  val compFinish = Wire(Bool())
+  private val compFinish = Wire(Bool())
 
   if(maxGroupSize > 1) {
     // Counter Register File
@@ -51,7 +51,7 @@ class ReorderScoreboard(depth: Int, maxGroupSize: Int) extends Module {
   }
 
   // Valid Register File
-  val validRF = Module(new XorRF2RWAsyncRam(addressWidth = log2Ceil(depth), dataWidth = 1, selfReset = 1))
+  private val validRF = Module(new XorRF2RWAsyncRam(addressWidth = log2Ceil(depth), dataWidth = 1, selfReset = 1))
 
   validRF.wp(0).we := comp.valid & compFinish
   validRF.wp(0).waddr := comp.reqGroupID
