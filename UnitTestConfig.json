@@ -61,5 +61,8 @@
     },
     "DMATestTop": {
         "Package": "rvtng.dma"
+    },
+    "VecDecode": {
+        "Package": "rvtng.vec"
     }
 }
