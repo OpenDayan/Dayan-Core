@@ -7,16 +7,6 @@ import rvtng.top.{ScoreboardComp, TensorInst, TensorResp}
 import rvtng.uram.{Adv2R1WURAM, AdvURAMReq, AdvURAMResp, AdvURAMWResp}
 import _root_.circt.stage.ChiselStage
 
-/*
-* 需求：
-*    本模块作为 DMA 子系统的顶层，例化 ReorderTransposeBuffer、Ctrl、TLReader、TLWriter、URAMReader、URAMWriter 等单元并完成连线。
-* 总线部分无性能开销的同时兼容 Tilelink / AXI 外部接口，使用两种总线标准的子集。
-*
-* 端口：
-*    TL-A/D 接口：流式接口，用于发出 Tilelink 读 / 写请求
-*    URAM R/W 接口：流式接口，用于发出 URAM 读 / 写请求
-*
-*/
 case class DMAParams(
                       addressBits: Int = 48,
                       dataBits: Int = 512,
@@ -35,6 +25,20 @@ case class DMAParams(
   val sizeBits = log2Ceil(log2Ceil(dataBits / 8))
 }
 
+
+/*
+* 需求：
+*    本模块作为 DMA 子系统的顶层，例化 ReorderTransposeBuffer、Ctrl、TLReader、TLWriter、URAMReader、URAMWriter 等单元并完成连线。
+* 总线部分无性能开销的兼容 Tilelink / AXI 外部接口，使用两种总线标准的子集。
+*
+* 端口：
+*    TL-A/D 接口：流式接口，用于发出 Tilelink 读 / 写请求
+*    URAM R/W 接口：流式接口，用于发出 URAM 读 / 写请求
+*    instReq：流式接口，输入指令
+*    instResp：流式接口，指令执行结果返回
+*    sbComp：流式接口，Scoreboard 完成机制
+*
+*/
 class DMATop(params: DMAParams) extends Module {
   // Note: Two Independent Tilelink Bus for Read / Write
   // tlWr can be mapped to AXI4 - AW+W+B, with no Burst Transaction, no ID reuse.
