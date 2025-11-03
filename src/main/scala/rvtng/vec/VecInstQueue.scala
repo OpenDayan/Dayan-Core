@@ -7,13 +7,13 @@ import _root_.circt.stage.ChiselStage
 import rvtng.top.TensorInst
 import rvtng.utils._
 
-class VecInst(params: VECParams) extends VecDecoded(params) {
+class VecInst(params: VecParams) extends VecDecoded(params) {
   val rs1 = UInt(64.W) // Based Address of A
   val rs2 = UInt(64.W) // Based Address of B
   val rd  = UInt(64.W)
 }
 
-class VecInstWSchedule(params: VECParams) extends VecInst(params) {
+class VecInstWSchedule(params: VecParams) extends VecInst(params) {
   val waitCycle = UInt(params.log2MaxLatency.W)
   val waitVarLat = Bool()
 }
@@ -36,7 +36,7 @@ class VecInstWSchedule(params: VECParams) extends VecInst(params) {
 * 输入指令部分，实现一个基本 2R1W Scoreboard，记录所有指令发射周期，用于执行依赖分析。
 *
 */
-class VecInstQueue(params: VECParams) extends Module {
+class VecInstQueue(params: VecParams) extends Module {
   val instReq = IO(Flipped(Decoupled(new TensorInst())))
   val instDeq = IO(Input(UInt(params.log2MaxInstCount.W))) // 至多弹出 maxInstCount - 1 条指令。
   val instPtr = IO(Input(UInt(params.log2MaxInstCount.W)))
@@ -123,17 +123,23 @@ class VecInstQueue(params: VECParams) extends Module {
   // 可变 Latency 指令的 Scoreboard Entry 状态
   val varLatValid = RegInit(0.B)
   val varLatEntry = RegInit(0.U(5.W))
-  val varLatMatch = Wire(Bool())
-  when(instDecodedQ.fire & instDecodedQ.bits.vdstv) {
-    when(instDecodedQ.bits.optionalLatency === 0.U) {
+  val varLatMatch = (realVSrc1 === varLatEntry & instDecodedQ.bits.vsrc1v) |
+                    (realVSrc2 === varLatEntry & instDecodedQ.bits.vsrc2v)
+  val varLatOverflow = varLatEntry(3, 0) === 15.U
+  val varLatOverwrite = instDecodedQ.bits.optionalLatency === 0.U
+  when(instDecodedQ.fire & instDecodedQ.bits.vdst.asBool) {
+    when(varLatOverwrite) {
+      // Only Track Load.
       varLatValid := 1.B
       varLatEntry := Cat(instDecodedQ.bits.vdst, 0.U(4.W))
     }.otherwise {
-      when(varLatEntry(3, 0) === 15.U | varLatMatch) {
-        varLatValid := 0.B
-      }
       when(varLatValid & instDecodedQ.bits.vdst === varLatEntry(4)) {
-        varLatEntry := Cat(varLatEntry(4), varLatEntry(3, 0) + 1.U)
+        when(varLatOverflow | varLatMatch) {
+          varLatValid := 0.B
+          varLatEntry := Cat(varLatEntry(4), 0.U(4.W))
+        }.otherwise {
+          varLatEntry := Cat(varLatEntry(4), varLatEntry(3, 0) + 1.U)
+        }
       }
     }
   }
@@ -144,7 +150,7 @@ class VecInstQueue(params: VECParams) extends Module {
   val instWSchedule = Wire(new VecInstWSchedule(params))
   PartitialAssign(instWSchedule, instDecodedQ.bits)
   instWSchedule.waitCycle := tsWait
-  instWSchedule.waitVarLat := varLatMatch
+  instWSchedule.waitVarLat := varLatOverflow | varLatMatch
 
   // 队列容量更新
   instDecodedQ.ready := instMemCount =/= params.maxInstCount.U
