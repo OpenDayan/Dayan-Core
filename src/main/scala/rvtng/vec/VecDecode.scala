@@ -5,7 +5,7 @@ import chisel3.util._
 import chisel3.util.experimental.decode._
 import _root_.circt.stage.ChiselStage
 
-object VecInst {
+object VecInstList {
   val v_load           = BitPat("b010000_?_?????_00000_00000000_???????")
   val s_load           = BitPat("b010000_?_?????_00001_00000000_???????")
   val const_load       = BitPat("b010000_?_?????_00010_00000000_???????")
@@ -107,47 +107,47 @@ class VecDecode(params: VecParams) extends Module{
   }
 
   val fuDecodeMap = Seq(
-    VecInst.v_load -> BitPat(enumToUInt(VecFuEnum.Lsu)), VecInst.s_load -> BitPat(enumToUInt(VecFuEnum.Lsu)),
-    VecInst.const_load -> BitPat(enumToUInt(VecFuEnum.Lsu)),
-    VecInst.v_store -> BitPat(enumToUInt(VecFuEnum.Lsu)), VecInst.s_store -> BitPat(enumToUInt(VecFuEnum.Lsu)),
+    VecInstList.v_load -> BitPat(enumToUInt(VecFuEnum.Lsu)), VecInstList.s_load -> BitPat(enumToUInt(VecFuEnum.Lsu)),
+    VecInstList.const_load -> BitPat(enumToUInt(VecFuEnum.Lsu)),
+    VecInstList.v_store -> BitPat(enumToUInt(VecFuEnum.Lsu)), VecInstList.s_store -> BitPat(enumToUInt(VecFuEnum.Lsu)),
 
-    VecInst.vv_int32_rol -> BitPat(enumToUInt(VecFuEnum.Int)), VecInst.vv_int32_sll -> BitPat(enumToUInt(VecFuEnum.Int)),
-    VecInst.vv_int32_sra -> BitPat(enumToUInt(VecFuEnum.Int)), VecInst.vv_int32_srl -> BitPat(enumToUInt(VecFuEnum.Int)),
-    VecInst.vv_int32_add -> BitPat(enumToUInt(VecFuEnum.Int)), VecInst.vv_int32_sub -> BitPat(enumToUInt(VecFuEnum.Int)),
-    VecInst.vv_int32_mul24 -> BitPat(enumToUInt(VecFuEnum.Int)), VecInst.vv_int32_bitwise -> BitPat(enumToUInt(VecFuEnum.Int)),
+    VecInstList.vv_int32_rol -> BitPat(enumToUInt(VecFuEnum.Int)), VecInstList.vv_int32_sll -> BitPat(enumToUInt(VecFuEnum.Int)),
+    VecInstList.vv_int32_sra -> BitPat(enumToUInt(VecFuEnum.Int)), VecInstList.vv_int32_srl -> BitPat(enumToUInt(VecFuEnum.Int)),
+    VecInstList.vv_int32_add -> BitPat(enumToUInt(VecFuEnum.Int)), VecInstList.vv_int32_sub -> BitPat(enumToUInt(VecFuEnum.Int)),
+    VecInstList.vv_int32_mul24 -> BitPat(enumToUInt(VecFuEnum.Int)), VecInstList.vv_int32_bitwise -> BitPat(enumToUInt(VecFuEnum.Int)),
 
-    VecInst.v_int32_sll -> BitPat(enumToUInt(VecFuEnum.Int)), VecInst.v_int32_sra -> BitPat(enumToUInt(VecFuEnum.Int)),
-    VecInst.v_int32_srl -> BitPat(enumToUInt(VecFuEnum.Int)),
+    VecInstList.v_int32_sll -> BitPat(enumToUInt(VecFuEnum.Int)), VecInstList.v_int32_sra -> BitPat(enumToUInt(VecFuEnum.Int)),
+    VecInstList.v_int32_srl -> BitPat(enumToUInt(VecFuEnum.Int)),
 
-    VecInst.vv_int32_cmp -> BitPat(enumToUInt(VecFuEnum.Cmp)), VecInst.v_int32_cmp -> BitPat(enumToUInt(VecFuEnum.Cmp)),
-    VecInst.cond_bitwise -> BitPat(enumToUInt(VecFuEnum.Cmp)),
+    VecInstList.vv_int32_cmp -> BitPat(enumToUInt(VecFuEnum.Cmp)), VecInstList.v_int32_cmp -> BitPat(enumToUInt(VecFuEnum.Cmp)),
+    VecInstList.cond_bitwise -> BitPat(enumToUInt(VecFuEnum.Cmp)),
 
-    VecInst.vv_mux2 -> BitPat(enumToUInt(VecFuEnum.Mov)),
-    VecInst.v_comb_2x2B -> BitPat(enumToUInt(VecFuEnum.Mov)),
-    VecInst.v_comb_4x1B -> BitPat(enumToUInt(VecFuEnum.Mov)),
-    VecInst.v_separate_2x2B -> BitPat(enumToUInt(VecFuEnum.Mov)),
-    VecInst.v_separate_4x1B -> BitPat(enumToUInt(VecFuEnum.Mov))
+    VecInstList.vv_mux2 -> BitPat(enumToUInt(VecFuEnum.Mov)),
+    VecInstList.v_comb_2x2B -> BitPat(enumToUInt(VecFuEnum.Mov)),
+    VecInstList.v_comb_4x1B -> BitPat(enumToUInt(VecFuEnum.Mov)),
+    VecInstList.v_separate_2x2B -> BitPat(enumToUInt(VecFuEnum.Mov)),
+    VecInstList.v_separate_4x1B -> BitPat(enumToUInt(VecFuEnum.Mov))
   )
 
   val opTable = Seq(
-    VecInst.v_load -> BitPat("b000000"), VecInst.s_load -> BitPat("b000001"),
-    VecInst.const_load -> BitPat("b000011"),
-    VecInst.v_store -> BitPat("b100000"), VecInst.s_store -> BitPat("b100001"),
+    VecInstList.v_load -> BitPat("b000000"), VecInstList.s_load -> BitPat("b000001"),
+    VecInstList.const_load -> BitPat("b000011"),
+    VecInstList.v_store -> BitPat("b100000"), VecInstList.s_store -> BitPat("b100001"),
 
-    VecInst.vv_int32_rol -> BitPat("b000000"), VecInst.vv_int32_sll -> BitPat("b000001"),
-    VecInst.vv_int32_sra -> BitPat("b000010"), VecInst.vv_int32_srl -> BitPat("b000011"),
-    VecInst.vv_int32_add -> BitPat("b000100"), VecInst.vv_int32_sub -> BitPat("b000101"),
-    VecInst.vv_int32_mul24 -> BitPat("b000110"), VecInst.vv_int32_bitwise -> BitPat("b010000"),
+    VecInstList.vv_int32_rol -> BitPat("b000000"), VecInstList.vv_int32_sll -> BitPat("b000001"),
+    VecInstList.vv_int32_sra -> BitPat("b000010"), VecInstList.vv_int32_srl -> BitPat("b000011"),
+    VecInstList.vv_int32_add -> BitPat("b000100"), VecInstList.vv_int32_sub -> BitPat("b000101"),
+    VecInstList.vv_int32_mul24 -> BitPat("b000110"), VecInstList.vv_int32_bitwise -> BitPat("b010000"),
 
-    VecInst.v_int32_sll -> BitPat("b001001"), VecInst.v_int32_sra -> BitPat("b001010"),
-    VecInst.v_int32_srl -> BitPat("b001011"),
+    VecInstList.v_int32_sll -> BitPat("b001001"), VecInstList.v_int32_sra -> BitPat("b001010"),
+    VecInstList.v_int32_srl -> BitPat("b001011"),
 
-    VecInst.vv_int32_cmp -> BitPat("b000000"), VecInst.v_int32_cmp -> BitPat("b000001"),
-    VecInst.cond_bitwise -> BitPat("b100000"),
+    VecInstList.vv_int32_cmp -> BitPat("b000000"), VecInstList.v_int32_cmp -> BitPat("b000001"),
+    VecInstList.cond_bitwise -> BitPat("b100000"),
 
-    VecInst.vv_mux2         -> BitPat("b000000"),
-    VecInst.v_comb_2x2B     -> BitPat("b000010"), VecInst.v_comb_4x1B     -> BitPat("b000011"),
-    VecInst.v_separate_2x2B -> BitPat("b000100"), VecInst.v_separate_4x1B -> BitPat("b000101")
+    VecInstList.vv_mux2         -> BitPat("b000000"),
+    VecInstList.v_comb_2x2B     -> BitPat("b000010"), VecInstList.v_comb_4x1B     -> BitPat("b000011"),
+    VecInstList.v_separate_2x2B -> BitPat("b000100"), VecInstList.v_separate_4x1B -> BitPat("b000101")
   )
 
   val latencyDecodeMap: Seq[(BitPat, BitPat)] = fuDecodeMap.map(it => {
@@ -168,41 +168,41 @@ class VecDecode(params: VecParams) extends Module{
 
   // 使用 vsrc1 的指令
   val vsrc1vInst = Seq(
-    VecInst.vv_int32_rol, VecInst.vv_int32_sll, VecInst.vv_int32_sra, VecInst.vv_int32_srl,
-    VecInst.vv_int32_add, VecInst.vv_int32_sub, VecInst.vv_int32_mul24, VecInst.vv_int32_cmp,
-    VecInst.vv_int32_bitwise, VecInst.vv_mux2, VecInst.v_int32_cmp,
-    VecInst.v_int32_sll, VecInst.v_int32_sra, VecInst.v_int32_srl,
-    VecInst.v_comb_2x2B, VecInst.v_comb_4x1B, VecInst.v_separate_2x2B, VecInst.v_separate_4x1B
+    VecInstList.vv_int32_rol, VecInstList.vv_int32_sll, VecInstList.vv_int32_sra, VecInstList.vv_int32_srl,
+    VecInstList.vv_int32_add, VecInstList.vv_int32_sub, VecInstList.vv_int32_mul24, VecInstList.vv_int32_cmp,
+    VecInstList.vv_int32_bitwise, VecInstList.vv_mux2, VecInstList.v_int32_cmp,
+    VecInstList.v_int32_sll, VecInstList.v_int32_sra, VecInstList.v_int32_srl,
+    VecInstList.v_comb_2x2B, VecInstList.v_comb_4x1B, VecInstList.v_separate_2x2B, VecInstList.v_separate_4x1B
   )
   // 使用 vsrc2 的指令
   val vsrc2vInst = Seq(
-    VecInst.v_store, VecInst.s_store,
-    VecInst.vv_int32_rol, VecInst.vv_int32_sll, VecInst.vv_int32_sra, VecInst.vv_int32_srl,
-    VecInst.vv_int32_add, VecInst.vv_int32_sub, VecInst.vv_int32_mul24, VecInst.vv_int32_cmp,
-    VecInst.vv_int32_bitwise, VecInst.vv_mux2
+    VecInstList.v_store, VecInstList.s_store,
+    VecInstList.vv_int32_rol, VecInstList.vv_int32_sll, VecInstList.vv_int32_sra, VecInstList.vv_int32_srl,
+    VecInstList.vv_int32_add, VecInstList.vv_int32_sub, VecInstList.vv_int32_mul24, VecInstList.vv_int32_cmp,
+    VecInstList.vv_int32_bitwise, VecInstList.vv_mux2
   )
   // 使用 vdst 的指令
   val vdstvInst = Seq(
-    VecInst.v_load, VecInst.s_load, VecInst.const_load,
-    VecInst.vv_int32_rol, VecInst.vv_int32_sll, VecInst.vv_int32_sra, VecInst.vv_int32_srl,
+    VecInstList.v_load, VecInstList.s_load, VecInstList.const_load,
+    VecInstList.vv_int32_rol, VecInstList.vv_int32_sll, VecInstList.vv_int32_sra, VecInstList.vv_int32_srl,
     // Note: CMP Does Not Writeback to VREG!
-    VecInst.vv_int32_add, VecInst.vv_int32_sub, VecInst.vv_int32_mul24, // VecInst.vv_int32_cmp,
-    VecInst.vv_int32_bitwise, VecInst.vv_mux2, // VecInst.v_int32_cmp,
-    VecInst.v_int32_sll, VecInst.v_int32_sra, VecInst.v_int32_srl,
-    VecInst.v_comb_2x2B, VecInst.v_comb_4x1B, VecInst.v_separate_2x2B, VecInst.v_separate_4x1B
+    VecInstList.vv_int32_add, VecInstList.vv_int32_sub, VecInstList.vv_int32_mul24, // VecInst.vv_int32_cmp,
+    VecInstList.vv_int32_bitwise, VecInstList.vv_mux2, // VecInst.v_int32_cmp,
+    VecInstList.v_int32_sll, VecInstList.v_int32_sra, VecInstList.v_int32_srl,
+    VecInstList.v_comb_2x2B, VecInstList.v_comb_4x1B, VecInstList.v_separate_2x2B, VecInstList.v_separate_4x1B
   )
   // 使用 cond1 的指令
-  val condr1vInst = Seq(VecInst.vv_mux2, VecInst.cond_bitwise)
+  val condr1vInst = Seq(VecInstList.vv_mux2, VecInstList.cond_bitwise)
   // 使用 cond2 的指令
-  val condr2vInst = Seq(VecInst.cond_bitwise)
+  val condr2vInst = Seq(VecInstList.cond_bitwise)
   // 写回 cond 的指令
-  val condwvInst  = Seq(VecInst.cond_bitwise, VecInst.vv_int32_cmp, VecInst.v_int32_cmp)
+  val condwvInst  = Seq(VecInstList.cond_bitwise, VecInstList.vv_int32_cmp, VecInstList.v_int32_cmp)
 
   // 带有 Finish 标记的指令
-  val finishInst = Seq(VecInst.tcsr_write, VecInst.tcsr_read, VecInst.sb_produce, VecInst.sb_bar)
+  val finishInst = Seq(VecInstList.tcsr_write, VecInstList.tcsr_read, VecInstList.sb_produce, VecInstList.sb_bar)
 
   def generateBoolDecodeTable(yInst: Seq[BitPat]): Seq[(BitPat, BitPat)] = {
-    VecInst.allVecInst.map(it => {
+    VecInstList.allVecInst.map(it => {
       if(yInst.contains(it)) {
         it -> BitPat(1.B)
       }

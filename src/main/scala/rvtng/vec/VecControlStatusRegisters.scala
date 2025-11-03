@@ -92,7 +92,21 @@ class VecControlStatusRegisters(params: VecParams) extends Module {
       when(instDecode.subAddr === idx.U && instDecode.bank < params.tcsrBanks.U) {
         instRespRaw.bits.data := mem.rwdata
       }
-          println(name + ": " + idx.toString)
+//      println(name + ": " + idx.toString)
   }
 }
 
+
+
+object VecControlStatusRegisters extends App {
+  ChiselStage.emitSystemVerilog(
+    new VecControlStatusRegisters(VecParams()),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/VecControlStatusRegisters"
+    )
+  )
+}

@@ -64,5 +64,8 @@
     },
     "VecDecode": {
         "Package": "rvtng.vec"
+    },
+    "VecControlStatusRegisters": {
+        "Package": "rvtng.vec"
     }
 }

@@ -58,9 +58,9 @@ class VecInstQueue(params: VecParams) extends Module {
   PartitialAssign(instDecoded.bits, instReq.bits)
 
   private val instMem = SyncReadMem(params.maxInstCount, new VecInstWSchedule(params))
-  private val instMemWPtr = RegInit(0.U(params.log2MaxInstCount))
-  private val instMemRPtr = RegInit(0.U(params.log2MaxInstCount))
-  private val instMemCount = RegInit(0.U(params.log2MaxInstCount + 1))
+  private val instMemWPtr = RegInit(0.U(params.log2MaxInstCount.W))
+  private val instMemRPtr = RegInit(0.U(params.log2MaxInstCount.W))
+  private val instMemCount = RegInit(0.U((params.log2MaxInstCount + 1).W))
   instMemRPtr := instMemRPtr + instDeq
   instOut := instMem.read(instMemRPtr + instPtr)
   instValid := RegNext(instPtr < instMemCount)
@@ -79,7 +79,7 @@ class VecInstQueue(params: VecParams) extends Module {
 
   // 当前的 Timestamp
   // TODO: 删除复位
-  private val tsCurrent = RegInit(0.U(tsBits))
+  private val tsCurrent = RegInit(0.U(tsBits.W))
   private val tsCurrentIssued = Wire(UInt(tsBits.W))
   private val tsCurrentCommit = tsCurrentIssued + fixedLatency.U + instDecodedQ.bits.optionalLatency
   private val depHead = RegInit(VecInit.tabulate(2)(i => {0.U(4.W)}))
