@@ -43,7 +43,7 @@ class VecControlStatusRegisters(params: VecParams) extends Module {
   val instResp = IO(Decoupled(new TensorResp()))
   private val instRespRaw = Wire(DecoupledIO(new TensorResp()))
   instResp <> Queue(instRespRaw, 2, false, false)
-  val groupCtrlIf = IO(Output(new VecCSRStorage(params)))
+  val csrInfo = IO(Output(new VecCSRStorage(params)))
 
   val instRebuild = VecInstRebuild(instReq.bits)
 
@@ -85,7 +85,7 @@ class VecControlStatusRegisters(params: VecParams) extends Module {
     case ((name, fieldGen), idx) =>
       val mem = Module(new RF1R1RWAsyncRamGen(log2Ceil(params.tcsrBanks), 0, fieldGen))
       mem.raddr := ridxReg
-      groupCtrlIf.elements(name) := mem.rdata
+      csrInfo.elements(name) := mem.rdata
       mem.waddr := instDecode.bank
       mem.we    := instDecode.we & instDecode.subAddr === idx.U && instDecode.bank < params.tcsrBanks.U
       mem.wdata := instDecode.wData
