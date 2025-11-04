@@ -93,8 +93,7 @@ class VecInstQueue(params: VecParams) extends Module {
   // TODO: 删除复位
   private val tsCurrent = RegInit(0.U(tsBits.W))
   private val tsCurrentIssued = Wire(UInt(tsBits.W))
-  private val tsCurrentCommit = tsCurrentIssued + fixedLatency.U +
-    Mux(instDecodedQ.bits.optionalLatency < 2.U, 0.U, instDecodedQ.bits.optionalLatency - 1.U)
+  private val tsCurrentCommit = tsCurrentIssued + fixedLatency.U + instDecodedQ.bits.optionalLatency
   private val depHead = RegInit(VecInit.tabulate(2)(i => {0.U(4.W)}))
 
   private val realVDst = Cat(instDecodedQ.bits.vdst, depHead(instDecodedQ.bits.vdst))
