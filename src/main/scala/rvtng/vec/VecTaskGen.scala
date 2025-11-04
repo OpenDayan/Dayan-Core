@@ -26,7 +26,7 @@ class VecInitTaskGroup(params: VecParams) extends Bundle {
 *    threadFinish: 非流式输入脉冲信号，标记所有 Thread 已完成执行。
 *
 * */
-class VecGlobalTaskGen(params: VecParams) extends Module {
+class VecTaskGen(params: VecParams) extends Module {
   val threadTask = IO(Decoupled(new VecInitTaskGroup(params)))
   val csrInfo = IO(Input(new VecCSRStorage(params)))
   val instWindows = IO(Input(new VecInstWSchedule(params)))

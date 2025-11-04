@@ -2,6 +2,8 @@ package rvtng.vec
 
 import chisel3._
 import chisel3.util._
+import rvtng.top._
+import rvtng.uram._
 
 case class VecParams(
                     maxInstCount: Int = 512,
@@ -18,6 +20,53 @@ case class VecParams(
   val log2MaxThreadCount = log2Ceil(maxThreadCount)
 }
 
-class VecTop {
+/*
+* 需求：
+*    向量部分顶层，例化各个子系统并完成连线。
+*
+* 端口：
+*    URAM R/W 接口：流式接口，用于发出 URAM 读 / 写请求
+*    instReq：流式接口，输入指令
+*    instResp：流式接口，指令执行结果返回
+*    sbComp：流式接口，Scoreboard 完成机制
+*
+* */
+class VecTop(params: VecParams) extends Module {
+  // 端口
+  // 指令接口
+  val instReq = IO(Flipped(Decoupled(new TensorInst())))
+  val instResp = IO(Decoupled(new TensorResp()))
+  val sbComp  = IO(Decoupled(new ScoreboardComp()))
+
+  private val uramPort = (params.laneWidth * 32 / 2) / 64
+  private val uramPortPerChannel = params.uramPortPerChannel
+  private val uramChannel = uramPort / uramPortPerChannel
+
+  // URAM 读口
+  val uramRReq  = IO(Vec(uramPort, Decoupled(
+    new AdvURAMReq(params.uramAddrBits, params.sourceBits - 1, 64))))
+  val uramRResp = IO(Flipped(Vec(uramChannel, Decoupled(Vec(uramPortPerChannel,
+    new AdvURAMResp(params.uramAddrBits,  params.sourceBits - 1, 64))))))
+
+  // URAM 写口
+  val uramWReq = IO(Vec(uramPort, Decoupled(
+    new AdvURAMReq(params.uramAddrBits, params.sourceBits - 1, 64))))
+  val uramWData = IO(Output(Vec(uramPort, UInt(64.W))))
+  val uramWResp = IO(Flipped(Vec(uramChannel, Decoupled(Vec(uramPortPerChannel,
+    new AdvURAMWResp(params.uramAddrBits,  params.sourceBits - 1, 64))))))
+
+  // 子模块
+  private val instQueue = Module(new VecInstQueue(params))
+  private val csr = Module(new VecControlStatusRegisters(params))
+  private val taskGen = Module(new VecTaskGen(params))
+  private val threads = Seq.tabulate(params.maxThreadCount)(t => {
+    Module(new VecThreadCtrl(params, t))
+  })
+  private val scheduler = Module(new VecGlobalScheduler(params))
+  private val rf = Module(new VecRegfile(params, 1, 1))
+
+  // FU
+  private val FUInt = Module(new VecFUInt(params))
+  private val FULsu = Module(new VecFULsu(params))
 
 }
