@@ -8,7 +8,10 @@ case class VecParams(
                     maxThreadCount: Int = 32, // 最多同时 32 个并行线程
                     maxLatency: Int = 8,
                     tcsrBanks: Int = 8,
-                    laneWidth: Int = 128
+                    laneWidth: Int = 128,
+                    uramAddrBits: Int = 22,
+                    sourceBits: Int = 0,
+                    uramPortPerChannel: Int = 4
                     ) {
   val log2MaxInstCount = log2Ceil(maxInstCount)
   val log2MaxLatency = log2Ceil(maxLatency)

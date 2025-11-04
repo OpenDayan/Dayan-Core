@@ -48,7 +48,8 @@ class VecGlobalScheduler(params: VecParams) extends Module{
   private val intWait = RegInit(0.U(1.W)) // 1Cycle-block before last issue
   // Mov 全吞吐
   // Cmp 全吞吐
-  private val lsuCredit = RegInit(8.U(4.W)) // 8-Credit for LSU FIFO
+  // TODO: Check if 4 is enough or too huge ?
+  private val lsuCredit = RegInit(4.U(3.W)) // 4-Credit for LSU FIFO
 
   when(issue.fire & issue.bits.inst.fu === VecFuEnum.Int) {
     intWait := 1.U

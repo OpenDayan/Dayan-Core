@@ -8,8 +8,8 @@ import rvtng.top.TensorInst
 import rvtng.utils._
 
 class VecInst(params: VecParams) extends VecDecoded(params) {
-  val rs1 = UInt(64.W) // Based Address of A
-  val rs2 = UInt(64.W) // Based Address of B
+  val rs1 = UInt(64.W)
+  val rs2 = UInt(64.W)
   val rd  = UInt(64.W)
 }
 

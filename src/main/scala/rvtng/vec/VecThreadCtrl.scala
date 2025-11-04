@@ -21,7 +21,7 @@ class VecSlotInfo(params: VecParams) extends Bundle {
 *
 * 接口：
 *    - allocateReq: 流式任务分派接口，接收一个分派来的执行流
-*    - free: 输出，表示当前执行线程空闲
+*    - busy: 输出，表示当前执行线程正忙
 *    - fetchReq: 流式取指请求接口，从 InstMem 请求取指令
 *    - fetchResp: 广播取指响应，从 InstMem 返回的指令结果
 *    - preIssue: 流式预发射接口，发射到调度器一级
@@ -36,7 +36,7 @@ class VecSlotInfo(params: VecParams) extends Bundle {
 
 class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
   val allocateReq = IO(Flipped(Decoupled(new VecInitTaskGroup(params))))
-  val free = IO(Output(Bool()))
+  val busy = IO(Output(Bool()))
   val fetchReq = IO(Decoupled(UInt(params.log2MaxInstCount.W))) // 取指令偏移
   val fetchResp = IO(Input(new VecInstFetchResp(params)))
   val preIssue = IO(Decoupled(new VecInstWThreadInfo(params)))
@@ -78,7 +78,7 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
             (state === S.sPreIssue1 & curIssued & (task.inst.optionalLatency === 0.U))
 
   allocateReq.ready := state === S.sFree
-  free := state === S.sFree
+  busy := state =/= S.sFree
   fetchReq.valid := (state === S.sFetch) & RegNext(!fetchReq.fire)
   fetchReq.bits := pc
   preIssue.valid := state === S.sIssue

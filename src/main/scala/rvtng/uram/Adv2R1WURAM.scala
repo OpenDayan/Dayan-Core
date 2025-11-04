@@ -182,7 +182,7 @@ class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int, GroupCount: Int = 4, fifo
   // W Port Sync Bar Generation
 
   for(syncBarId <- 0 until (N / GroupCount)) {
-    val wSyncBarSrc = Module(new SyncBarSource(fifoSize, GroupCount, W0Port))
+    val wSyncBarSrc = Module(new SyncBarSource(fifoSize * 2, GroupCount, W0Port))
     wSyncBarSrc.inValid := VecInit.tabulate(W0Port)(inReqId => VecInit.tabulate(GroupCount)(streamId => {
       wreq_i(inReqId)(syncBarId * GroupCount + streamId).ready := wSyncBarSrc.inReady(inReqId)
       wreq_i(inReqId)(syncBarId * GroupCount + streamId).valid
@@ -196,7 +196,7 @@ class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int, GroupCount: Int = 4, fifo
       wSyncReq(syncBarId * GroupCount + streamId).bits := r
     }
 
-    val wSyncBarSink = Module(new SyncBarSink(fifoSize, GroupCount, W0Port,
+    val wSyncBarSink = Module(new SyncBarSink(fifoSize * 2, GroupCount, W0Port,
       new AdvURAMWResp(addrWidth, idWidth, dataWidth)))
     wSyncBarSink.in := VecInit.tabulate(GroupCount)(streamId => {
       val r = Wire(new AdvURAMWResp(addrWidth, idWidth, dataWidth))

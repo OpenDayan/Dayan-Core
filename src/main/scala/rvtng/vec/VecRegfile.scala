@@ -18,6 +18,7 @@ class VecWData(params: VecParams) extends Bundle {
 }
 
 // wPort: 非阻塞写口数量（注意：需要经过 Global Scheduler 预约）
+// busy: 提供给 global task gen 使用的忙信号，用于同步操作
 class VecRegfile(params: VecParams, nbWPortCount: Int, bWPortCount: Int) extends Module {
   val in  = IO(Flipped(Decoupled(new VecInstWThreadInfo(params))))
   val out = IO(Decoupled(new VecInstRData(params)))
@@ -105,4 +106,7 @@ class VecRegfile(params: VecParams, nbWPortCount: Int, bWPortCount: Int) extends
   when(wReqBank1.valid) {
     mem1.write(wReqBank1.wAddr(4 + params.log2MaxThreadCount, 1), wReqBank1.wData)
   }
+
+  val busy = IO(Output(Bool()))
+  busy := s1.valid | s2.valid | s3.valid
 }
