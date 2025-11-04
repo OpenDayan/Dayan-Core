@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 class VecInitTaskGroup(params: VecParams) extends Bundle {
-  val firstInst = new VecInstWSchedule(params) // 第一条指令
+  val inst = new VecInstWSchedule(params) // 第一条指令
   val dim0 = UInt(16.W) // 维度0 index
   val dim1 = UInt(16.W) // 维度1 index
   val threadCount = UInt(8.W) // 有效线程数目
@@ -46,7 +46,7 @@ class VecGlobalScheduler(params: VecParams) extends Module {
 
   // 第一条指令记录
   val firstInst = RegEnable(instWindows, blockStart)
-  threadTask.bits.firstInst := firstInst
+  threadTask.bits.inst := firstInst
 
   // 内部循环控制机制
   val curInfo = RegEnable(csrInfo, enable = blockStart)

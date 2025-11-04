@@ -44,8 +44,8 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
 
   /// 关键寄存器
   private val pc = Reg(UInt(params.log2MaxInstCount.W))
-  private val inst = Reg(new VecInstWSchedule(params))
-  preIssue.bits.inst := inst
+  private val task = Reg(new VecInitTaskGroup(params))
+  preIssue.bits.inst := task.inst
   preIssue.bits.htId := htId.U
 
   private val curFetched = fetchResp.valid & fetchResp.pc === pc
@@ -69,16 +69,20 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
 
   // 可变延迟 Barrier 更新逻辑
   varBar := (varBar & !(varCommit.valid && varCommit.htId === htId.U)) |
-            (state === S.sPreIssue1 & curIssued & (inst.optionalLatency === 0.U))
+            (state === S.sPreIssue1 & curIssued & (task.inst.optionalLatency === 0.U))
 
   allocateReq.ready := state === S.sFree
   free := state === S.sFree
   fetchReq.valid := state === S.sFetch
+  fetchReq.bits := pc
   preIssue.valid := state === S.sIssue
+  preIssue.bits.htId := htId.U
+  preIssue.bits.inst := task.inst
 
   switch (state) {
     is(S.sFree) {
       when (allocateReq.fire) {
+        task := allocateReq.bits
         state := S.sIssue
       }
     }
@@ -109,7 +113,7 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
         }.otherwise {
           state := S.sWait
         }
-        inst := fetchResp.inst
+        task.inst := fetchResp.inst
         stallCounter := fetchResp.inst.waitCycle
         waitVarLat := fetchResp.inst.waitVarLat
       }
