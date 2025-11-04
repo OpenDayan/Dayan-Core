@@ -16,6 +16,9 @@ class VecInst(params: VecParams) extends VecDecoded(params) {
 class VecInstWSchedule(params: VecParams) extends VecInst(params) {
   val waitCycle = UInt(params.log2MaxLatency.W)
   val waitVarLat = Bool()
+  val realVSrc1 = UInt(5.W)
+  val realVSrc2 = UInt(5.W)
+  val realVDst  = UInt(5.W)
 }
 
 class VecInstFetchResp(params: VecParams) extends Bundle {
@@ -73,8 +76,9 @@ class VecInstQueue(params: VecParams) extends Module {
   instOut.valid := RegNext(instPtr < instMemCount)
 //  instValid := RegNext(instPtr < instMemCount)
 
+  // TODO: 确定固定延迟值
   // 固定延迟，所有指令共享，2 周期取操作数，1 周期写回，调度选择额外延迟 1 周期，共计 2 + 1 - 1 = 2 T
-  private val fixedLatency = 2
+  private val fixedLatency = 0
   private val maxLatency = fixedLatency + params.maxLatency
   private val log2MaxLatency = log2Up(maxLatency)
 
@@ -89,7 +93,8 @@ class VecInstQueue(params: VecParams) extends Module {
   // TODO: 删除复位
   private val tsCurrent = RegInit(0.U(tsBits.W))
   private val tsCurrentIssued = Wire(UInt(tsBits.W))
-  private val tsCurrentCommit = tsCurrentIssued + fixedLatency.U + instDecodedQ.bits.optionalLatency
+  private val tsCurrentCommit = tsCurrentIssued + fixedLatency.U +
+    Mux(instDecodedQ.bits.optionalLatency < 2.U, 0.U, instDecodedQ.bits.optionalLatency - 1.U)
   private val depHead = RegInit(VecInit.tabulate(2)(i => {0.U(4.W)}))
 
   private val realVDst = Cat(instDecodedQ.bits.vdst, depHead(instDecodedQ.bits.vdst))
@@ -159,6 +164,9 @@ class VecInstQueue(params: VecParams) extends Module {
   PartialAssign(instWSchedule, instDecodedQ.bits)
   instWSchedule.waitCycle := tsWait
   instWSchedule.waitVarLat := varLatValid & (varLatOverflow | varLatMatch | varLatOverwrite)
+  instWSchedule.realVDst := realVDst
+  instWSchedule.realVSrc1 := realVSrc1
+  instWSchedule.realVSrc2 := realVSrc2
 
   // 队列容量更新
   instDecodedQ.ready := instMemCount =/= params.maxInstCount.U

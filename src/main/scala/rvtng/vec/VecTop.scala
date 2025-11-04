@@ -6,7 +6,7 @@ import chisel3.util._
 case class VecParams(
                     maxInstCount: Int = 512,
                     maxThreadCount: Int = 32, // 最多同时 32 个并行线程
-                    maxLatency: Int = 16,
+                    maxLatency: Int = 8,
                     tcsrBanks: Int = 8
                     ) {
   val log2MaxInstCount = log2Ceil(maxInstCount)

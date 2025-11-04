@@ -152,7 +152,7 @@ class VecDecode(params: VecParams) extends Module{
 
   val latencyDecodeMap: Seq[(BitPat, BitPat)] = fuDecodeMap.map(it => {
     if(it._2 == BitPat(enumToUInt(VecFuEnum.Int))) {
-      it._1 -> BitPat(1.U(params.log2MaxLatency.W))
+      it._1 -> BitPat(2.U(params.log2MaxLatency.W))
     } else if(it._2 == BitPat(enumToUInt(VecFuEnum.Mov))) {
       it._1 -> BitPat(2.U(params.log2MaxLatency.W))
     } else if(it._2 == BitPat(enumToUInt(VecFuEnum.Cmp))) {

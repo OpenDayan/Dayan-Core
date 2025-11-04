@@ -7,6 +7,7 @@ import rvtng.utils._
 class VecInstWThreadInfo(params: VecParams) extends Bundle {
   val inst = new VecInstWSchedule(params)
   val htId = UInt(params.maxThreadCount.W)
+  val pc  = UInt(params.log2MaxInstCount.W)
 }
 
 class VecSlotInfo(params: VecParams) extends Bundle {
@@ -46,7 +47,12 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
   private val pc = Reg(UInt(params.log2MaxInstCount.W))
   private val task = Reg(new VecInitTaskGroup(params))
   preIssue.bits.inst := task.inst
+  // TODO: Enable Bank Swizzling in different Threads.
+  //  preIssue.bits.inst.realVDst := preIssue.bits.inst.realVDst ^ htId.U(5.W)(0)
+  //  preIssue.bits.inst.realVSrc1 := preIssue.bits.inst.realVSrc1 ^ htId.U(5.W)(0)
+  //  preIssue.bits.inst.realVSrc2 := preIssue.bits.inst.realVSrc2 ^ htId.U(5.W)(0)
   preIssue.bits.htId := htId.U
+  preIssue.bits.pc := pc // For better schedule logic
 
   private val curFetched = fetchResp.valid & fetchResp.pc === pc
   private val curFetchFinished = fetchResp.inst.finishHint
@@ -73,7 +79,7 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
 
   allocateReq.ready := state === S.sFree
   free := state === S.sFree
-  fetchReq.valid := state === S.sFetch
+  fetchReq.valid := (state === S.sFetch) & RegNext(!fetchReq.fire)
   fetchReq.bits := pc
   preIssue.valid := state === S.sIssue
   preIssue.bits.htId := htId.U
@@ -104,6 +110,8 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
         state := S.sFetch
         // Update PC
         pc := pc + 1.U
+      }.otherwise {
+        state := S.sIssue
       }
     }
     is(S.sFetch) {
