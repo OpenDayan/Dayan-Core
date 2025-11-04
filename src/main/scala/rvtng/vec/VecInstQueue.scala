@@ -77,8 +77,8 @@ class VecInstQueue(params: VecParams) extends Module {
 //  instValid := RegNext(instPtr < instMemCount)
 
   // TODO: 确定固定延迟值
-  // 固定延迟，所有指令共享，2 周期取操作数，1 周期写回，调度选择额外延迟 1 周期，共计 2 + 1 - 1 = 2 T
-  private val fixedLatency = 0
+  // 固定延迟，所有指令共享，3 周期取操作数，1 周期写回，调度选择取指额外延迟 3 周期，共计 3 + 1 - 3 = 1 T
+  private val fixedLatency = 1
   private val maxLatency = fixedLatency + params.maxLatency
   private val log2MaxLatency = log2Up(maxLatency)
 
