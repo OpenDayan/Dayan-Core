@@ -35,8 +35,8 @@ class VecTaskGen(params: VecParams) extends Module {
   val threadFinish = IO(Input(Bool()))
 
   // 内部状态记录
-  val curIsInBlock = RegInit(0.B)
-  val curIsValid = RegInit(0.B)
+  private val curIsInBlock = RegInit(0.B)
+  private val curIsValid = RegInit(0.B)
 
   // Parallel Handling of blockStart and blockEnd pulse.
   curIsInBlock := (curIsInBlock & !blockEnd) | blockStart
@@ -45,20 +45,20 @@ class VecTaskGen(params: VecParams) extends Module {
   chisel3.assert(!(blockEnd &  !curIsInBlock))
 
   // 第一条指令记录
-  val firstInst = RegEnable(instWindows, blockStart)
+  private val firstInst = RegEnable(instWindows, blockStart)
   threadTask.bits.inst := firstInst
 
   // 内部循环控制机制
-  val curInfo = RegEnable(csrInfo, enable = blockStart)
-  val curDim0 = Reg(UInt(16.W))
-  val curDim1 = Reg(UInt(16.W))
-  val curVBase0 = Reg(Vec(4, UInt(48.W)))
-  val curVBase1 = Reg(Vec(4, UInt(48.W)))
-  val curSBase0 = Reg(Vec(4, UInt(48.W)))
-  val curSBase1 = Reg(Vec(4, UInt(48.W)))
+  private val curInfo = RegEnable(csrInfo, enable = blockStart)
+  private val curDim0 = Reg(UInt(16.W))
+  private val curDim1 = Reg(UInt(16.W))
+  private val curVBase0 = Reg(Vec(4, UInt(48.W)))
+  private val curVBase1 = Reg(Vec(4, UInt(48.W)))
+  private val curSBase0 = Reg(Vec(4, UInt(48.W)))
+  private val curSBase1 = Reg(Vec(4, UInt(48.W)))
 
-  val curDim0Cr =  curInfo.Dim0 === curDim0
-  val curDim1Cr = (curInfo.Dim1 === curDim1) & curDim0Cr
+  private val curDim0Cr =  curInfo.Dim0 === curDim0
+  private val curDim1Cr = (curInfo.Dim1 === curDim1) & curDim0Cr
 
   when(blockStart) {
     curDim0 := 0.U
@@ -69,19 +69,19 @@ class VecTaskGen(params: VecParams) extends Module {
     curSBase1 := 0.U.asTypeOf(curSBase1)
   }
 
-  val nxtVBase0 = VecInit(curVBase0.zipWithIndex.map({
+  private val nxtVBase0 = VecInit(curVBase0.zipWithIndex.map({
     case (field, idx) =>
       field + curInfo.elements("Dim0VStride" + idx.toString).asUInt
   }))
-  val nxtVBase1 = VecInit(curVBase1.zipWithIndex.map({
+  private val nxtVBase1 = VecInit(curVBase1.zipWithIndex.map({
     case (field, idx) =>
       field + curInfo.elements("Dim1VStride" + idx.toString).asUInt
   }))
-  val nxtSBase0 = VecInit(curSBase0.zipWithIndex.map({
+  private val nxtSBase0 = VecInit(curSBase0.zipWithIndex.map({
     case (field, idx) =>
       field + curInfo.elements("Dim0SStride" + idx.toString).asUInt
   }))
-  val nxtSBase1 = VecInit(curSBase1.zipWithIndex.map({
+  private val nxtSBase1 = VecInit(curSBase1.zipWithIndex.map({
     case (field, idx) =>
       field + curInfo.elements("Dim1SStride" + idx.toString).asUInt
   }))

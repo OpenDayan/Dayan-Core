@@ -133,12 +133,12 @@ class VecInstQueue(params: VecParams) extends Module {
   }
 
   // 可变 Latency 指令的 Scoreboard Entry 状态
-  val varLatValid = RegInit(0.B)
-  val varLatEntry = RegInit(0.U(5.W))
-  val varLatMatch = (realVSrc1 === varLatEntry & instDecodedQ.bits.vsrc1v) |
+  private val varLatValid = RegInit(0.B)
+  private val varLatEntry = RegInit(0.U(5.W))
+  private val varLatMatch = (realVSrc1 === varLatEntry & instDecodedQ.bits.vsrc1v) |
                     (realVSrc2 === varLatEntry & instDecodedQ.bits.vsrc2v)
-  val varLatOverflow = varLatEntry(3, 0) === 15.U
-  val varLatOverwrite = instDecodedQ.bits.optionalLatency === 0.U
+  private val varLatOverflow = varLatEntry(3, 0) === 15.U
+  private val varLatOverwrite = instDecodedQ.bits.optionalLatency === 0.U
   when(instDecodedQ.fire & instDecodedQ.bits.vdst.asBool) {
     when(varLatOverwrite) {
       // Only Track Load.
@@ -159,7 +159,7 @@ class VecInstQueue(params: VecParams) extends Module {
   // 生成输出指令
   varLatMatch := (realVSrc1 === varLatEntry & instDecodedQ.bits.vsrc1v) |
                  (realVSrc2 === varLatEntry & instDecodedQ.bits.vsrc2v)
-  val instWSchedule = Wire(new VecInstWSchedule(params))
+  private val instWSchedule = Wire(new VecInstWSchedule(params))
   PartialAssign(instWSchedule, instDecodedQ.bits)
   instWSchedule.waitCycle := tsWait
   instWSchedule.waitVarLat := varLatValid & (varLatOverflow | varLatMatch | varLatOverwrite)

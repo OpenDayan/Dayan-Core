@@ -59,6 +59,8 @@ class VecTop(params: VecParams) extends Module {
   private val instQueue = Module(new VecInstQueue(params))
   private val csr = Module(new VecControlStatusRegisters(params))
   private val taskGen = Module(new VecTaskGen(params))
+  private val dispatch = Module(new VecTaskDispatch(params))
+  private val fetchMgr = Module(new VecFetchManager(params))
   private val threads = Seq.tabulate(params.maxThreadCount)(t => {
     Module(new VecThreadCtrl(params, t))
   })
@@ -68,5 +70,36 @@ class VecTop(params: VecParams) extends Module {
   // FU
   private val FUInt = Module(new VecFUInt(params))
   private val FULsu = Module(new VecFULsu(params))
+
+  // 接线
+  instQueue.instReq <> instReq
+  instQueue.instPtr := fetchMgr.instPtr
+  instQueue.instOut
+  instQueue.instDeq
+
+  csr.instReq
+  csr.instResp <> instResp
+  // TODO: Scoreboard
+
+  taskGen.csrInfo := csr.csrInfo
+  taskGen.threadTask <> dispatch.taskIn
+  taskGen.instWindows := instQueue.instOut.inst
+  taskGen.blockStart
+  taskGen.blockEnd
+  taskGen.threadFinish
+
+  dispatch.taskOut <> VecInit.tabulate(params.maxThreadCount)(t => threads(t).allocateReq)
+  fetchMgr.fetchIn <> VecInit.tabulate(params.maxThreadCount)(t => {
+    threads(t).fetchResp := instQueue.instOut
+    threads(t).fetchReq
+  })
+  scheduler.preIssue <> VecInit.tabulate(params.maxThreadCount)(t => {
+    threads(t).preIssueResp := scheduler.preIssueResp
+    threads(t).varCommit // TODO: Connect to LSU
+    threads(t).preIssue
+  })
+
+  rf.in <> scheduler.issue
+  rf.out // TODO: Connect TO FUs
 
 }

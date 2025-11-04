@@ -40,7 +40,7 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
   val fetchReq = IO(Decoupled(UInt(params.log2MaxInstCount.W))) // 取指令偏移
   val fetchResp = IO(Input(new VecInstFetchResp(params)))
   val preIssue = IO(Decoupled(new VecInstWThreadInfo(params)))
-  val issue = IO(Input(new VecSlotInfo(params)))
+  val preIssueResp = IO(Input(new VecSlotInfo(params)))
   val varCommit = IO(Input(new VecSlotInfo(params))) // 可变延迟指令提交
 
   /// 关键寄存器
@@ -56,7 +56,7 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
 
   private val curFetched = fetchResp.valid & fetchResp.pc === pc
   private val curFetchFinished = fetchResp.inst.finishHint
-  private val curIssued = issue.valid & issue.htId === htId.U
+  private val curIssued = preIssueResp.valid & preIssueResp.htId === htId.U
 
   private object S extends ChiselEnum {
     val sFree, sFetch, sWait, sIssue, sPreIssue0, sPreIssue1 = Value
