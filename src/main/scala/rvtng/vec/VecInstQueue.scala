@@ -18,6 +18,12 @@ class VecInstWSchedule(params: VecParams) extends VecInst(params) {
   val waitVarLat = Bool()
 }
 
+class VecInstFetchResp(params: VecParams) extends Bundle {
+  val inst = new VecInstWSchedule(params)
+  val valid = Bool()
+  val pc = UInt(params.log2MaxInstCount.W)
+}
+
 /*
 * 需求：
 *    本模块为向量单元提供供指机能，接收来自标量处理器核心发射的原始 32 位指令，解码为实际内部指令。
@@ -40,8 +46,8 @@ class VecInstQueue(params: VecParams) extends Module {
   val instReq = IO(Flipped(Decoupled(new TensorInst())))
   val instDeq = IO(Input(UInt(params.log2MaxInstCount.W))) // 至多弹出 maxInstCount - 1 条指令。
   val instPtr = IO(Input(UInt(params.log2MaxInstCount.W)))
-  val instValid = IO(Output(Bool()))
-  val instOut = IO(Output(new VecInstWSchedule(params)))
+//  val instValid = IO(Output(Bool()))
+  val instOut = IO(Output(new VecInstFetchResp(params)))
   private val instDecoded = Wire(DecoupledIO(new VecInst(params)))
   private val decoder = Module(new VecDecode(params))
   decoder.inst := instReq.bits.instWord
@@ -54,16 +60,18 @@ class VecInstQueue(params: VecParams) extends Module {
 //        field := instReq.bits.elements(name)
 //      }
 //  })
-  PartitialAssign(instDecoded.bits, decoder.decode)
-  PartitialAssign(instDecoded.bits, instReq.bits)
+  PartialAssign(instDecoded.bits, decoder.decode)
+  PartialAssign(instDecoded.bits, instReq.bits)
 
   private val instMem = SyncReadMem(params.maxInstCount, new VecInstWSchedule(params))
   private val instMemWPtr = RegInit(0.U(params.log2MaxInstCount.W))
   private val instMemRPtr = RegInit(0.U(params.log2MaxInstCount.W))
   private val instMemCount = RegInit(0.U((params.log2MaxInstCount + 1).W))
   instMemRPtr := instMemRPtr + instDeq
-  instOut := instMem.read(instMemRPtr + instPtr)
-  instValid := RegNext(instPtr < instMemCount)
+  instOut.inst := instMem.read(instMemRPtr + instPtr)
+  instOut.pc   := RegNext(instPtr)
+  instOut.valid := RegNext(instPtr < instMemCount)
+//  instValid := RegNext(instPtr < instMemCount)
 
   // 固定延迟，所有指令共享，2 周期取操作数，1 周期写回，调度选择额外延迟 1 周期，共计 2 + 1 - 1 = 2 T
   private val fixedLatency = 2
@@ -148,9 +156,9 @@ class VecInstQueue(params: VecParams) extends Module {
   varLatMatch := (realVSrc1 === varLatEntry & instDecodedQ.bits.vsrc1v) |
                  (realVSrc2 === varLatEntry & instDecodedQ.bits.vsrc2v)
   val instWSchedule = Wire(new VecInstWSchedule(params))
-  PartitialAssign(instWSchedule, instDecodedQ.bits)
+  PartialAssign(instWSchedule, instDecodedQ.bits)
   instWSchedule.waitCycle := tsWait
-  instWSchedule.waitVarLat := varLatOverflow | varLatMatch
+  instWSchedule.waitVarLat := varLatValid & (varLatOverflow | varLatMatch | varLatOverwrite)
 
   // 队列容量更新
   instDecodedQ.ready := instMemCount =/= params.maxInstCount.U

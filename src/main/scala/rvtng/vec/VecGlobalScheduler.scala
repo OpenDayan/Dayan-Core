@@ -23,7 +23,7 @@ class VecInitTaskGroup(params: VecParams) extends Bundle {
 *    instWindows: 非流式输入，探查指令信息，记录首条张量指令用于分派执行。
 *    blockStart: 非流式输入脉冲信号，标记张量指令块开始
 *    blockEnd: 非流式输出脉冲信号，标记张量指令块结束
-*    threadFinish: 非流式输入脉冲信号，标记一次 Thread 完成, 内部更新 Scoreboard 信息。
+*    threadFinish: 非流式输入脉冲信号，标记所有 Thread 已完成执行。
 *
 * */
 class VecGlobalScheduler(params: VecParams) extends Module {
@@ -42,7 +42,7 @@ class VecGlobalScheduler(params: VecParams) extends Module {
   curIsInBlock := (curIsInBlock & !blockEnd) | blockStart
 
   chisel3.assert(!(blockStart & curIsInBlock))
-  chisel3.assert(!(blockEnd & !(curIsInBlock)))
+  chisel3.assert(!(blockEnd &  !curIsInBlock))
 
   // 第一条指令记录
   val firstInst = RegEnable(instWindows, blockStart)
@@ -104,10 +104,7 @@ class VecGlobalScheduler(params: VecParams) extends Module {
   threadTask.valid := curIsValid
   curIsValid := (curIsValid | blockStart) & !(threadTask.fire & curDim1Cr)
 
-  val onTheFlyCount = RegInit(0.U(params.log2MaxThreadCount.W + 1))
-  onTheFlyCount := onTheFlyCount + threadTask.fire.asUInt - threadFinish.asUInt
-
-  blockEnd := (onTheFlyCount === 0.U) & !curIsValid & curIsInBlock
+  blockEnd := RegNext(threadFinish & !curIsValid & curIsInBlock)
 
   threadTask.bits.dim0 := curDim0
   threadTask.bits.dim1 := curDim1
