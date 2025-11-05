@@ -68,31 +68,34 @@ class VecTop(params: VecParams) extends Module {
   private val rf = Module(new VecRegfile(params, 1, 1))
 
   // FU
+  private val FUDispatch = Module(new VecFUDispatch(params))
   private val FUInt = Module(new VecFUInt(params))
   private val FULsu = Module(new VecFULsu(params))
 
   // 接线
   instQueue.instReq <> instReq
   instQueue.instPtr := fetchMgr.instPtr
-  instQueue.instOut
-  instQueue.instDeq
+  instQueue.instDeq := fetchMgr.instDeq
 
-  csr.instReq
-  csr.instResp <> instResp
   // TODO: Scoreboard
+  csr.instReq <> fetchMgr.csrInst
+  csr.instResp <> instResp
 
   taskGen.csrInfo := csr.csrInfo
   taskGen.threadTask <> dispatch.taskIn
-  taskGen.instWindows := instQueue.instOut.inst
-  taskGen.blockStart
-  taskGen.blockEnd
-  taskGen.threadFinish
+  taskGen.instWindows := instQueue.instOut
+  taskGen.blockStart := fetchMgr.blockStart
+  taskGen.threadFinish := !VecInit.tabulate(params.maxThreadCount)(t => threads(t).busy).asUInt.orR
 
   dispatch.taskOut <> VecInit.tabulate(params.maxThreadCount)(t => threads(t).allocateReq)
+
   fetchMgr.fetchIn <> VecInit.tabulate(params.maxThreadCount)(t => {
     threads(t).fetchResp := instQueue.instOut
     threads(t).fetchReq
   })
+  fetchMgr.instWindows := instQueue.instOut
+  fetchMgr.blockEnd := taskGen.blockEnd
+
   scheduler.preIssue <> VecInit.tabulate(params.maxThreadCount)(t => {
     threads(t).preIssueResp := scheduler.preIssueResp
     threads(t).varCommit // TODO: Connect to LSU
@@ -100,6 +103,15 @@ class VecTop(params: VecParams) extends Module {
   })
 
   rf.in <> scheduler.issue
-  rf.out // TODO: Connect TO FUs
+  rf.out <> FUDispatch.in
 
+  // FU 连线
+  FUInt.inst <> FUDispatch.outInt
+  FULsu.inst <> FUDispatch.outLsu
+
+  // 固定延迟 FU
+  rf.nbWP(0) := FUInt.wback
+
+  // 可变延迟 FU
+  rf.bWP(0) <> FULsu.wback
 }

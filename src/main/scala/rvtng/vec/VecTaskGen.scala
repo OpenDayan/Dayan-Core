@@ -23,7 +23,7 @@ class VecInitTaskGroup(params: VecParams) extends Bundle {
 *    instWindows: 非流式输入，探查指令信息，记录首条张量指令用于分派执行。
 *    blockStart: 非流式输入脉冲信号，标记张量指令块开始
 *    blockEnd: 非流式输出脉冲信号，标记张量指令块结束
-*    threadFinish: 非流式输入脉冲信号，标记所有 Thread 已完成执行。
+*    threadFinish: 非流式输入信号，标记所有 Thread 已完成执行。
 *
 * */
 class VecTaskGen(params: VecParams) extends Module {
