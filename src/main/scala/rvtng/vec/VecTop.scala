@@ -177,15 +177,18 @@ class VecTestTop(params: VecParams) extends Module {
   })
 }
 
-object VecTestTop extends App {
+object VecTinyTestTop extends App {
   ChiselStage.emitSystemVerilog(
-    new VecTestTop(VecParams()),
+    new VecTestTop(VecParams(
+      maxThreadCount = 8,
+      laneWidth = 32, // Tiny Configuration
+    )),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",
-      "-preserve-aggregate=vec",
+      "-preserve-aggregate=all",
       "--split-verilog",
-      "-o=generated/VecTestTop"
+      "-o=generated/VecTinyTestTop"
     )
   )
 }

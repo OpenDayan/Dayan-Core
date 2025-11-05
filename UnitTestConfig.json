@@ -68,7 +68,7 @@
     "VecControlStatusRegisters": {
         "Package": "rvtng.vec"
     },
-    "VecTestTop": {
+    "VecTinyTestTop": {
         "Package": "rvtng.vec"
     }
 }
