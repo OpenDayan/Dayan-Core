@@ -14,4 +14,10 @@ class VecFUDispatch(params: VecParams) extends Module {
   outInt.bits  := in.bits
   outLsu.valid := in.valid & in.bits.inst.fu === VecFuEnum.Lsu
   outLsu.bits  := in.bits
+
+  // Assertion 检查，流式接口不可阻塞。
+  in.ready := 1.B
+  chisel3.assert(!(outInt.valid & !outInt.ready))
+  chisel3.assert(!(outLsu.valid & !outLsu.ready))
+
 }
