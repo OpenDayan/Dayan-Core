@@ -58,6 +58,7 @@ class VecTop(params: VecParams) extends Module {
   // 子模块
   private val instQueue = Module(new VecInstQueue(params))
   private val csr = Module(new VecControlStatusRegisters(params))
+  private val sb  = Module(new VecScoreboard(params))
   private val taskGen = Module(new VecTaskGen(params))
   private val dispatch = Module(new VecTaskDispatch(params))
   private val fetchMgr = Module(new VecFetchManager(params))
@@ -79,7 +80,12 @@ class VecTop(params: VecParams) extends Module {
 
   // TODO: Scoreboard
   csr.instReq <> fetchMgr.csrInst
-  csr.instResp <> instResp
+  sb.instReq <> fetchMgr.sbInst
+  val respArb = Module(new RRArbiter(csr.instReq.bits.cloneType, 2)).io
+  respArb.in(0) <> csr.instResp
+  respArb.in(1) <> sb.instResp
+  respArb.out <> instResp
+  sb.sbComp <> sbComp
 
   taskGen.csrInfo := csr.csrInfo
   taskGen.threadTask <> dispatch.taskIn

@@ -60,7 +60,7 @@ class DMAControlStatusRegisters(params: DMAParams) extends Module {
     val rd      = instReq.bits.instWord(11,  7)
     val addr    = instReq.bits.instWord(24, 15)
     val bank    = addr(9, 5)
-    val wData   = instReq.bits.rd
+    val wData   = instReq.bits.rdData
     val subAddr = addr(4, 0)
   }
   instReq.ready := instRespRaw.ready

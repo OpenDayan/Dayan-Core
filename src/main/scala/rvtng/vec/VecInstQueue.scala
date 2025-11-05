@@ -8,9 +8,9 @@ import rvtng.top.TensorInst
 import rvtng.utils._
 
 class VecInst(params: VecParams) extends VecDecoded(params) {
-  val rs1 = UInt(64.W)
-  val rs2 = UInt(64.W)
-  val rd  = UInt(64.W)
+  val rs1Data = UInt(64.W)
+  val rs2Data = UInt(64.W)
+  val rdData  = UInt(64.W)
 }
 
 class VecInstWSchedule(params: VecParams) extends VecInst(params) {

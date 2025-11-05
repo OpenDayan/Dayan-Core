@@ -42,16 +42,16 @@ class MatTop(
   private val tcsrID = matInst.bits.instWord(24, 15)
 
   when(isCfgWrite & matInst.fire) {
-    when(tcsrID === 0.U) { problemM := matInst.bits.rd }
-    when(tcsrID === 1.U) { problemN := matInst.bits.rd }
-    when(tcsrID === 2.U) { problemK := matInst.bits.rd }
-    when(tcsrID === 3.U) { strideA := matInst.bits.rd }
-    when(tcsrID === 4.U) { strideB := matInst.bits.rd }
-    when(tcsrID === 5.U) { strideC := matInst.bits.rd }
-    when(tcsrID === 6.U) { sM := matInst.bits.rd }
-    when(tcsrID === 7.U) { sN := matInst.bits.rd }
-    when(tcsrID === 8.U) { sK := matInst.bits.rd }
-    when(tcsrID === 9.U) { persistentMode := matInst.bits.rd }
+    when(tcsrID === 0.U) { problemM := matInst.bits.rdData }
+    when(tcsrID === 1.U) { problemN := matInst.bits.rdData }
+    when(tcsrID === 2.U) { problemK := matInst.bits.rdData }
+    when(tcsrID === 3.U) { strideA := matInst.bits.rdData }
+    when(tcsrID === 4.U) { strideB := matInst.bits.rdData }
+    when(tcsrID === 5.U) { strideC := matInst.bits.rdData }
+    when(tcsrID === 6.U) { sM := matInst.bits.rdData }
+    when(tcsrID === 7.U) { sN := matInst.bits.rdData }
+    when(tcsrID === 8.U) { sK := matInst.bits.rdData }
+    when(tcsrID === 9.U) { persistentMode := matInst.bits.rdData }
   }
   // TODO: tcfg Read Handling
   matInstResp.bits := 0.U
@@ -65,9 +65,9 @@ class MatTop(
   matSpilt.task.valid := isMatInst & matInst.valid
   matInst.ready := isCfgInst | (isMatInst & matSpilt.task.ready)
   matSpilt.task.bits.bf16 := 0.B // Fixme: BF16/FP8
-  matSpilt.task.bits.aBaseAddr := matInst.bits.rs1
-  matSpilt.task.bits.bBaseAddr := matInst.bits.rs2
-  matSpilt.task.bits.cBaseAddr := matInst.bits.rd
+  matSpilt.task.bits.aBaseAddr := matInst.bits.rs1Data
+  matSpilt.task.bits.bBaseAddr := matInst.bits.rs2Data
+  matSpilt.task.bits.cBaseAddr := matInst.bits.rdData
   matSpilt.task.bits.aStride := strideA
   matSpilt.task.bits.bStride := strideB
   matSpilt.task.bits.cStride := strideC

@@ -53,7 +53,7 @@ class VecControlStatusRegisters(params: VecParams) extends Module {
     val rd      = instRebuild(11,  7)
     val addr    = instRebuild(24, 15)
     val bank    = addr(9, 5)
-    val wData   = instReq.bits.rd
+    val wData   = instReq.bits.rdData
     val subAddr = addr(4, 0)
   }
   instReq.ready := instRespRaw.ready

@@ -107,8 +107,8 @@ class DMATaskGen(params: DMAParams) extends Module {
 
   // Connection Of Inst Issued Port
   mergeInstQ.enq.bits.csr := groupCtrlIf.ctrl
-  mergeInstQ.enq.bits.src := instReq.bits.rs1
-  mergeInstQ.enq.bits.dst := instReq.bits.rd
+  mergeInstQ.enq.bits.src := instReq.bits.rs1Data
+  mergeInstQ.enq.bits.dst := instReq.bits.rdData
   mergeInstQ.enq.bits.srcDRAM := instReq.bits.instWord(13).asBool
   mergeInstQ.enq.bits.dstDRAM := instReq.bits.instWord(12).asBool
   mergeInstQ.enq.valid := instReq.valid
