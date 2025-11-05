@@ -18,8 +18,9 @@ class VecTaskDispatch(params: VecParams) extends Module {
   private val taskQ = Queue(taskIn, 2, false, false)
 
 
+  // Reshuffle Index for better scheduling
   private def shuffleIdx(in: Int): Int = {
-    (in / 8) + 4 * (in % 8)
+    (in / (params.maxThreadCount / 4)) + 4 * (in % (params.maxThreadCount / 4))
   }
 
   for(i <- 1 until params.maxThreadCount) {

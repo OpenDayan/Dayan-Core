@@ -29,7 +29,7 @@ class VecInitTaskGroup(params: VecParams) extends Bundle {
 class VecTaskGen(params: VecParams) extends Module {
   val threadTask = IO(Decoupled(new VecInitTaskGroup(params)))
   val csrInfo = IO(Input(new VecCSRStorage(params)))
-  val instWindows = IO(Input(new VecInstWSchedule(params)))
+  val instWindows = IO(Input(new VecInstFetchResp(params)))
   val blockStart = IO(Input(Bool()))
   val blockEnd = IO(Output(Bool()))
   val threadFinish = IO(Input(Bool()))
@@ -45,7 +45,7 @@ class VecTaskGen(params: VecParams) extends Module {
   chisel3.assert(!(blockEnd &  !curIsInBlock))
 
   // 第一条指令记录
-  private val firstInst = RegEnable(instWindows, blockStart)
+  private val firstInst = RegEnable(instWindows.inst, blockStart)
   threadTask.bits.inst := firstInst
 
   // 内部循环控制机制
