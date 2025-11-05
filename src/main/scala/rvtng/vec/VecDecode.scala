@@ -62,6 +62,7 @@ object VecFuEnum extends ChiselEnum {
   val Cmp = Value(2.U)
   val Lsu = Value(3.U)
   val Csr = Value(4.U)
+  val Scoreboard = Value(5.U)
 }
 
 class VecDecodedFixed(params: VecParams) extends Bundle {
@@ -126,7 +127,11 @@ class VecDecode(params: VecParams) extends Module{
     VecInstList.v_comb_2x2B -> BitPat(enumToUInt(VecFuEnum.Mov)),
     VecInstList.v_comb_4x1B -> BitPat(enumToUInt(VecFuEnum.Mov)),
     VecInstList.v_separate_2x2B -> BitPat(enumToUInt(VecFuEnum.Mov)),
-    VecInstList.v_separate_4x1B -> BitPat(enumToUInt(VecFuEnum.Mov))
+    VecInstList.v_separate_4x1B -> BitPat(enumToUInt(VecFuEnum.Mov)),
+
+    // CSR and Scoreboard Instructions
+    VecInstList.tcsr_write -> BitPat(enumToUInt(VecFuEnum.Csr)), VecInstList.tcsr_read -> BitPat(enumToUInt(VecFuEnum.Csr)),
+    VecInstList.sb_produce -> BitPat(enumToUInt(VecFuEnum.Scoreboard)), VecInstList.sb_bar -> BitPat(enumToUInt(VecFuEnum.Scoreboard))
   )
 
   val opTable = Seq(
