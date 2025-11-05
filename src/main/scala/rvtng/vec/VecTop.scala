@@ -141,8 +141,9 @@ class VecTop(params: VecParams) extends Module {
 }
 
 
-class VecTestTop(params: VecParams) extends Module {
+class VecTestTop(params: VecParams, name: String = "VecTestTop") extends Module {
 
+  override def desiredName: String = name
   private val uramPort = (params.laneWidth * 32 / 2) / 64
   private val uramPortPerChannel = params.uramPortPerChannel
   private val uramChannel = uramPort / uramPortPerChannel
@@ -182,7 +183,8 @@ object VecTinyTestTop extends App {
     new VecTestTop(VecParams(
       maxThreadCount = 8,
       laneWidth = 32, // Tiny Configuration
-    )),
+    ),
+    "VecTinyTestTop"),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",

@@ -12,12 +12,52 @@ unsigned long long sim_time = 0;
 unsigned int stopFlag = 0;
 
 // Tiny Configuration, 向量寄存器车道宽度为 32， 运算器个数为 16， SFU 为 4 个。
+// URAM == (32 * 32) / 2 / 64 == 8 Banks
+
+#define LOG2BANK 3
+#define URAMSIZE ((1 << LOG2BANK) * 32 * 1024ull)
+long int uram[URAMSIZE / 8]; // 1024KBytes URAM
+static int* uramBase = (int*)&uram;
+
+extern "C" long long UltraRamRead(int id, int raddr)
+{
+    long long rtValue = uram[id | (raddr << LOG2BANK)];
+    return rtValue;
+}
+
+extern "C" long long UltraRamWrite(int id, int waddr, long int wdata)
+{
+    uram[id | (waddr << LOG2BANK)] = wdata;
+    return 0;
+}
+
+typedef struct {
+ 	uint32_t inst;
+    uint64_t rd;
+    uint64_t rs1;
+    uint64_t rs2;
+} rvt_pack_t;
+
+typedef struct {
+ 	uint8_t rd;
+ 	uint64_t data;
+} rvt_commit_t;
+
+extern "C" long fetch_tensor_inst(rvt_pack_t *inst);
+extern "C" long commit_tensor_inst(rvt_commit_t *info);
+extern "C" int nemu_main(int argc, char *argv[]);
 
 static inline void mainLoop()
 {
+
 }
+
 int main(int argc, char **argv)
 {
+    // INIT NEMU
+    const char* paramsArray[] = {"nemu_thread", "-b"};
+    std::thread nemu_thread(nemu_main, 2, (char**)paramsArray);
+
     contextp = new VerilatedContext;
     contextp->commandArgs(argc, argv);
     dut = new VVecTinyTestTop;

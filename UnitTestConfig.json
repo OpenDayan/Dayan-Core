@@ -69,6 +69,7 @@
         "Package": "rvtng.vec"
     },
     "VecTinyTestTop": {
-        "Package": "rvtng.vec"
+        "Package": "rvtng.vec",
+        "NeedNEMU": true
     }
 }
