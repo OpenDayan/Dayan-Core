@@ -136,7 +136,7 @@ class VecInstQueue(params: VecParams) extends Module {
   private val varLatValid = RegInit(0.B)
   private val varLatEntry = RegInit(0.U(5.W))
   private val varLatMatch = (realVSrc1 === varLatEntry & instDecodedQ.bits.vsrc1v) |
-                    (realVSrc2 === varLatEntry & instDecodedQ.bits.vsrc2v)
+                            (realVSrc2 === varLatEntry & instDecodedQ.bits.vsrc2v)
   private val varLatOverflow = varLatEntry(3, 0) === 15.U
   private val varLatOverwrite = instDecodedQ.bits.optionalLatency === 0.U
   when(instDecodedQ.fire & instDecodedQ.bits.vdst.asBool) {
@@ -157,8 +157,6 @@ class VecInstQueue(params: VecParams) extends Module {
   }
 
   // 生成输出指令
-  varLatMatch := (realVSrc1 === varLatEntry & instDecodedQ.bits.vsrc1v) |
-                 (realVSrc2 === varLatEntry & instDecodedQ.bits.vsrc2v)
   private val instWSchedule = Wire(new VecInstWSchedule(params))
   PartialAssign(instWSchedule, instDecodedQ.bits)
   instWSchedule.waitCycle := tsWait

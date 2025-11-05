@@ -41,7 +41,7 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
   val fetchResp = IO(Input(new VecInstFetchResp(params)))
   val preIssue = IO(Decoupled(new VecInstWThreadInfo(params)))
   val preIssueResp = IO(Input(new VecSlotInfo(params)))
-  val varCommit = IO(Input(new VecSlotInfo(params))) // 可变延迟指令提交
+  val varCommit = IO(Input(Vec(2, new VecSlotInfo(params)))) // 可变延迟指令提交, 2 Bank
 
   /// 关键寄存器
   private val pc = Reg(UInt(params.log2MaxInstCount.W))
@@ -74,8 +74,9 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
   }
 
   // 可变延迟 Barrier 更新逻辑
-  varBar := (varBar & !(varCommit.valid && varCommit.htId === htId.U)) |
-            (state === S.sPreIssue1 & curIssued & (task.inst.optionalLatency === 0.U))
+  varBar := (varBar & !(
+    (varCommit(0).valid && varCommit(0).htId === htId.U) | (varCommit(1).valid && varCommit(1).htId === htId.U)
+    )) | (state === S.sPreIssue1 & curIssued & (task.inst.optionalLatency === 0.U))
 
   allocateReq.ready := state === S.sFree
   busy := state =/= S.sFree

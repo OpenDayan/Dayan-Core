@@ -39,8 +39,12 @@ class VecGlobalScheduler(params: VecParams) extends Module{
   for(bank <- 0 until 2) {
     wBookTable(bank)(0) := 0.B
     for(lat <- 1 until params.maxLatency) {
-      wBookTable(bank)(lat) := wBookTable(bank)(lat + 1) |
-        (issue.fire & issue.bits.inst.vdstv & issue.bits.inst.optionalLatency === lat.U)
+      if(lat != params.maxLatency - 1) {
+        wBookTable(bank)(lat) := wBookTable(bank)(lat + 1) |
+          (issue.fire & issue.bits.inst.vdstv & issue.bits.inst.optionalLatency === lat.U)
+      } else {
+        wBookTable(bank)(lat) := issue.fire & issue.bits.inst.vdstv & issue.bits.inst.optionalLatency === lat.U
+      }
     }
   }
 

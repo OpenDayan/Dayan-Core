@@ -13,7 +13,8 @@ class VecInstRData(params: VecParams) extends VecInstWThreadInfo(params) {
 
 class VecWData(params: VecParams) extends Bundle {
   val wData = Vec(params.laneWidth, UInt(32.W))
-  val wAddr = UInt(10.W)
+  val wAddr = UInt((params.log2MaxThreadCount + 5).W)
+  val htId  = UInt(params.log2MaxThreadCount.W)
   val valid = Bool()
 }
 
@@ -79,7 +80,7 @@ class VecRegfile(params: VecParams, nbWPortCount: Int, bWPortCount: Int) extends
   private val nbWReqBank1 = Mux1H(nbWP.map(i => i.valid &  i.wAddr(0)), nbWP)
 
   // Blockable Write Port(LSU)
-  val bWP = IO(Input(Vec(bWPortCount, Decoupled(new VecWData(params)))))
+  val bWP = IO(Vec(bWPortCount, Flipped(Decoupled(new VecWData(params)))))
   private val bWPBank0s = Wire(Vec(bWPortCount, DecoupledIO(new VecWData(params))))
   private val bWPBank1s = Wire(Vec(bWPortCount, DecoupledIO(new VecWData(params))))
   for(i <- 0 until bWPortCount) {
@@ -93,8 +94,8 @@ class VecRegfile(params: VecParams, nbWPortCount: Int, bWPortCount: Int) extends
   }
   private val bWPBank0Arb = Module(new RRArbiter(new VecWData(params), bWPortCount)).io
   private val bWPBank1Arb = Module(new RRArbiter(new VecWData(params), bWPortCount)).io
-  bWPBank0Arb.in := bWPBank0s
-  bWPBank1Arb.in := bWPBank1s
+  bWPBank0Arb.in <> bWPBank0s
+  bWPBank1Arb.in <> bWPBank1s
   bWPBank0Arb.out.ready := !nbWReqBank0.valid
   bWPBank1Arb.out.ready := !nbWReqBank1.valid
 
@@ -109,4 +110,11 @@ class VecRegfile(params: VecParams, nbWPortCount: Int, bWPortCount: Int) extends
 
   val busy = IO(Output(Bool()))
   busy := s1.valid | s2.valid | s3.valid
+
+  val varCommit = IO(Output(Vec(2, new VecSlotInfo(params)))) // 可变延迟指令提交
+  varCommit(0).valid := bWPBank0Arb.out.fire
+  varCommit(0).htId  := bWPBank0Arb.out.bits.htId
+  varCommit(1).valid := bWPBank1Arb.out.fire
+  varCommit(1).htId  := bWPBank1Arb.out.bits.htId
+
 }

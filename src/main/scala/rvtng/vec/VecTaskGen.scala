@@ -49,7 +49,7 @@ class VecTaskGen(params: VecParams) extends Module {
   threadTask.bits.inst := firstInst
 
   // 内部循环控制机制
-  private val curInfo = RegEnable(csrInfo, enable = blockStart)
+  private val curInfo = RegEnable(csrInfo, blockStart)
   private val curDim0 = Reg(UInt(16.W))
   private val curDim1 = Reg(UInt(16.W))
   private val curVBase0 = Reg(Vec(4, UInt(48.W)))

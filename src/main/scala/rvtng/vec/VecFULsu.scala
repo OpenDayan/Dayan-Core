@@ -88,6 +88,7 @@ class VecFULsu(params: VecParams) extends Module {
   wback.bits.valid := readQ.deq.valid
   wback.bits.wData := readQ.deq.bits
   wback.bits.wAddr := instInfoQ.deq.bits
+  wback.bits.htId  := instInfoQ.deq.bits(4 + params.log2MaxThreadCount, 5)
 
   instInfoQ.deq.ready := wback.fire
   readQ.deq.ready := wback.fire

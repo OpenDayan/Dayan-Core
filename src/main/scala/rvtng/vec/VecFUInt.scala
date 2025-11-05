@@ -67,4 +67,5 @@ class VecFUInt(params: VecParams) extends Module {
   wback.valid := outVld
   wback.wAddr := Cat(s3Ctrl.htId, s3Ctrl.inst.realVDst)
   wback.wData := result
+  wback.htId  := s3Ctrl.htId
 }

@@ -1,5 +1,6 @@
 package rvtng.vec
 
+import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
 import rvtng.top._
@@ -12,7 +13,7 @@ case class VecParams(
                     tcsrBanks: Int = 8,
                     laneWidth: Int = 128,
                     uramAddrBits: Int = 22,
-                    sourceBits: Int = 0,
+                    sourceBits: Int = 1,
                     uramPortPerChannel: Int = 4
                     ) {
   val log2MaxInstCount = log2Ceil(maxInstCount)
@@ -81,9 +82,9 @@ class VecTop(params: VecParams) extends Module {
   // TODO: Scoreboard
   csr.instReq <> fetchMgr.csrInst
   sb.instReq <> fetchMgr.sbInst
-  val respArb = Module(new RRArbiter(csr.instReq.bits.cloneType, 2)).io
-  respArb.in(0) <> csr.instResp
-  respArb.in(1) <> sb.instResp
+  val respArb = Module(new Arbiter(instResp.bits.cloneType, 2)).io
+  respArb.in(0) <> sb.instResp
+  respArb.in(1) <> csr.instResp
   respArb.out <> instResp
   sb.sbComp <> sbComp
 
@@ -93,20 +94,21 @@ class VecTop(params: VecParams) extends Module {
   taskGen.blockStart := fetchMgr.blockStart
   taskGen.threadFinish := !VecInit.tabulate(params.maxThreadCount)(t => threads(t).busy).asUInt.orR
 
-  dispatch.taskOut <> VecInit.tabulate(params.maxThreadCount)(t => threads(t).allocateReq)
-
-  fetchMgr.fetchIn <> VecInit.tabulate(params.maxThreadCount)(t => {
+//  dispatch.taskOut <> VecInit.tabulate(params.maxThreadCount)(t => threads(t).allocateReq)
+//  fetchMgr.fetchIn <> VecInit.tabulate(params.maxThreadCount)(t => {
+//    threads(t).fetchResp := instQueue.instOut
+//    threads(t).fetchReq
+//  })
+  for(t <- 0 until params.maxThreadCount) {
+    threads(t).preIssueResp := scheduler.preIssueResp
     threads(t).fetchResp := instQueue.instOut
-    threads(t).fetchReq
-  })
+    threads(t).fetchReq <> fetchMgr.fetchIn(t)
+    threads(t).allocateReq <> dispatch.taskOut(t)
+    threads(t).preIssue <> scheduler.preIssue(t)
+    threads(t).varCommit := FULsu.commit // TODO: Connect to LSU
+  }
   fetchMgr.instWindows := instQueue.instOut
   fetchMgr.blockEnd := taskGen.blockEnd
-
-  scheduler.preIssue <> VecInit.tabulate(params.maxThreadCount)(t => {
-    threads(t).preIssueResp := scheduler.preIssueResp
-    threads(t).varCommit // TODO: Connect to LSU
-    threads(t).preIssue
-  })
 
   rf.in <> scheduler.issue
   rf.out <> FUDispatch.in
@@ -121,3 +123,55 @@ class VecTop(params: VecParams) extends Module {
   // 可变延迟 FU
   rf.bWP(0) <> FULsu.wback
 }
+
+
+class VecTestTop(params: VecParams) extends Module {
+
+  private val uramPort = (params.laneWidth * 32 / 2) / 64
+  private val uramPortPerChannel = params.uramPortPerChannel
+  private val uramChannel = uramPort / uramPortPerChannel
+
+  // URAM Instance
+  private val uram = Module(new Adv2R1WURAM(
+    R0Port = 1, R1Port = 1, W0Port = 1, GroupCount = params.uramPortPerChannel,
+    fifoSize = 16, N = uramPort, addrWidth = 24, idWidth = params.sourceBits, dataWidth = 64
+  ))
+
+  // DMA Instance
+  private val vec = Module(new VecTop(params))
+
+  val instReq = IO(Flipped(Decoupled(new TensorInst)))
+  val instResp = IO(Decoupled(new TensorResp))
+  val sbComp  = IO(Decoupled(new ScoreboardComp()))
+
+  vec.instReq <> instReq
+  vec.instResp <> instResp
+  vec.sbComp <> sbComp
+  vec.uramRReq <> uram.r0req_i(0)
+  vec.uramRResp <> uram.r0resp_o(0)
+  vec.uramWReq <> uram.wreq_i(0)
+  vec.uramWResp <> uram.wresp_o(0)
+  uram.wdata_i(0) := vec.uramWData
+  uram.r1req_i(0).map(u => {
+    u.bits := DontCare
+    u.valid := 0.B
+  })
+  uram.r1resp_o(0).map(u => {
+    u.ready := 1.B
+  })
+}
+
+object VecTestTop extends App {
+  ChiselStage.emitSystemVerilog(
+    new VecTestTop(VecParams()),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/VecTestTop"
+    )
+  )
+}
+
+
