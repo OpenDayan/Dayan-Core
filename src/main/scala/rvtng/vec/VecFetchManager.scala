@@ -16,6 +16,7 @@ import _root_.circt.stage.ChiselStage
 *    instDeq: 指令弹出数目
 *    instWindows: 指令窗口
 *    csrInst: 流式输出 CSR 指令
+*    sbInst: 流式输出 Scoreboard 指令
 *    blockStart: 脉冲输出给 TaskGen 负责任务生成
 * */
 class VecFetchManager(params: VecParams) extends Module {
@@ -24,6 +25,7 @@ class VecFetchManager(params: VecParams) extends Module {
   val instDeq = IO(Output(UInt(params.log2MaxInstCount.W)))
   val instWindows = IO(Input(new VecInstFetchResp(params)))
   val csrInst = IO(Decoupled(new VecInstWSchedule(params)))
+  val sbInst  = IO(Decoupled(new VecInstWSchedule(params)))
   val blockStart = IO(Output(Bool()))
   val blockEnd = IO(Input(Bool()))
 
@@ -45,17 +47,23 @@ class VecFetchManager(params: VecParams) extends Module {
 
   // 管理 instPtr 和 instDeq 及 csrInst
   private val headIsBlockInst = instWindows.valid & !instWindows.inst.finishHint
-  private val headIsCsr       = instWindows.valid & instWindows.inst.finishHint
+  private val headIsImmediate = instWindows.valid & instWindows.inst.finishHint
+  private val headIsCsr       = instWindows.valid & instWindows.inst.fu === VecFuEnum.Csr
+  private val headIsSb        = instWindows.valid & instWindows.inst.fu === VecFuEnum.Scoreboard
   when(!curIsInBlock) {
     // 当前处于块外
-    instPtr := Mux(headIsCsr, csrInst.ready.asUInt, 0.U)
-    instDeq := Mux(headIsCsr, csrInst.ready.asUInt, 0.U)
+    instPtr := Mux(headIsImmediate,
+      Mux(instWindows.inst.fu === VecFuEnum.Csr, csrInst.ready, sbInst.ready).asUInt, 0.U)
+    instDeq := Mux(headIsImmediate,
+      Mux(instWindows.inst.fu === VecFuEnum.Csr, csrInst.ready, sbInst.ready).asUInt, 0.U)
   }.otherwise {
     // 当前处于块内
     instPtr := arb.out.bits
     instDeq := Mux(blockEnd, instPtr, 0.U)
   }
   csrInst.valid := !curIsInBlock & headIsCsr
-  csrInst.bits := instWindows.inst
-  blockStart := !curIsInBlock & headIsBlockInst
+  csrInst.bits  := instWindows.inst
+  sbInst.valid  := !curIsInBlock & headIsSb
+  sbInst.bits   := instWindows.inst
+  blockStart    := !curIsInBlock & headIsBlockInst
 }
