@@ -92,7 +92,8 @@ class VecTop(params: VecParams) extends Module {
   taskGen.threadTask <> dispatch.taskIn
   taskGen.instWindows := instQueue.instOut
   taskGen.blockStart := fetchMgr.blockStart
-  taskGen.threadFinish := !VecInit.tabulate(params.maxThreadCount)(t => threads(t).busy).asUInt.orR
+  private val threadsBusy = VecInit.tabulate(params.maxThreadCount)(t => threads(t).busy).asUInt.orR
+  taskGen.threadFinish := !threadsBusy
 
 //  dispatch.taskOut <> VecInit.tabulate(params.maxThreadCount)(t => threads(t).allocateReq)
 //  fetchMgr.fetchIn <> VecInit.tabulate(params.maxThreadCount)(t => {
@@ -105,8 +106,11 @@ class VecTop(params: VecParams) extends Module {
     threads(t).fetchReq <> fetchMgr.fetchIn(t)
     threads(t).allocateReq <> dispatch.taskOut(t)
     threads(t).preIssue <> scheduler.preIssue(t)
-    threads(t).varCommit := FULsu.commit // TODO: Connect to LSU
+    threads(t).varCommit := rf.varCommit
   }
+
+  scheduler.lsuCreditGain := FULsu.lsuCreditGain
+
   fetchMgr.instWindows := instQueue.instOut
   fetchMgr.blockEnd := taskGen.blockEnd
 
@@ -122,6 +126,18 @@ class VecTop(params: VecParams) extends Module {
 
   // 可变延迟 FU
   rf.bWP(0) <> FULsu.wback
+
+  // FU-URAM 连线
+  FULsu.uramRReq <> uramRReq
+  FULsu.uramRResp <> uramRResp
+  uramWData := FULsu.uramWData
+  FULsu.uramWReq <> uramWReq
+  FULsu.uramWResp <> uramWResp
+
+  // Busy 信号连线
+  // TODO: busy 信号被阻断一拍，这个是否影响功能正确性？
+  sb.busy := RegNext(threadsBusy | rf.busy | FULsu.busy)
+
 }
 
 

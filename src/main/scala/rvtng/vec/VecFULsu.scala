@@ -27,7 +27,7 @@ class VecFULsu(params: VecParams) extends Module {
   lsuCreditGain := instQ.fire
 
   // uram Read Port Handling
-  private val uramPort = params.laneWidth * 4 / 8
+  private val uramPort = ((params.laneWidth * 4) / 2) / 8
   private val uramChannel = uramPort / params.uramPortPerChannel
   val uramRReq  = IO(Vec(uramPort, Decoupled(
     new AdvURAMReq(params.uramAddrBits, params.sourceBits - 1, 64))))
@@ -131,7 +131,8 @@ class VecFULsu(params: VecParams) extends Module {
     val i = Module(new Queue(Bool(), 64, false, false)).io
     i.enq.valid := uramWReq(c * params.uramPortPerChannel).fire
     i.enq.bits := 0.B
-    i.deq.ready := uramWResp(c).ready
+    uramWResp(c).ready := 1.B
+    i.deq.ready := uramWResp(c).fire
     i.deq.valid
   }).asUInt.orR
 

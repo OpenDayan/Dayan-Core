@@ -65,6 +65,8 @@ class VecInstQueue(params: VecParams) extends Module {
 //  })
   PartialAssign(instDecoded.bits, decoder.decode)
   PartialAssign(instDecoded.bits, instReq.bits)
+  instDecoded.valid := instReq.valid
+  instReq.ready := instDecoded.ready
 
   private val instMem = SyncReadMem(params.maxInstCount, new VecInstWSchedule(params))
   private val instMemWPtr = RegInit(0.U(params.log2MaxInstCount.W))

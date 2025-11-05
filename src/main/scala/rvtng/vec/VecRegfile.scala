@@ -24,6 +24,8 @@ class VecRegfile(params: VecParams, nbWPortCount: Int, bWPortCount: Int) extends
   val in  = IO(Flipped(Decoupled(new VecInstWThreadInfo(params))))
   val out = IO(Decoupled(new VecInstRData(params)))
 
+  in.ready := 1.B
+
   // 存储器例化
   private val mem0 = SyncReadMem(32 * params.maxThreadCount / 2, Vec(params.laneWidth, UInt(32.W)))
   private val mem1 = SyncReadMem(32 * params.maxThreadCount / 2, Vec(params.laneWidth, UInt(32.W)))
@@ -35,6 +37,7 @@ class VecRegfile(params: VecParams, nbWPortCount: Int, bWPortCount: Int) extends
   private val s1 = RegNext({
     val n = Wire(new taggedVInst)
     PartialAssign(n.task, in.bits)
+    n.valid := in.valid
     n.task.vsrc1Data := DontCare
     n.task.vsrc2Data := DontCare
     n
