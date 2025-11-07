@@ -45,6 +45,15 @@ static inline void mainLoop()
     rvt_pack_t inst;
     static int instCount = 0;
 
+    dut->instResp_ready = 1;
+
+    if(dut->instResp_valid) {
+        rvt_commit_t commit;
+        commit.data = dut->instResp_bits_data;
+        commit.rd   = dut->instResp_bits_rd;
+        backend_instruction_commit(fdMsg, 0, &commit);
+    }
+
     if(dut->instReq_valid & dut->instReq_ready) {
         instCount = 0;
     }
@@ -55,7 +64,7 @@ static inline void mainLoop()
 
     if(instCount != 0) {
         dut->instReq_valid = 1;
-        dut->instReq_bits_instWord = inst.inst & 0xfffffffful;
+        dut->instReq_bits_instWord = (int)inst.inst;
         dut->instReq_bits_rdData   = inst.rd;
         dut->instReq_bits_rs1Data  = inst.rs1;
         dut->instReq_bits_rs2Data  = inst.rs2;

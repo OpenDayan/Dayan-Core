@@ -31,6 +31,10 @@ wave/V{Name}.fst: build/V{Name}/V{Name} wave
 .PHONY: surver_{Name}
 surver_{Name}: wave/V{Name}.fst
 	surver wave/V{Name}.fst --port 4000 --token 00000000
+
+.PHONY: run_{Name}
+run_{Name}:
+	build/V{Name}/V{Name} --trace-fst --trace-structs
 '''
     return str_builder.format(Name=moduleName, Package=modulePackage)
 

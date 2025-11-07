@@ -188,7 +188,7 @@ object VecTinyTestTop extends App {
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",
-      "-preserve-aggregate=all",
+      "-preserve-aggregate=vec",
       "--split-verilog",
       "-o=generated/VecTinyTestTop"
     )
