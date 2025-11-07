@@ -5,7 +5,7 @@ with open('UnitTestConfig.json', 'r') as f:
     module_map = json.load(f)
 
 # Generate One Module Makefile
-def generateOneModuleMakefile(moduleName: str, modulePackage: str, AdditionDeps: dict, NeedNEMU: bool):
+def generateOneModuleMakefile(moduleName: str, modulePackage: str, AdditionDeps: dict, NeedEMU: bool):
     str_builder = ''
     for dep in AdditionDeps:
         str_builder +='build/V{Name}/V{Name}: {depName}\n'.format(Name=moduleName, depName=dep)
@@ -14,14 +14,7 @@ def generateOneModuleMakefile(moduleName: str, modulePackage: str, AdditionDeps:
 build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
 	verilator --output-split 3000 --compiler clang -j 0 --assert --trace --trace-structs --trace-fst \
 -CFLAGS -Wno-unknown-warning-option -CFLAGS -DVL_USER_FATAL -CFLAGS -DVL_USER_STOP -CFLAGS -Wno-narrowing '''
-    if(NeedNEMU):
-        str_builder += '''-LDFLAGS $(NEMU_HOME)/build/riscv64-nemu-interpreter.a \
--LDFLAGS $(NEMU_HOME)/resource/softfloat/repo/build/Linux-x86_64-GCC/softfloat.a \
--LDFLAGS -lpthread \
--LDFLAGS -lz \
--LDFLAGS -lreadline \
--LDFLAGS -lfuse3 '''
-    str_builder += '''--top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f --exe csrc/test/{Name}Test.cpp
+    str_builder += '''--top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f --exe csrc/test/{Name}Test.cpp csrc/test/cliUtils.cpp csrc/test/bar.cpp
 	make CXX=clang++-15 CC=clang-15 -C build/V{Name} -f V{Name}.mk V{Name}
 
 .PHONY: generated/{Name}/filelist.f
@@ -33,8 +26,6 @@ build/V{Name}:
 
 wave/V{Name}.fst: build/V{Name}/V{Name} wave
 	'''
-    if(NeedNEMU):
-        str_builder += '''umount /tmp/virtual_npu; '''
     str_builder += '''build/V{Name}/V{Name} --trace-fst --trace-structs
 
 .PHONY: surver_{Name}
@@ -52,10 +43,10 @@ for name in module_map:
     deps = module_map[name].get('AdditionDeps')
     if deps == None:
         deps = {}
-    NeedNEMU = module_map[name].get('NeedNEMU')
-    if NeedNEMU == None:
-        NeedNEMU = False
-    str_builder += generateOneModuleMakefile(name, module_map[name]['Package'], deps, NeedNEMU)
+    NeedEMU = module_map[name].get('NeedEMU')
+    if NeedEMU == None:
+        NeedEMU = False
+    str_builder += generateOneModuleMakefile(name, module_map[name]['Package'], deps, NeedEMU)
 
 with open('UnitTest.mk', 'w') as f:
     f.write(str_builder)

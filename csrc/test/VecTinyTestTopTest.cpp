@@ -3,13 +3,19 @@
 #include <verilated.h>
 #include "verilated_fst_c.h"
 #include "VVecTinyTestTop.h"
+#include "cliUtils.h"
+#include "rvtng-intf.h"
+#include "bar.h"
 #include <vector>
 #include <queue>
-#define MAX_SIM_TIME 1000
 VerilatedContext *contextp;
+VerilatedFstC *m_trace;
 VVecTinyTestTop *dut;
 unsigned long long sim_time = 0;
 unsigned int stopFlag = 0;
+
+// 交互 fd
+long fdInst, fdMsg;
 
 // Tiny Configuration, 向量寄存器车道宽度为 32， 运算器个数为 16， SFU 为 4 个。
 // URAM == (32 * 32) / 2 / 64 == 8 Banks
@@ -31,38 +37,92 @@ extern "C" long long UltraRamWrite(int id, int waddr, long int wdata)
     return 0;
 }
 
-typedef struct {
- 	uint32_t inst;
-    uint64_t rd;
-    uint64_t rs1;
-    uint64_t rs2;
-} rvt_pack_t;
-
-typedef struct {
- 	uint8_t rd;
- 	uint64_t data;
-} rvt_commit_t;
-
-extern "C" long fetch_tensor_inst(rvt_pack_t *inst);
-extern "C" long commit_tensor_inst(rvt_commit_t *info);
-extern "C" int nemu_main(int argc, char *argv[]);
+#include "rvtng-intf.h"
 
 static inline void mainLoop()
 {
+    // Get Instructions
+    rvt_pack_t inst;
+    static int instCount = 0;
 
+    if(dut->instReq_valid & dut->instReq_ready) {
+        instCount = 0;
+    }
+
+    if(instCount == 0) {
+        instCount = backend_instruction_fetch(fdInst, 0, &inst);
+    }
+
+    if(instCount != 0) {
+        dut->instReq_valid = 1;
+        dut->instReq_bits_instWord = inst.inst & 0xfffffffful;
+        dut->instReq_bits_rdData   = inst.rd;
+        dut->instReq_bits_rs1Data  = inst.rs1;
+        dut->instReq_bits_rs2Data  = inst.rs2;
+    } else {
+        dut->instReq_valid = 0;
+    }
+}
+
+void run_next_cycle(int n) {
+    unsigned long realN = n * 1000;
+    for(unsigned long i = 0; i < realN;) {
+        dut->clock ^= 1;
+        dut->eval();
+        mainLoop();
+        m_trace->dump(contextp->time());
+        contextp->timeInc(1);
+        dut->clock ^= 1;
+        dut->eval();
+        m_trace->dump(contextp->time());
+        contextp->timeInc(1);
+        sim_time++;
+        if(stopFlag != 0) {
+            if((--stopFlag) == 1) break;
+        }
+        print_progress_with_speed_multithread(++i, realN, 0);
+    }
+    wait_for_render_completion();
+    if(!stopFlag) {
+        printf("\033[42;32mVerilator: VecTinyTestTop Run Next Cycle Success!\033[0m\n");
+    } else {
+        printf("\033[41;32mVerilator: VecTinyTestTop Run Next Cycle FAILED!\033[0m\n");
+    }
+}
+
+void run_until_empty(void) {
+    printf("Verilator: TODO - Add support for run_until_empty.\n");
+}
+
+void dump_waveform(void) {
+    m_trace->close();
+    start_surfer_process((char*) "wave/VVecTinyTestTop.fst");
+    sleep(3);
+    m_trace->open("wave/VVecTinyTestTop.fst");
 }
 
 int main(int argc, char **argv)
 {
-    // INIT NEMU
-    const char* paramsArray[] = {"nemu_thread", "-b"};
-    std::thread nemu_thread(nemu_main, 2, (char**)paramsArray);
+    // 创建 QEMU 子进程
+    pid_t qemuPid = fork();
+    if (qemuPid == -1) {
+        return -1;
+    } 
+    else if (qemuPid == 0) {
+        execlp("/workspace/npu-qemu/build/dl-riscv64", "QEMU_THREAD", "-monitor", "null",
+        "-bios", "/workspace/npu-firmware/bl0/bootrom.elf",
+        "-machine", "rvtng-v0", "-nographic", "-m", "4096", "-S", "-s", NULL);
+        exit(EXIT_FAILURE);
+    }
+    // 父进程创建 server socket
+    backend_init((int*)&fdMsg, (int*)&fdInst);
+    printf("Main: QEMU Ready!\n");
 
     contextp = new VerilatedContext;
     contextp->commandArgs(argc, argv);
     dut = new VVecTinyTestTop;
     Verilated::traceEverOn(true);
-    VerilatedFstC *m_trace = new VerilatedFstC;
+    m_trace = new VerilatedFstC;
     dut->trace(m_trace, 99);
     m_trace->open("wave/VVecTinyTestTop.fst");
     dut->clock = 0;
@@ -78,29 +138,7 @@ int main(int argc, char **argv)
         contextp->timeInc(1);
     }
     dut->reset = 0;
-    while (sim_time < MAX_SIM_TIME)
-    {
-        dut->clock ^= 1;
-        dut->eval();
-        mainLoop();
-        m_trace->dump(contextp->time());
-        contextp->timeInc(1);
-        dut->clock ^= 1;
-        dut->eval();
-        m_trace->dump(contextp->time());
-        contextp->timeInc(1);
-        sim_time++;
-        if(stopFlag != 0) {
-            if((--stopFlag) == 1) break;
-        }
-    }
-    if(!stopFlag) {
-        printf("\033[42;32mVerilator: VecTinyTestTop Test PASS!\033[0m\n");
-    } else {
-        printf("\033[41;32mVerilator: VecTinyTestTop Test FAILED!\033[0m\n");
-    }
-    m_trace->close();
-    delete dut;
+    cli_main();
     exit(EXIT_SUCCESS);
 }
 

@@ -347,3 +347,6 @@ project/plugins/project/
 hs_err_pid*
 
 mill.*
+
+# Emulator Log
+.emu_log
