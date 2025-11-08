@@ -140,7 +140,7 @@ class VecInstQueue(params: VecParams) extends Module {
   private val varLatMatch = (realVSrc1 === varLatEntry & instDecodedQ.bits.vsrc1v) |
                             (realVSrc2 === varLatEntry & instDecodedQ.bits.vsrc2v)
   private val varLatOverflow = varLatEntry(3, 0) === 15.U
-  private val varLatOverwrite = instDecodedQ.bits.optionalLatency === 0.U
+  private val varLatOverwrite = (instDecodedQ.bits.optionalLatency === 0.U) & !instDecodedQ.bits.finishHint
   when(instDecodedQ.fire & instDecodedQ.bits.vdst.asBool) {
     when(varLatOverwrite) {
       // Only Track Load.

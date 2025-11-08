@@ -49,7 +49,7 @@ class VecFULsu(params: VecParams) extends Module {
     issueHighMask := issueHighMask ^ uramRReq((i / params.uramPortPerChannel) * params.uramPortPerChannel).fire
     // TODO 1: Add Swizzle here
     // TODO 2: Add More Address Mode here
-    uramRReq(i).bits.address := instQ.bits.inst.rs2Data + Mux(instQ.bits.inst.optype(0), 0.U,
+    uramRReq(i).bits.address := instQ.bits.inst.rs2Data(63, 3) + Mux(instQ.bits.inst.optype(0), 0.U,
       Mux(issueHighMask, (i + uramPort).U, i.U)
     )
     uramRReq(i).bits.id := 0.U
@@ -99,7 +99,7 @@ class VecFULsu(params: VecParams) extends Module {
   val uramWData = IO(Output(Vec(uramPort, UInt(64.W))))
 
   private val writeIssued = Wire(Vec(uramChannel, Bool()))
-  private val writeIssuedAll = readIssued.asUInt.andR
+  private val writeIssuedAll = writeIssued.asUInt.andR
   // write req handling
   for(i <- 0 until uramPort) {
     val issueHighMask = RegInit(0.B)
@@ -115,7 +115,7 @@ class VecFULsu(params: VecParams) extends Module {
     issueHighMask := issueHighMask ^ uramWReq((i / params.uramPortPerChannel) * params.uramPortPerChannel).fire
     // TODO 1: Add Swizzle here
     // TODO 2: Add More Address Mode here
-    uramWReq(i).bits.address := instQ.bits.inst.rs2Data + Mux(instQ.bits.inst.optype(0), 0.U,
+    uramWReq(i).bits.address := instQ.bits.inst.rs2Data(63, 3) + Mux(instQ.bits.inst.optype(0), 0.U,
       Mux(issueHighMask, (i + uramPort).U, i.U)
     )
     uramWData := instQ.bits.vsrc2Data.asTypeOf(Vec(2, UInt((params.laneWidth * 32 / 2).W)))(issueHighMask).asTypeOf(uramWData)

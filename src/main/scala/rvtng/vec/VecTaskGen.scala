@@ -104,7 +104,7 @@ class VecTaskGen(params: VecParams) extends Module {
   threadTask.valid := curIsValid
   curIsValid := (curIsValid | blockStart) & !(threadTask.fire & curDim1Cr)
 
-  blockEnd := RegNext(threadFinish & !curIsValid & curIsInBlock)
+  blockEnd := RegNext(threadFinish & !curIsValid & curIsInBlock & !blockEnd)
 
   threadTask.bits.dim0 := curDim0
   threadTask.bits.dim1 := curDim1

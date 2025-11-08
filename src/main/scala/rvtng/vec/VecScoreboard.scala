@@ -28,8 +28,8 @@ class VecScoreboard(params: VecParams) extends Module {
   val instIsBar = instRebuild(12)
 
   instReq.ready := !busy & Mux(instIsBar, instResp.ready, sbComp.ready)
-  instResp.valid := !busy & instReq.valid & !instIsBar
-  sbComp.valid := !busy & instReq.valid & instIsBar
+  instResp.valid := !busy & instReq.valid & instIsBar
+  sbComp.valid := !busy & instReq.valid & !instIsBar
 
   instResp.bits.rd := instReq.bits.vsrc1
   instResp.bits.data := instReq.bits.rdData

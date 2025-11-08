@@ -86,10 +86,31 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
   preIssue.bits.htId := htId.U
   preIssue.bits.inst := task.inst
 
+  val newTask = Wire(new VecInitTaskGroup(params))
+  val inInst = Mux(state === S.sFree, allocateReq.bits.inst, fetchResp.inst)
+  val newInst = Wire(new VecInstWSchedule(params))
+  newTask := allocateReq.bits
+  newInst := inInst
+  // TODO: More address calculation here.
+  when(inInst.fu === VecFuEnum.Lsu) {
+    // v load/store
+    when(inInst.optype(4, 0) === 0b00000.U) {
+      newInst.rs2Data := inInst.rs2Data + allocateReq.bits.vbase(inInst.vsrc1(3, 2))
+    }
+
+    // s load/store
+    when(inInst.optype(4, 0) === 0b00001.U) {
+      newInst.rs2Data := inInst.rs2Data + allocateReq.bits.sbase(inInst.vsrc1(3, 2))
+    }
+  }
+  newTask.inst := newInst
+
   switch (state) {
     is(S.sFree) {
       when (allocateReq.fire) {
-        task := allocateReq.bits
+        // Init PC
+        pc := 0.U
+        task := newTask
         state := S.sIssue
       }
     }
@@ -122,9 +143,9 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
         }.otherwise {
           state := S.sWait
         }
-        task.inst := fetchResp.inst
-        stallCounter := fetchResp.inst.waitCycle
-        waitVarLat := fetchResp.inst.waitVarLat
+        task.inst := newInst
+        stallCounter := newInst.waitCycle
+        waitVarLat := newInst.waitVarLat
       }
     }
   }

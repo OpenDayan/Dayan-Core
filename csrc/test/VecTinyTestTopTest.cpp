@@ -93,6 +93,7 @@ void run_next_cycle(uint64_t n) {
         }
         print_progress_with_speed_multithread(++i, realN, 0);
     }
+    print_progress_with_speed_multithread(realN, realN, 0);
     wait_for_render_completion();
     if(!stopFlag) {
         printf("\033[42;32mVerilator: VecTinyTestTop Run Next Cycle Success!\033[0m\n");
