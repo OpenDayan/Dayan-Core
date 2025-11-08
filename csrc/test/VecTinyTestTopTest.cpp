@@ -75,8 +75,8 @@ static inline void mainLoop()
 
 static uint64_t dump_offset;
 
-void run_next_cycle(int n) {
-    unsigned long realN = n * 1000;
+void run_next_cycle(uint64_t n) {
+    unsigned long realN = n;
     for(unsigned long i = 0; i < realN;) {
         dut->clock ^= 1;
         dut->eval();

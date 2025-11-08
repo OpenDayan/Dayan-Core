@@ -9,6 +9,8 @@
 #include <sys/types.h>
 #include <sys/prctl.h>
 
+#include "cliUtils.h"
+
 // 新增头文件
 #include <termios.h>
 #include <errno.h>
@@ -28,9 +30,6 @@ typedef struct {
 static History history = { .count = 0, .current = 0 };
 
 // 函数声明
-void run_next_cycle(int n);
-void run_until_empty(void);
-void dump_waveform(void);
 static inline void process_command(const char *command);
 static inline int parse_number(const char *str, int *result);
 
@@ -107,8 +106,8 @@ pid_t start_surfer_process(char* filename) {
 }
 
 // 模拟的函数实现
-static inline void run_next_cycle_abstract(int n) {
-    printf("执行 run_next_cycle(%d)\n", n);
+static inline void run_next_cycle_abstract(uint64_t n) {
+    printf("执行 run_next_cycle(%ld)\n", n);
     run_next_cycle(n);
 }
 
@@ -122,19 +121,19 @@ static inline void dump_waveform_abstract(void) {
     dump_waveform();
 }
 
-static inline int parse_number(const char *str, int *result) {
+static inline int parse_number(const char *str, uint64_t *result) {
     char *endptr;
-    long num = strtol(str, &endptr, 10);
+    uint64_t num = strtol(str, &endptr, 10);
 
-    if (endptr == str || *endptr != '\0') {
+    if (endptr == str) {
         return 0;
     }
 
-    if (num < -2147483647 || num > 2147483647) {
-        return 0;
+    if(endptr[0] == 'k' || endptr[0] == 'K') {
+        num *= 1000;
     }
 
-    *result = (int)num;
+    *result = num;
     return 1;
 }
 
@@ -164,14 +163,14 @@ static inline void process_command(const char *command) {
                 return;
             }
 
-            int n;
+            uint64_t n;
             if (parse_number(arg, &n)) {
-                run_next_cycle(n);
+                run_next_cycle_abstract(n);
             } else {
                 printf("错误：无效的数字参数 '%s'\n", arg);
             }
             if(command[1] == 'd') {
-                dump_waveform();
+                dump_waveform_abstract();
             }
             break;
         }
@@ -181,7 +180,7 @@ static inline void process_command(const char *command) {
             break;
 
         case 'd':
-            dump_waveform();
+            dump_waveform_abstract();
             break;
 
         default:
