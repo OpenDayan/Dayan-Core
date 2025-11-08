@@ -73,17 +73,19 @@ static inline void mainLoop()
     }
 }
 
+static uint64_t dump_offset;
+
 void run_next_cycle(int n) {
     unsigned long realN = n * 1000;
     for(unsigned long i = 0; i < realN;) {
         dut->clock ^= 1;
         dut->eval();
         mainLoop();
-        m_trace->dump(contextp->time());
+        m_trace->dump(contextp->time() - dump_offset);
         contextp->timeInc(1);
         dut->clock ^= 1;
         dut->eval();
-        m_trace->dump(contextp->time());
+        m_trace->dump(contextp->time() - dump_offset);
         contextp->timeInc(1);
         sim_time++;
         if(stopFlag != 0) {
@@ -104,10 +106,16 @@ void run_until_empty(void) {
 }
 
 void dump_waveform(void) {
-    m_trace->close();
-    start_surfer_process((char*) "wave/VVecTinyTestTop.fst");
-    sleep(3);
-    m_trace->open("wave/VVecTinyTestTop.fst");
+    if(contextp->time() != dump_offset) {
+        m_trace->close();
+        start_surfer_process((char*) "wave/VVecTinyTestTop.fst");
+        delete m_trace;
+        m_trace = new VerilatedFstC;
+        dut->trace(m_trace, 99);
+        sleep(2);
+        dump_offset = contextp->time();
+        m_trace->open("wave/VVecTinyTestTop.fst");
+    }
 }
 
 int main(int argc, char **argv)
@@ -116,7 +124,7 @@ int main(int argc, char **argv)
     pid_t qemuPid = fork();
     if (qemuPid == -1) {
         return -1;
-    } 
+    }
     else if (qemuPid == 0) {
         execlp("/workspace/npu-qemu/build/dl-riscv64", "QEMU_THREAD", "-monitor", "null",
         "-bios", "/workspace/npu-firmware/bl0/bootrom.elf",
@@ -137,13 +145,13 @@ int main(int argc, char **argv)
     dut->clock = 0;
     dut->reset = 1;
     dut->eval();
-    m_trace->dump(contextp->time());
+    m_trace->dump(contextp->time() - dump_offset);
     contextp->timeInc(1);
     for (int i = 0; i < 20; i++)
     {
         dut->clock ^= 1;
         dut->eval();
-        m_trace->dump(contextp->time());
+        m_trace->dump(contextp->time() - dump_offset);
         contextp->timeInc(1);
     }
     dut->reset = 0;
