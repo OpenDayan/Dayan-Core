@@ -29,6 +29,9 @@ typedef struct {
 // 全局历史记录变量
 static History history = { .count = 0, .current = 0 };
 
+// 全局波形记录状态
+int enable_waveform = 1;
+
 // 函数声明
 static inline void process_command(const char *command);
 static inline int parse_number(const char *str, int *result);
@@ -107,6 +110,9 @@ pid_t start_surfer_process(char* filename) {
 
 // 模拟的函数实现
 static inline void run_next_cycle_abstract(uint64_t n) {
+    if(n < 2) {
+        n = 2;
+    }
     printf("执行 run_next_cycle(%ld)\n", n);
     run_next_cycle(n);
 }
@@ -183,12 +189,18 @@ static inline void process_command(const char *command) {
             dump_waveform_abstract();
             break;
 
+        case 't':
+            enable_waveform = !enable_waveform;
+            printf("目前波形记录状态：%s\n", enable_waveform ? "记录" : "不记录");
+            break;
+
         default:
             printf("错误：未知命令 '%c'\n", command[0]);
             printf("可用命令：\n");
             printf("  n [数字] - 执行指定的周期数\n");
             printf("  c        - 运行直到仿真终止标志指令\n");
             printf("  d        - 导出波形数据，并启用 surfer 查看\n");
+            printf("  t        - 切换波形记录状态\n");
             printf("  q        - 退出\n");
             break;
     }
@@ -415,10 +427,11 @@ int cli_main() {
         // 检查帮助命令
         if (strcmp(input, "help") == 0) {
             printf("可用命令：\n");
-            printf("  n [十进制数字] - 调用函数 run_next_cycle(int n)\n");
-            printf("  nd [十进制数字] - 调用函数 run_next_cycle(int n);dump_waveform();\n");
+            printf("  n [十进制数字] - 调用函数 run_next_cycle(n)\n");
+            printf("  nd [十进制数字] - 调用函数 run_next_cycle(n);dump_waveform();\n");
             printf("  c              - 调用函数 run_until_empty()\n");
             printf("  d              - 调用函数 dump_waveform()\n");
+            printf("  t              - 切换波形记录状态\n");
             printf("  help           - 显示此帮助信息\n");
             printf("  q, quit, exit  - 退出RVT CLI\n");
             printf("\n使用 ↑/↓ 键浏览历史命令\n");

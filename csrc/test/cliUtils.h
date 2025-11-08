@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+extern int enable_waveform;
+
 // 函数声明
 void run_next_cycle(uint64_t n);
 void run_until_empty(void);

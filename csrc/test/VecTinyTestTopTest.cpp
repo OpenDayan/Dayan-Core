@@ -81,11 +81,11 @@ void run_next_cycle(uint64_t n) {
         dut->clock ^= 1;
         dut->eval();
         mainLoop();
-        m_trace->dump(contextp->time() - dump_offset);
+        if(enable_waveform) m_trace->dump(contextp->time() - dump_offset);
         contextp->timeInc(1);
         dut->clock ^= 1;
         dut->eval();
-        m_trace->dump(contextp->time() - dump_offset);
+        if(enable_waveform) m_trace->dump(contextp->time() - dump_offset);
         contextp->timeInc(1);
         sim_time++;
         if(stopFlag != 0) {
@@ -145,13 +145,13 @@ int main(int argc, char **argv)
     dut->clock = 0;
     dut->reset = 1;
     dut->eval();
-    m_trace->dump(contextp->time() - dump_offset);
+    if(enable_waveform) m_trace->dump(contextp->time() - dump_offset);
     contextp->timeInc(1);
     for (int i = 0; i < 20; i++)
     {
         dut->clock ^= 1;
         dut->eval();
-        m_trace->dump(contextp->time() - dump_offset);
+        if(enable_waveform) m_trace->dump(contextp->time() - dump_offset);
         contextp->timeInc(1);
     }
     dut->reset = 0;
