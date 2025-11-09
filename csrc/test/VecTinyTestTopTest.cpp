@@ -22,8 +22,7 @@ long fdInst, fdMsg;
 
 #define LOG2BANK 3
 #define URAMSIZE ((1 << LOG2BANK) * 32 * 1024ull)
-long int uram[URAMSIZE / 8]; // 1024KBytes URAM
-static int* uramBase = (int*)&uram;
+long int *uram = NULL; // 1024KBytes URAM
 
 extern "C" long long UltraRamRead(int id, int raddr)
 {
@@ -121,6 +120,8 @@ void dump_waveform(void) {
 
 int main(int argc, char **argv)
 {
+    // 创建 URAM
+    uram = (long *)backend_get_uram_ptr(0, 1024 * 1024);
     // 创建 QEMU 子进程
     pid_t qemuPid = fork();
     if (qemuPid == -1) {

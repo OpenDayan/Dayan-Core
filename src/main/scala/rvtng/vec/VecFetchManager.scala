@@ -5,6 +5,11 @@ import chisel3.util._
 import chisel3.util.experimental.decode._
 import _root_.circt.stage.ChiselStage
 
+class VecBlockEndPtrMark(params: VecParams) extends Bundle {
+  val valid = Bool()
+  val ptr = UInt(params.log2MaxInstCount.W)
+}
+
 /*
 * 需求:
 *    将来自 threads 的多个取指令请求，汇聚为一个独立的请求。
@@ -18,6 +23,7 @@ import _root_.circt.stage.ChiselStage
 *    csrInst: 流式输出 CSR 指令
 *    sbInst: 流式输出 Scoreboard 指令
 *    blockStart: 脉冲输出给 TaskGen 负责任务生成
+*    endMark: 缓冲块结束地址，减少取指请求数。
 * */
 class VecFetchManager(params: VecParams) extends Module {
   val fetchIn = IO(Vec(params.maxThreadCount, Flipped(Decoupled(UInt(params.log2MaxInstCount.W)))))
@@ -28,6 +34,7 @@ class VecFetchManager(params: VecParams) extends Module {
   val sbInst  = IO(Decoupled(new VecInstWSchedule(params)))
   val blockStart = IO(Output(Bool()))
   val blockEnd = IO(Input(Bool()))
+  val endMark = IO(Output(new VecBlockEndPtrMark(params)))
 
   // 这里不用聚合请求
   private val arb = Module(new RRArbiter(fetchIn(0).bits.cloneType, params.maxThreadCount)).io
@@ -39,17 +46,22 @@ class VecFetchManager(params: VecParams) extends Module {
   curIsInBlock := (curIsInBlock & !blockEnd) | blockStart
 
   // 记录首个非块内指令指针
-  private val blockEndPtr = Reg(UInt(params.log2MaxInstCount.W))
+  private val blockEndPtr = Reg(new VecBlockEndPtrMark(params))
   when(curIsInBlock & instWindows.valid & instWindows.inst.finishHint) {
-    blockEndPtr := instWindows.pc
+    blockEndPtr.ptr := instWindows.pc
+    blockEndPtr.valid := 1.B
+  }
+  when(!curIsInBlock) {
+    blockEndPtr.valid := 0.B
   }
   arb.out.ready := 1.B
 
   // 管理 instPtr 和 instDeq 及 csrInst
-  private val headIsBlockInst = instWindows.valid & !instWindows.inst.finishHint
-  private val headIsImmediate = instWindows.valid & instWindows.inst.finishHint
-  private val headIsCsr       = instWindows.valid & instWindows.inst.fu === VecFuEnum.Csr
-  private val headIsSb        = instWindows.valid & instWindows.inst.fu === VecFuEnum.Scoreboard
+  private val headInstVal = instWindows.valid & !RegNext(curIsInBlock)
+  private val headIsBlockInst = headInstVal & !instWindows.inst.finishHint
+  private val headIsImmediate = headInstVal & instWindows.inst.finishHint
+  private val headIsCsr       = headInstVal & instWindows.inst.fu === VecFuEnum.Csr
+  private val headIsSb        = headInstVal & instWindows.inst.fu === VecFuEnum.Scoreboard
   when(!curIsInBlock) {
     // 当前处于块外
     instPtr := Mux(headIsImmediate,
@@ -59,11 +71,12 @@ class VecFetchManager(params: VecParams) extends Module {
   }.otherwise {
     // 当前处于块内
     instPtr := arb.out.bits
-    instDeq := Mux(blockEnd, instPtr, 0.U)
+    instDeq := Mux(blockEnd, blockEndPtr.ptr, 0.U)
   }
   csrInst.valid := !curIsInBlock & headIsCsr
   csrInst.bits  := instWindows.inst
   sbInst.valid  := !curIsInBlock & headIsSb
   sbInst.bits   := instWindows.inst
   blockStart    := !curIsInBlock & headIsBlockInst
+  endMark       := blockEndPtr
 }

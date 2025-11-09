@@ -79,20 +79,30 @@ class VecRegfile(params: VecParams, nbWPortCount: Int, bWPortCount: Int) extends
   // Write Port Handling
   // None-Blocking Write Port * N
   val nbWP = IO(Input(Vec(nbWPortCount, new VecWData(params))))
-  private val nbWReqBank0 = Mux1H(nbWP.map(i => i.valid & !i.wAddr(0)), nbWP)
-  private val nbWReqBank1 = Mux1H(nbWP.map(i => i.valid &  i.wAddr(0)), nbWP)
+  private val nbWReqBank0 = Mux1H(nbWP.map(i => i.valid & !i.wAddr(0)), nbWP.map(i => {
+    val nxt = Wire(i.cloneType)
+    nxt := i
+    nxt.valid := i.valid & !i.wAddr(0)
+    nxt
+  }))
+  private val nbWReqBank1 = Mux1H(nbWP.map(i => i.valid &  i.wAddr(0)), nbWP.map(i => {
+    val nxt = Wire(i.cloneType)
+    nxt := i
+    nxt.valid := i.valid &  i.wAddr(0)
+    nxt
+  }))
 
   // Blockable Write Port(LSU)
   val bWP = IO(Vec(bWPortCount, Flipped(Decoupled(new VecWData(params)))))
   private val bWPBank0s = Wire(Vec(bWPortCount, DecoupledIO(new VecWData(params))))
   private val bWPBank1s = Wire(Vec(bWPortCount, DecoupledIO(new VecWData(params))))
   for(i <- 0 until bWPortCount) {
-    bWPBank0s(i).valid       := bWP(i).valid & !bWP(i).bits.wAddr(0)
-    bWPBank0s(i).bits.valid  := bWP(i).valid & !bWP(i).bits.wAddr(0)
-    bWPBank1s(i).valid       := bWP(i).valid &  bWP(i).bits.wAddr(0)
-    bWPBank1s(i).bits.valid  := bWP(i).valid &  bWP(i).bits.wAddr(0)
     bWPBank0s(i).bits := bWP(i).bits
     bWPBank1s(i).bits := bWP(i).bits
+    bWPBank0s(i).valid       := bWP(i).valid & !bWP(i).bits.wAddr(0)
+    bWPBank1s(i).valid       := bWP(i).valid &  bWP(i).bits.wAddr(0)
+    bWPBank0s(i).bits.valid  := bWP(i).valid & !bWP(i).bits.wAddr(0)
+    bWPBank1s(i).bits.valid  := bWP(i).valid &  bWP(i).bits.wAddr(0)
     bWP(i).ready := bWPBank0s(i).fire | bWPBank1s(i).fire
   }
   private val bWPBank0Arb = Module(new RRArbiter(new VecWData(params), bWPortCount)).io

@@ -46,11 +46,7 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
   /// 关键寄存器
   private val pc = Reg(UInt(params.log2MaxInstCount.W))
   private val task = Reg(new VecInitTaskGroup(params))
-  preIssue.bits.inst := task.inst
   // TODO: Enable Bank Swizzling in different Threads.
-  //  preIssue.bits.inst.realVDst := preIssue.bits.inst.realVDst ^ htId.U(5.W)(0)
-  //  preIssue.bits.inst.realVSrc1 := preIssue.bits.inst.realVSrc1 ^ htId.U(5.W)(0)
-  //  preIssue.bits.inst.realVSrc2 := preIssue.bits.inst.realVSrc2 ^ htId.U(5.W)(0)
   preIssue.bits.htId := htId.U
   preIssue.bits.pc := pc // For better schedule logic
 
@@ -85,32 +81,28 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
   preIssue.valid := state === S.sIssue
   preIssue.bits.htId := htId.U
   preIssue.bits.inst := task.inst
-
-  val newTask = Wire(new VecInitTaskGroup(params))
-  val inInst = Mux(state === S.sFree, allocateReq.bits.inst, fetchResp.inst)
-  val newInst = Wire(new VecInstWSchedule(params))
-  newTask := allocateReq.bits
-  newInst := inInst
   // TODO: More address calculation here.
-  when(inInst.fu === VecFuEnum.Lsu) {
+  when(task.inst.fu === VecFuEnum.Lsu) {
     // v load/store
-    when(inInst.optype(4, 0) === 0b00000.U) {
-      newInst.rs2Data := inInst.rs2Data + allocateReq.bits.vbase(inInst.vsrc1(3, 2))
+    when(task.inst.optype(4, 0) === 0b00000.U) {
+      preIssue.bits.inst.rs2Data := task.inst.rs2Data + task.vbase(task.inst.vsrc1(3, 2))
     }
 
     // s load/store
-    when(inInst.optype(4, 0) === 0b00001.U) {
-      newInst.rs2Data := inInst.rs2Data + allocateReq.bits.sbase(inInst.vsrc1(3, 2))
+    when(task.inst.optype(4, 0) === 0b00001.U) {
+      preIssue.bits.inst.rs2Data := task.inst.rs2Data + task.sbase(task.inst.vsrc1(3, 2))
     }
   }
-  newTask.inst := newInst
+  //  preIssue.bits.inst.realVDst := task.inst.realVDst ^ htId.U(5.W)(0)
+  //  preIssue.bits.inst.realVSrc1 := task.inst.realVSrc1 ^ htId.U(5.W)(0)
+  //  preIssue.bits.inst.realVSrc2 := task.inst.realVSrc2 ^ htId.U(5.W)(0)
 
   switch (state) {
     is(S.sFree) {
       when (allocateReq.fire) {
         // Init PC
         pc := 0.U
-        task := newTask
+        task := allocateReq.bits
         state := S.sIssue
       }
     }
@@ -143,9 +135,9 @@ class VecThreadCtrl(params: VecParams, htId: Int) extends Module {
         }.otherwise {
           state := S.sWait
         }
-        task.inst := newInst
-        stallCounter := newInst.waitCycle
-        waitVarLat := newInst.waitVarLat
+        task.inst := fetchResp.inst
+        stallCounter := fetchResp.inst.waitCycle
+        waitVarLat := fetchResp.inst.waitVarLat
       }
     }
   }

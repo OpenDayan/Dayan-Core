@@ -20,7 +20,14 @@
 extern "C" {
 #endif
 
+#include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include "ipc_channel.h"
 #include "blocking-queue.h"
 
@@ -106,6 +113,91 @@ static inline void* frontend_serve_inst_loop(void* arg) {
     return NULL;
 }
 
+// 生成共享内存名称
+static inline const char* get_shm_name(int coreIdx) {
+    static char name[64];
+    snprintf(name, sizeof(name), "/uram_shm_%d", coreIdx);
+    return name;
+}
+
+// backend端：创建共享内存区域
+static inline void* backend_get_uram_ptr(int coreIdx, size_t sz) {
+    const char* shm_name = get_shm_name(coreIdx);
+
+    // 创建共享内存对象
+    int shm_fd = shm_open(shm_name, O_CREAT | O_RDWR, 0666);
+    if (shm_fd == -1) {
+        perror("shm_open failed");
+        return NULL;
+    }
+
+    // 设置共享内存大小
+    if (ftruncate(shm_fd, sz) == -1) {
+        perror("ftruncate failed");
+        close(shm_fd);
+        return NULL;
+    }
+
+    // 内存映射
+    void* ptr = mmap(NULL, sz, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    if (ptr == MAP_FAILED) {
+        perror("mmap failed");
+        close(shm_fd);
+        return NULL;
+    }
+
+    close(shm_fd); // 文件描述符可以关闭，映射仍然有效
+
+    printf("Backend: Created shared memory '%s' with size %zu at %p\n",
+           shm_name, sz, ptr);
+    return ptr;
+}
+
+// frontend端：打开已创建的共享内存
+static inline void* frontend_get_uram_ptr(int coreIdx) {
+    const char* shm_name = get_shm_name(coreIdx);
+
+    // 打开已存在的共享内存对象
+    int shm_fd = shm_open(shm_name, O_RDWR, 0666);
+    if (shm_fd == -1) {
+        perror("shm_open failed");
+        return NULL;
+    }
+
+    // 获取共享内存大小
+    struct stat sb;
+    if (fstat(shm_fd, &sb) == -1) {
+        perror("fstat failed");
+        close(shm_fd);
+        return NULL;
+    }
+    size_t sz = sb.st_size;
+
+    // 内存映射
+    void* ptr = mmap(NULL, sz, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    if (ptr == MAP_FAILED) {
+        perror("mmap failed");
+        close(shm_fd);
+        return NULL;
+    }
+
+    close(shm_fd); // 文件描述符可以关闭，映射仍然有效
+
+    printf("Frontend: Opened shared memory '%s' with size %zu at %p\n",
+           shm_name, sz, ptr);
+    return ptr;
+}
+
+// 清理共享内存（可选）
+static inline void cleanup_uram_ptr(int coreIdx, void* ptr, size_t sz) {
+    if (ptr && ptr != MAP_FAILED) {
+        munmap(ptr, sz);
+    }
+
+    const char* shm_name = get_shm_name(coreIdx);
+    shm_unlink(shm_name);
+    printf("Cleaned up shared memory '%s'\n", shm_name);
+}
 static inline void* frontend_serve_msg_loop(void* arg) {
     int fdMsg = (long)arg;
     uint64_t msg;

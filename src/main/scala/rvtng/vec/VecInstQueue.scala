@@ -137,15 +137,15 @@ class VecInstQueue(params: VecParams) extends Module {
   // 可变 Latency 指令的 Scoreboard Entry 状态
   private val varLatValid = RegInit(0.B)
   private val varLatEntry = RegInit(0.U(5.W))
-  private val varLatMatch = (realVSrc1 === varLatEntry & instDecodedQ.bits.vsrc1v) |
-                            (realVSrc2 === varLatEntry & instDecodedQ.bits.vsrc2v)
-  private val varLatOverflow = varLatEntry(3, 0) === 15.U
+  private val varLatMatch = (instDecodedQ.bits.vsrc1 === varLatEntry & instDecodedQ.bits.vsrc1v) |
+                            (instDecodedQ.bits.vsrc2 === varLatEntry & instDecodedQ.bits.vsrc2v)
+  private val varLatOverflow = varLatEntry(3, 0) === 0.U
   private val varLatOverwrite = (instDecodedQ.bits.optionalLatency === 0.U) & !instDecodedQ.bits.finishHint
-  when(instDecodedQ.fire & instDecodedQ.bits.vdst.asBool) {
+  when(instDecodedQ.fire & instDecodedQ.bits.vdstv.asBool) {
     when(varLatOverwrite) {
       // Only Track Load.
       varLatValid := 1.B
-      varLatEntry := Cat(instDecodedQ.bits.vdst, 0.U(4.W))
+      varLatEntry := Cat(instDecodedQ.bits.vdst, 1.U(4.W))
     }.otherwise {
       when(varLatValid & instDecodedQ.bits.vdst === varLatEntry(4)) {
         when(varLatOverflow | varLatMatch) {
