@@ -96,7 +96,7 @@ int main(int argc, char **argv)
     Verilated::traceEverOn(true);
     VerilatedFstC *m_trace = new VerilatedFstC;
     dut->trace(m_trace, 99);
-    m_trace->open("wave/VTransposer.fst");
+    m_trace->open("wave/Transposer.fst");
     dut->clock = 0;
     dut->reset = 1;
     dut->in_bits_elemSize = 0;

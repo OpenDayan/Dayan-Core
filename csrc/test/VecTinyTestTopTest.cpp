@@ -108,13 +108,13 @@ void run_until_empty(void) {
 void dump_waveform(void) {
     if(contextp->time() != dump_offset) {
         m_trace->close();
-        start_surfer_process((char*) "wave/VVecTinyTestTop.fst");
+        start_surfer_process((char*) "wave/VecTinyTestTop.fst");
         delete m_trace;
         m_trace = new VerilatedFstC;
         dut->trace(m_trace, 99);
         sleep(2);
         dump_offset = contextp->time();
-        m_trace->open("wave/VVecTinyTestTop.fst");
+        m_trace->open("wave/VecTinyTestTop.fst");
     }
 }
 
@@ -143,7 +143,7 @@ int main(int argc, char **argv)
     Verilated::traceEverOn(true);
     m_trace = new VerilatedFstC;
     dut->trace(m_trace, 99);
-    m_trace->open("wave/VVecTinyTestTop.fst");
+    m_trace->open("wave/VecTinyTestTop.fst");
     dut->clock = 0;
     dut->reset = 1;
     dut->eval();

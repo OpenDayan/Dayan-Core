@@ -290,7 +290,7 @@ int main(int argc, char **argv)
     Verilated::traceEverOn(true);
     VerilatedFstC *m_trace = new VerilatedFstC;
     if(enableTrace) dut->trace(m_trace, 99);
-    if(enableTrace) m_trace->open("wave/VMatTestTop.fst");
+    if(enableTrace) m_trace->open("wave/MatTestTop.fst");
     dut->clock = 0;
     dut->reset = 1;
     dut->eval();

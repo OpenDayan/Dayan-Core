@@ -119,7 +119,7 @@ int main(int argc, char **argv)
     Verilated::traceEverOn(true);
     VerilatedFstC *m_trace = new VerilatedFstC;
     dut->trace(m_trace, 99);
-    m_trace->open("wave/VU8m2n2k1U4m2n2k2Mul.fst");
+    m_trace->open("wave/U8m2n2k1U4m2n2k2Mul.fst");
 
     dut->clock = 0;
     dut->reset = 1;

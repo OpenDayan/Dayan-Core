@@ -22,7 +22,7 @@ reports:
 validate_VMatTestTop:
 	make -C build/VMatTestTop -f VMatTestTop.mk VMatTestTop
 	./build/VMatTestTop/VMatTestTop 64 64 128 -1
-	surver wave/VMatTestTop.fst --port 4000 --token 00000000
+	surver wave/MatTestTop.fst --port 4000 --token 00000000
 '''
     for test in testList:
         strBuilder += '''

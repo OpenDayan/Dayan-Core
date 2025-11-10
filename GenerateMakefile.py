@@ -24,14 +24,18 @@ generated/{Name}/filelist.f:
 build/V{Name}:
 	mkdir -p build/V{Name}
 
-wave/V{Name}.fst: build/V{Name}/V{Name} wave
+wave/{Name}.fst: build/V{Name}/V{Name} wave
 	'''
     str_builder += '''build/V{Name}/V{Name} --trace-fst --trace-structs
-
+'''
+    if not NeedEMU:
+        str_builder += '''
 .PHONY: surver_{Name}
-surver_{Name}: wave/V{Name}.fst
-	surver wave/V{Name}.fst --port 4000 --token 00000000
-
+surver_{Name}: wave/{Name}.fst
+	surver wave/{Name}.fst --port 4000 --token 00000000
+'''
+    else:
+        str_builder += '''
 .PHONY: run_{Name}
 run_{Name}:
 	build/V{Name}/V{Name} --trace-fst --trace-structs
@@ -40,7 +44,8 @@ run_{Name}:
 
 str_builder = 'all:'
 for name in module_map:
-    str_builder += ' wave/V{Name}.fst'.format(Name = name)
+    if module_map[name].get('NeedEMU') != True:
+        str_builder += ' wave/{Name}.fst'.format(Name = name)
 
 str_builder += '\n'
 for name in module_map:
@@ -81,7 +86,7 @@ int main(int argc, char **argv)
     Verilated::traceEverOn(true);
     VerilatedFstC *m_trace = new VerilatedFstC;
     dut->trace(m_trace, 99);
-    m_trace->open(\"wave/V{Name}.fst\");
+    m_trace->open(\"wave/{Name}.fst\");
     dut->clock = 0;
     dut->reset = 1;
     dut->eval();

@@ -67,7 +67,7 @@ int main(int argc, char **argv)
     Verilated::traceEverOn(true);
     VerilatedFstC *m_trace = new VerilatedFstC;
     dut->trace(m_trace, 99);
-    m_trace->open("wave/VFakeURAM.fst");
+    m_trace->open("wave/FakeURAM.fst");
     dut->clock = 0;
     dut->reset = 1;
     dut->eval();

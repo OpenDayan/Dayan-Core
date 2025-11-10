@@ -181,7 +181,7 @@ class VecTestTop(params: VecParams, name: String = "VecTestTop") extends Module 
 object VecTinyTestTop extends App {
   ChiselStage.emitSystemVerilog(
     new VecTestTop(VecParams(
-      maxThreadCount = 8,
+      maxThreadCount = 32,
       laneWidth = 32, // Tiny Configuration
     ),
     "VecTinyTestTop"),

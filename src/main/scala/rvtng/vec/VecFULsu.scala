@@ -22,6 +22,9 @@ import rvtng.utils.PartialAssign
 
 class VecFULsu(params: VecParams) extends Module {
   val inst = IO(Flipped(Decoupled(new VecInstRData(params))))
+  // TODO: Spilt credit FIFO
+  //   Vector / Scaler Load use one FIFO
+  //   Scatter/ Gathering use one FIFO
   private val instQ = Queue(inst, 4) // Credit Based Fifo
   val lsuCreditGain = IO(Output(Bool()))
   lsuCreditGain := instQ.fire

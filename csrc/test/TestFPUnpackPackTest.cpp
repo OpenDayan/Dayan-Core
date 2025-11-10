@@ -36,7 +36,7 @@ int main(int argc, char **argv)
     Verilated::traceEverOn(true);
     VerilatedFstC *m_trace = new VerilatedFstC;
     dut->trace(m_trace, 99);
-    m_trace->open("wave/VTestFPUnpackPack.fst");
+    m_trace->open("wave/TestFPUnpackPack.fst");
     dut->clock = 0;
     dut->reset = 1;
     dut->eval();
