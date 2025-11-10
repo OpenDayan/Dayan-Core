@@ -92,6 +92,13 @@ class DMAIssueQueue(params: DMAParams) extends Module {
   compQ.enq.valid := compReq.valid
   compReq.ready := compQ.enq.ready
 
+  when(taskSpiltReq.fire) {
+    isCounter := isCounter + 1.U
+  }
+  when(instFinish) {
+    cmCounter := cmCounter + 1.U
+  }
+
   // Dequeue and completion logic
   private val lowBitsCmp  = cmCounter(params.log2MaxOutStanding, 0) >= compQ.deq.bits.id(params.log2MaxOutStanding, 0)
   private val highBitsCmp = cmCounter(params.log2MaxOutStanding + 1) === compQ.deq.bits.id(params.log2MaxOutStanding + 1)

@@ -93,7 +93,7 @@ class DMATaskGen(params: DMAParams) extends Module {
   val transactionAlloc = IO(Flipped(Decoupled(UInt(log2MaxOutStanding.W))))
 
   // TODO: FIFO Size
-  private val noIdReadReqQ = Module(new Queue(new DMAReadReq(params), 16, false, false)).io
+  private val noIdReadReqQ = Module(new Queue(new DMAReadReq(params), 4, false, false)).io
   readReq.bits := noIdReadReqQ.deq.bits
   readReq.bits.id := transactionAlloc.bits
   // Channel Mixing
@@ -123,21 +123,30 @@ class DMATaskGen(params: DMAParams) extends Module {
   private val curBlockCr = curBlock === curInfo.csr.Block
   private val curBlockFirst = curBlock === 0.U
   private val curDim0    = Reg(UInt(24.W))
-  private val curDim0Cr  = curBlock === curInfo.csr.Dim0 & curBlockCr
+  private val curDim0Cr  = curDim0 === curInfo.csr.Dim0 & curBlockCr
   private val curDim1    = Reg(UInt(24.W))
-  private val curDim1Cr  = curBlock === curInfo.csr.Dim1 & curDim0Cr
+  private val curDim1Cr  = curDim1 === curInfo.csr.Dim1 & curDim0Cr
   private val curDim2    = Reg(UInt(24.W))
-  private val curDim2Cr  = curBlock === curInfo.csr.Dim2 & curDim1Cr // Last Signal
-  private val curInBlockBase = Reg(UInt(params.addressBits.W)); private val nxtInBlockBase = curInBlockBase + curInfo.csr.InBlockStride
-  private val curInDim0Base  = Reg(UInt(params.addressBits.W)); private val nxtInDim0Base  = curInDim0Base  + curInfo.csr.InDim0Stride
-  private val curInDim1Base  = Reg(UInt(params.addressBits.W)); private val nxtInDim1Base  = curInDim1Base  + curInfo.csr.InDim1Stride
-  private val curInDim2Base  = Reg(UInt(params.addressBits.W)); private val nxtInDim2Base  = curInDim2Base  + curInfo.csr.InDim2Stride
-  private val curOutBlockBase = Reg(UInt(params.addressBits.W)); private val nxtOutBlockBase = curOutBlockBase + curInfo.csr.OutBlockStride
-  private val curOutDim0Base  = Reg(UInt(params.addressBits.W)); private val nxtOutDim0Base  = curOutDim0Base  + curInfo.csr.OutDim0Stride
-  private val curOutDim1Base  = Reg(UInt(params.addressBits.W)); private val nxtOutDim1Base  = curOutDim1Base  + curInfo.csr.OutDim1Stride
-  private val curOutDim2Base  = Reg(UInt(params.addressBits.W)); private val nxtOutDim2Base  = curOutDim2Base  + curInfo.csr.OutDim2Stride
+  private val curDim2Cr  = curDim2 === curInfo.csr.Dim2 & curDim1Cr // Last Signal
+  private val curInBlockBase = Reg(UInt(params.addressBits.W))
+  private val curInDim0Base  = Reg(UInt(params.addressBits.W))
+  private val curInDim1Base  = Reg(UInt(params.addressBits.W))
+  private val curInDim2Base  = Reg(UInt(params.addressBits.W))
+  private val nxtInDim2Base  = curInDim2Base  + curInfo.csr.InDim2Stride
+  private val nxtInDim1Base  = Mux(curDim1Cr, nxtInDim2Base, curInDim1Base  + curInfo.csr.InDim1Stride)
+  private val nxtInDim0Base  = Mux(curDim0Cr, nxtInDim1Base, curInDim0Base  + curInfo.csr.InDim0Stride)
+  private val nxtInBlockBase = Mux(curBlockCr, nxtInDim0Base, curInBlockBase + curInfo.csr.InBlockStride)
+  private val curOutBlockBase = Reg(UInt(params.addressBits.W))
+  private val curOutDim0Base  = Reg(UInt(params.addressBits.W))
+  private val curOutDim1Base  = Reg(UInt(params.addressBits.W))
+  private val curOutDim2Base  = Reg(UInt(params.addressBits.W))
+  private val nxtOutDim2Base  = curOutDim2Base  + curInfo.csr.OutDim2Stride
+  private val nxtOutDim1Base  = Mux(curDim1Cr, nxtOutDim2Base, curOutDim1Base  + curInfo.csr.OutDim1Stride)
+  private val nxtOutDim0Base  = Mux(curDim0Cr, nxtOutDim1Base, curOutDim0Base  + curInfo.csr.OutDim0Stride)
+  private val nxtOutBlockBase = Mux(curBlockCr, nxtOutDim0Base, curOutBlockBase + curInfo.csr.OutBlockStride)
   when(mergeInstQ.deq.fire) {
     // New Request.
+    curValid := 1.B
     curBlock := 0.U
     curDim0  := 0.U
     curDim1  := 0.U
@@ -151,23 +160,32 @@ class DMATaskGen(params: DMAParams) extends Module {
     curOutDim1Base  := mergeInstQ.deq.bits.dst
     curOutDim2Base  := mergeInstQ.deq.bits.dst
   }.elsewhen(noIdReadReqQ.enq.fire) {
-    when(curBlockCr) {
-      curBlock := 0.U; curInBlockBase := nxtInDim0Base; curOutBlockBase := nxtOutDim0Base
-    }.otherwise {
-      curBlock := curBlock + 1.U; curInBlockBase := nxtInBlockBase; curOutBlockBase := nxtOutBlockBase
+    curInBlockBase := nxtInBlockBase
+    curOutBlockBase := nxtOutBlockBase
+    when(curDim1Cr) {
+      curDim1 := 0.U
+      curInDim2Base := nxtInDim2Base
+      curOutDim2Base := nxtOutDim2Base
+      curDim2 := curDim2 + 1.U
+    }.elsewhen(curDim0Cr) {
+      curDim1 := curDim1 + 1.U
     }
     when(curDim0Cr) {
-      curDim0 := 0.U; curInDim0Base := nxtInDim1Base; curOutDim0Base := nxtOutDim1Base
+      curDim0 := 0.U
+      curInDim1Base := nxtInDim1Base
+      curOutDim1Base := nxtOutDim1Base
     }.elsewhen(curBlockCr) {
-      curDim0 := curDim0 + 1.U; curInDim0Base := nxtInDim0Base; curOutDim0Base := nxtOutDim0Base
+      curDim0 := curDim0 + 1.U
     }
-    when(curDim1Cr) {
-      curDim1 := 0.U; curInDim1Base := nxtInDim2Base; curOutDim1Base := nxtOutDim2Base
-    }.elsewhen(curDim0Cr) {
-      curDim1 := curDim1 + 1.U; curInDim1Base := nxtInDim1Base; curOutDim1Base := nxtOutDim1Base
+    when(curBlockCr) {
+      curBlock := 0.U
+      curInDim0Base := nxtInDim0Base
+      curOutDim0Base := nxtOutDim0Base
+    }.otherwise {
+      curBlock := curBlock + 1.U
     }
-    when(curDim1Cr) {
-      curDim2 := curDim2 + 1.U; curInDim2Base := nxtInDim2Base; curOutDim2Base := nxtOutDim2Base
+    when(curDim2Cr) {
+      curValid := 0.B
     }
   }
   mergeInstQ.deq.ready := !curValid | (curDim2Cr & noIdReadReqQ.enq.fire)
@@ -175,9 +193,9 @@ class DMATaskGen(params: DMAParams) extends Module {
   // Read Request Generator
   noIdReadReqQ.enq.bits.addr := curInBlockBase
   noIdReadReqQ.enq.bits.isDRAM := curInfo.srcDRAM
-  noIdReadReqQ.enq.bits.UramSwizzleS := curInfo.csr.UramReadSwizzleS
-  noIdReadReqQ.enq.bits.UramSwizzleB := curInfo.csr.UramReadSwizzleB
-  noIdReadReqQ.enq.bits.UramSwizzleM := curInfo.csr.UramReadSwizzleM
+  noIdReadReqQ.enq.bits.UramSwizzleS := curInfo.csr.UramReadSwizzleMBS( 7,  0)
+  noIdReadReqQ.enq.bits.UramSwizzleB := curInfo.csr.UramReadSwizzleMBS(15,  8)
+  noIdReadReqQ.enq.bits.UramSwizzleM := curInfo.csr.UramReadSwizzleMBS(23, 16)
   noIdReadReqQ.enq.bits.id := DontCare
   noIdReadReqQ.enq.valid := curValid & (!curBlockFirst | groupReq.ready)
   // Group Request Generator
@@ -192,8 +210,9 @@ class DMATaskGen(params: DMAParams) extends Module {
   groupReq.bits.keepInfo.block  := curInfo.csr.Block
   groupReq.bits.keepInfo.stride := curInfo.csr.OutBlockStride
   groupReq.bits.keepInfo.isDRAM := curInfo.dstDRAM
-  groupReq.bits.keepInfo.isLastInst := curDim2Cr
-  groupReq.bits.keepInfo.UramSwizzleS := curInfo.csr.UramWriteSwizzleS
-  groupReq.bits.keepInfo.UramSwizzleB := curInfo.csr.UramWriteSwizzleB
-  groupReq.bits.keepInfo.UramSwizzleM := curInfo.csr.UramWriteSwizzleM
+  groupReq.bits.keepInfo.isLastInst :=
+    (curDim2 === curInfo.csr.Dim2) & (curDim1 === curInfo.csr.Dim1) & (curDim0 === curInfo.csr.Dim0)
+  groupReq.bits.keepInfo.UramSwizzleS := curInfo.csr.UramWriteSwizzleMBS( 7,  0)
+  groupReq.bits.keepInfo.UramSwizzleB := curInfo.csr.UramWriteSwizzleMBS(15,  8)
+  groupReq.bits.keepInfo.UramSwizzleM := curInfo.csr.UramWriteSwizzleMBS(23, 16)
 }

@@ -63,7 +63,7 @@ class Transposer[T <: Data](S: Int, N: Int, gen: T) extends Module{
   ctrlOut.ready := s0Last & out.ready
   val s1Ror = RegEnable(s0Ror, !s1Deny)
   val s1Valid = RegEnable(ctrlOut.valid, !s1Deny)
-  when(out.ready & ctrlOut.valid) {
+  when(!s1Deny & ctrlOut.valid) {
     when(s0Last) {
       s0Round := 0.U
       s0Base  := s0Base + (N.U(log2Ceil(2 * N).W) >> ctrlOut.bits)

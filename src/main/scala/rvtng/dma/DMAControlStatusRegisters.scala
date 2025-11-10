@@ -25,12 +25,8 @@ class DMACSRStorage extends Bundle {
   val BlockPadding      = UInt(8.W)
   val RequestPadding    = UInt(8.W)
   val PaddingValue      = UInt(64.W)
-  val UramWriteSwizzleS = UInt(8.W)
-  val UramWriteSwizzleB = UInt(8.W)
-  val UramWriteSwizzleM = UInt(8.W)
-  val UramReadSwizzleS  = UInt(8.W)
-  val UramReadSwizzleB  = UInt(8.W)
-  val UramReadSwizzleM  = UInt(8.W)
+  val UramWriteSwizzleMBS = UInt(24.W)
+  val UramReadSwizzleMBS  = UInt(24.W)
 }
 
 class DMACSRGroupFetchIF(params: DMAParams) extends Bundle {
@@ -63,12 +59,12 @@ class DMAControlStatusRegisters(params: DMAParams) extends Module {
     val wData   = instReq.bits.rdData
     val subAddr = addr(4, 0)
   }
-  instReq.ready := instRespRaw.ready
+  instReq.ready := instRespRaw.ready | !instDecode.re
 
   instRespRaw.bits.rd  := Mux(instDecode.re, instDecode.rd, 0.U)
   instRespRaw.bits.data := DontCare
 
-  instRespRaw.valid    := instReq.valid
+  instRespRaw.valid    := instReq.valid & instDecode.re
 
   private val cksumArray = VecInit.tabulate(params.tcsrBanks)(i => {
     val wSum = RegInit(0.U(20.W))

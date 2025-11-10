@@ -39,7 +39,7 @@ class DMAGroupReqSpilt[D <: Data, T <: Data](params: DMAParams) extends Module {
   }
   when((inQ.bits.groupPad - curBlockStart) <= curMaxSz) {
     // Pad to nearest
-    blockReq.bits.groupPad := inQ.bits.groupPad - curBlockStart - 1.U
+    blockReq.bits.groupPad := inQ.bits.groupPad - curBlockStart
   }.otherwise {
     blockReq.bits.groupPad := curMaxSz
   }

@@ -60,7 +60,8 @@
         "Package": "rvtng.dma"
     },
     "DMATestTop": {
-        "Package": "rvtng.dma"
+        "Package": "rvtng.dma",
+        "NeedEMU": true
     },
     "VecDecode": {
         "Package": "rvtng.vec"

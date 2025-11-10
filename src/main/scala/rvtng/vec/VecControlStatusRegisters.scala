@@ -14,30 +14,22 @@ class VecCSRStorage(params: VecParams) extends Bundle {
   val Dim1VStride0 = UInt(28.W)
   val Dim0SStride0 = UInt(28.W)
   val Dim1SStride0 = UInt(28.W)
-  val SwizzleS0 = UInt(8.W)
-  val SwizzleB0 = UInt(8.W)
-  val SwizzleM0 = UInt(8.W)
+  val SwizzleMBS0 = UInt(24.W)
   val Dim0VStride1 = UInt(28.W)
   val Dim1VStride1 = UInt(28.W)
   val Dim0SStride1 = UInt(28.W)
   val Dim1SStride1 = UInt(28.W)
-  val SwizzleS1 = UInt(8.W)
-  val SwizzleB1 = UInt(8.W)
-  val SwizzleM1 = UInt(8.W)
+  val SwizzleMBS1 = UInt(24.W)
   val Dim0VStride2 = UInt(28.W)
   val Dim1VStride2 = UInt(28.W)
   val Dim0SStride2 = UInt(28.W)
   val Dim1SStride2 = UInt(28.W)
-  val SwizzleS2 = UInt(8.W)
-  val SwizzleB2 = UInt(8.W)
-  val SwizzleM2 = UInt(8.W)
+  val SwizzleMBS2 = UInt(24.W)
   val Dim0VStride3 = UInt(28.W)
   val Dim1VStride3 = UInt(28.W)
   val Dim0SStride3 = UInt(28.W)
   val Dim1SStride3 = UInt(28.W)
-  val SwizzleS3 = UInt(8.W)
-  val SwizzleB3 = UInt(8.W)
-  val SwizzleM3 = UInt(8.W)
+  val SwizzleMBS3 = UInt(24.W)
 }
 
 /*
@@ -68,7 +60,7 @@ class VecControlStatusRegisters(params: VecParams) extends Module {
     val wData   = instReq.bits.rdData
     val subAddr = addr(4, 0)
   }
-  instReq.ready := instRespRaw.ready
+  instReq.ready := instRespRaw.ready | !instDecode.re
 
   instRespRaw.bits.rd  := instDecode.rd
   instRespRaw.bits.data := DontCare

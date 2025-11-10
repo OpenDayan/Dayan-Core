@@ -222,6 +222,7 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
   private val t0OutRor = (Cat(t0OutCurIdx, 0.U(log2BANK.W)) >> t0Outlog2BlockSz)(log2BANK - 1, 0).asUInt
   private val t0Outlog2CNCycle = log2CN.U - Mux(t0OutInfo.transpose >= log2CN.U, log2CN.U, t0OutInfo.transpose(log2Ceil(log2CN) - 1, 0))
   private val t0OutCurIdxP1 = t0OutCurIdx + 1.U
+  private val t0OutCurCIdxP1 = t0OutCurCIdx + 1.U
   when(t0OutCurBlockValid & trInReady) {
     when(t0OutCurLast) {
       t0OutCurIdx := 0.U
@@ -233,7 +234,7 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
     }.otherwise {
       t0OutCurIdx := t0OutCurIdxP1
       val cidxCarry = t0OutCurCIdx === ((1.U(log2CN.W) << t0Outlog2CNCycle).asUInt - 1.U)
-      t0OutCurCIdx := Mux(cidxCarry, 0.U, t0OutCurIdxP1)
+      t0OutCurCIdx := Mux(cidxCarry, 0.U, t0OutCurCIdxP1)
       t0OutCurBankIdx := t0OutCurBankIdx + cidxCarry.asUInt
     }
   }
