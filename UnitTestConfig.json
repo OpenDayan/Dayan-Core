@@ -1,62 +1,11 @@
 {
-    "U8m2n2k1U4m2n2k2Mul": {
-        "Package": "rvtng.fpmath"
-    },
-    "FP8BF16FusedDPUnit": {
-        "Package": "rvtng.fpmath"
-    },
-    "FP8BF16FusedDPArray": {
-        "Package": "rvtng.fpmath",
-        "AdditionDeps": {
-            "csrc/gen/FP8BF16FusedDPArrayTestBF16Gen.hpp csrc/gen/FP8BF16FusedDPArrayTestCheckGen.hpp": {
-                "deps": "csrc/gen/FP8BF16FusedDPArrayTestMatrixGen.py",
-                "cmd" : "python3 csrc/gen/FP8BF16FusedDPArrayTestMatrixGen.py"
-            }
-        }
-    },
-    "DPArrayCalcTaskSpilt": {
-        "Package": "rvtng.mat"
-    },
-    "TestFPUnpackPack": {
-        "Package": "rvtng.fpmath"
-    },
-    "DPArrayBufferAB": {
-        "Package": "rvtng.mat"
-    },
-    "DPArrayBufferC": {
-        "Package": "rvtng.mat"
-    },
-    "FakeURAM": {
-        "Package": "rvtng.uram"
-    },
-    "MatCtrlTaskGen": {
-        "Package": "rvtng.mat"
-    },
-    "DPArrayLoadStoreTaskSpilt": {
-        "Package": "rvtng.mat"
-    },
-    "DPArrayTop": {
-        "Package": "rvtng.mat"
-    },
-    "MatTestTop": {
-        "Package": "rvtng.mat"
-    },
-    "GroupXBar": {
-        "Package": "rvtng.utils"
-    },
     "Adv2R1WURAM": {
         "Package": "rvtng.uram"
     },
-    "Transposer": {
-        "Package": "rvtng.utils"
-    },
-    "ReorderScoreboard": {
-        "Package": "rvtng.utils"
-    },
-    "DMAReorderTransposeBuffer": {
+    "DMAControlStatusRegisters": {
         "Package": "rvtng.dma"
     },
-    "DMAControlStatusRegisters": {
+    "DMAReorderTransposeBuffer": {
         "Package": "rvtng.dma"
     },
     "DMATestTop": {
@@ -70,11 +19,38 @@
         },
         "NeedEMU": true
     },
-    "VecDecode": {
-        "Package": "rvtng.vec"
+    "DPArrayCalcTaskSpilt": {
+        "Package": "rvtng.mat"
     },
-    "VecControlStatusRegisters": {
-        "Package": "rvtng.vec"
+    "FakeURAM": {
+        "Package": "rvtng.uram"
+    },
+    "FP8BF16FusedDPArray": {
+        "Package": "rvtng.fpmath",
+        "AdditionDeps": {
+            "csrc/gen/FP8BF16FusedDPArrayTestBF16Gen.hpp csrc/gen/FP8BF16FusedDPArrayTestCheckGen.hpp": {
+                "deps": "csrc/gen/FP8BF16FusedDPArrayTestMatrixGen.py",
+                "cmd" : "python3 csrc/gen/FP8BF16FusedDPArrayTestMatrixGen.py"
+            }
+        }
+    },
+    "FP8BF16FusedDPUnit": {
+        "Package": "rvtng.fpmath"
+    },
+    "GroupXBar": {
+        "Package": "rvtng.utils"
+    },
+    "MatTestTop": {
+        "Package": "rvtng.mat"
+    },
+    "TestFPUnpackPack": {
+        "Package": "rvtng.fpmath"
+    },
+    "Transposer": {
+        "Package": "rvtng.utils"
+    },
+    "U8m2n2k1U4m2n2k2Mul": {
+        "Package": "rvtng.fpmath"
     },
     "VecTinyTestTop": {
         "Package": "rvtng.vec",
