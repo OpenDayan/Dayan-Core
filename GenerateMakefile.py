@@ -16,7 +16,9 @@ def generateOneModuleMakefile(moduleName: str, modulePackage: str, AdditionDeps:
 build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
 	verilator --output-split 3000 --compiler clang -j 0 --assert --trace --trace-structs --trace-fst \
 -CFLAGS -Wno-unknown-warning-option -CFLAGS -DVL_USER_FATAL -CFLAGS -DVL_USER_STOP -CFLAGS -Wno-narrowing '''
-    str_builder += '''--top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f --exe csrc/test/{Name}Test.cpp{ADDITION_DEPS}
+    str_builder += '''--top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f \
+-CFLAGS -I../../csrc/utils/ -CFLAGS -I../../csrc/gen/ \
+--exe csrc/test/{Name}Test.cpp{ADDITION_DEPS}
 	$(MAKE) CXX=clang++-15 CC=clang-15 -C build/V{Name} -f V{Name}.mk V{Name}
 
 .PHONY: generated/{Name}/filelist.f
@@ -42,7 +44,8 @@ surver_{Name}: wave/{Name}.fst
 run_{Name}:
 	build/V{Name}/V{Name} --trace-fst --trace-structs
 '''
-    return str_builder.format(Name=moduleName, Package=modulePackage, ADDITION_DEPS = ' csrc/test/bar.cpp csrc/test/cliUtils.cpp csrc/test/dramsim3Utils.cpp -LDFLAGS -Lcsrc/DRAMsim3/libdramsim3.a' if(NeedEMU) else '')
+    return str_builder.format(Name=moduleName, Package=modulePackage, ADDITION_DEPS = ''' csrc/utils/bar.cpp \
+csrc/utils/cliUtils.cpp csrc/utils/dramsim3Utils.cpp -LDFLAGS -Lcsrc/DRAMsim3/libdramsim3.a''' if(NeedEMU) else '')
 
 str_builder = 'all:'
 for name in module_map:

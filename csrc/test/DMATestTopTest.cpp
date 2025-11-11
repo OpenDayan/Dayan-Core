@@ -121,7 +121,7 @@ void dump_waveform(void) {
 int main(int argc, char **argv)
 {
     // 创建 URAM
-    uram = (long *)backend_get_uram_ptr(0, 1024 * 1024);
+    uram = (long *)backend_get_shm_ptr("/uram_shm_0", 1024 * 1024);
     // 创建 QEMU 子进程
     pid_t qemuPid = fork();
     if (qemuPid == -1) {

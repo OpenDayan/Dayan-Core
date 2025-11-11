@@ -8,9 +8,9 @@
     "FP8BF16FusedDPArray": {
         "Package": "rvtng.fpmath",
         "AdditionDeps": {
-            "csrc/test/FP8BF16FusedDPArrayTestBF16Gen.hpp csrc/test/FP8BF16FusedDPArrayTestCheckGen.hpp": {
-                "deps": "csrc/test/FP8BF16FusedDPArrayTestMatrixGen.py",
-                "cmd" : "python3 csrc/test/FP8BF16FusedDPArrayTestMatrixGen.py"
+            "csrc/gen/FP8BF16FusedDPArrayTestBF16Gen.hpp csrc/gen/FP8BF16FusedDPArrayTestCheckGen.hpp": {
+                "deps": "csrc/gen/FP8BF16FusedDPArrayTestMatrixGen.py",
+                "cmd" : "python3 csrc/gen/FP8BF16FusedDPArrayTestMatrixGen.py"
             }
         }
     },

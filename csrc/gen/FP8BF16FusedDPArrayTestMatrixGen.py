@@ -80,8 +80,8 @@ r0Latency = 5 + clog2(K) // 3 # 5 + log2Ceil(K)/3
 
 print('r0Latency: ', r0Latency)
 
-with open('csrc/test/FP8BF16FusedArrayTestBF16Gen.hpp', 'w') as f:
+with open('csrc/gen/FP8BF16FusedArrayTestBF16Gen.hpp', 'w') as f:
     f.write(genBF16Test(M,N,K,sK, r0Latency, enableScale, enableCin))
 
-with open('csrc/test/FP8BF16FusedArrayTestCheckGen.hpp', 'w') as f:
+with open('csrc/gen/FP8BF16FusedArrayTestCheckGen.hpp', 'w') as f:
     f.write(genCheck(M,N))
