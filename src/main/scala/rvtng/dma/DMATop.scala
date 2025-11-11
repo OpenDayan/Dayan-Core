@@ -2,7 +2,7 @@ package rvtng.dma
 
 import chisel3._
 import chisel3.util._
-import rvtng.bus.TLUH
+import rvtng.bus._
 import rvtng.top.{ScoreboardComp, TensorInst, TensorResp}
 import rvtng.uram.{Adv2R1WURAM, AdvURAMReq, AdvURAMResp, AdvURAMWResp}
 import _root_.circt.stage.ChiselStage
@@ -39,15 +39,7 @@ case class DMAParams(
 *    sbComp：流式接口，Scoreboard 完成机制
 *
 */
-class DMATop(params: DMAParams) extends Module {
-  // Note: Two Independent Tilelink Bus for Read / Write
-  // tlWr can be mapped to AXI4 - AW+W+B, with no Burst Transaction, no ID reuse.
-  val tlWr = IO(TLUH(addressBits = params.addressBits, dataBits = params.dataBits,
-    sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = log2Ceil(params.dataBits / 8)))
-  // tlRd can be mapped to AXI4 - AR+R, with no Burst Transaction, no ID reuse.
-  val tlRd = IO(TLUH(addressBits = params.addressBits, dataBits = params.dataBits,
-    sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = log2Ceil(params.dataBits / 8)))
-
+class DMATop(params: DMAParams, useAxi: Boolean) extends Module {
   // 指令接口
   val instReq = IO(Flipped(Decoupled(new TensorInst())))
   val instResp = IO(Decoupled(new TensorResp()))
@@ -125,16 +117,34 @@ class DMATop(params: DMAParams) extends Module {
   pubWriter.outReqStream.ready := (tlWriter.writeReq.ready & pubWriter.outReqStream.bits.isDRAM) |
                                   (uramWriter.writeReq.ready & !pubWriter.outReqStream.bits.isDRAM)
 
-  // Reader 连线
-  tlReader.tl <> tlRd
   uramReader.uramReq <> uramRReq
   uramReader.uramResp <> uramRResp
-
-  // Writer 连线
-  tlWriter.tl <> tlWr
   uramWriter.uramReq <> uramWReq
   uramWriter.uramWData <> uramWData
   uramWriter.uramResp <> uramWResp
+  // Note: Two Independent Tilelink Bus for Read / Write
+  // tlWr can be mapped to AXI4 - AW+W+B, with no Burst Transaction, no ID reuse.
+  // tlRd can be mapped to AXI4 - AR+R, with no Burst Transaction, no ID reuse.
+  val axi4Parms = new AXI4BundleParameters(
+    addressBits = params.addressBits, dataBits = params.dataBits, idBits = params.sourceBits
+  )
+  val tlParms = new TLBundleParameters(addressBits = params.addressBits, dataBits = params.dataBits,
+    sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = log2Ceil(params.dataBits / 8), hasBCE = false)
+  val axi4 = if(useAxi) IO(new AXI4Bundle(axi4Parms)) else WireDefault(0.U.asTypeOf(new AXI4Bundle(axi4Parms)))
+  val tlWr = if(!useAxi) IO(new TLBundle(tlParms)) else WireDefault(0.U.asTypeOf(new TLBundle(tlParms)))
+  val tlRd = if(!useAxi) IO(new TLBundle(tlParms)) else WireDefault(0.U.asTypeOf(new TLBundle(tlParms)))
+
+  if(useAxi) {
+    val tlToAxi4 = Module(new TilelinkUHToAXI(tlParms))
+    tlToAxi4.axi4 <> axi4
+    tlReader.tl <> tlToAxi4.tlRd
+    tlWriter.tl <> tlToAxi4.tlWr
+  }else {
+    // Reader 连线
+    tlReader.tl <> tlRd
+    // Writer 连线
+    tlWriter.tl <> tlWr
+  }
 }
 
 class DMATestTop(params: DMAParams) extends Module {
@@ -148,27 +158,27 @@ class DMATestTop(params: DMAParams) extends Module {
     fifoSize = 16, N = uramPort, addrWidth = 24, idWidth = params.sourceBits, dataWidth = 64
   ))
 
+  val axi4Parms = new AXI4BundleParameters(
+    addressBits = params.addressBits, dataBits = params.dataBits, idBits = params.sourceBits
+  )
+  // DPI Instance
+  val axi4 = Module(new DPIAXI4(axi4Parms, 0)).axi
+
   // DMA Instance
-  private val dma = Module(new DMATop(params))
+  private val dma = Module(new DMATop(params, true))
 
   val instReq = IO(Flipped(Decoupled(new TensorInst)))
   val instResp = IO(Decoupled(new TensorResp))
   val sbComp  = IO(Decoupled(new ScoreboardComp()))
-  val tlWr = IO(TLUH(addressBits = params.addressBits, dataBits = params.dataBits,
-    sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = log2Ceil(params.dataBits / 8)))
-  // tlRd can be mapped to AXI4 - AR+R, with no Burst Transaction, no ID reuse.
-  val tlRd = IO(TLUH(addressBits = params.addressBits, dataBits = params.dataBits,
-    sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = log2Ceil(params.dataBits / 8)))
 
   dma.instReq <> instReq
   dma.instResp <> instResp
   dma.sbComp <> sbComp
-  dma.tlWr <> tlWr
-  dma.tlRd <> tlRd
   dma.uramRReq <> uram.r0req_i(0)
   dma.uramRResp <> uram.r0resp_o(0)
   dma.uramWReq <> uram.wreq_i(0)
   dma.uramWResp <> uram.wresp_o(0)
+  dma.axi4 <> axi4
   uram.wdata_i(0) := dma.uramWData
   uram.r1req_i(0).map(u => {
     u.bits := DontCare

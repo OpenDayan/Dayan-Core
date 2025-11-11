@@ -61,6 +61,13 @@
     },
     "DMATestTop": {
         "Package": "rvtng.dma",
+        "AdditionDeps": {
+            "csrc/DRAMsim3/libdramsim3.a": {
+                "deps": "",
+                "cmd" : "$(MAKE) --directory=csrc/DRAMsim3 all",
+                "phony": true
+            }
+        },
         "NeedEMU": true
     },
     "VecDecode": {
