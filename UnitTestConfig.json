@@ -43,6 +43,13 @@
     "MatTestTop": {
         "Package": "rvtng.mat"
     },
+    "RVTNGTestTop": {
+        "Package": "rvtng.top",
+        "AdditionDeps": {
+            "csrc/DRAMsim3/libdramsim3.a": {}
+        },
+        "NeedEMU": true
+    },
     "TestFPUnpackPack": {
         "Package": "rvtng.fpmath"
     },

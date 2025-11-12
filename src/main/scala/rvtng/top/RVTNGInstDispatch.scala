@@ -43,7 +43,7 @@ class RVTNGInstDispatch extends Module {
                  (dmaReq.ready & decodeIsDma)        | (vecReq.ready & decodeIsVec) | illegal
 
   // RR-Arbiter of write-back
-  private val arb = Module(new RRArbiter(instResp.bits, 4)).io
+  private val arb = Module(new RRArbiter(instResp.bits.cloneType, 4)).io
   arb.in(0) <> sbResp
   arb.in(1) <> matResp
   arb.in(2) <> dmaResp

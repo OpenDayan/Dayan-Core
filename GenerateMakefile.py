@@ -9,9 +9,10 @@ def generateOneModuleMakefile(moduleName: str, modulePackage: str, AdditionDeps:
     str_builder = ''
     for dep in AdditionDeps:
         str_builder +='build/V{Name}/V{Name}: {depName}\n'.format(Name=moduleName, depName=dep)
-        str_builder +='{depName}: {depDep}\n	{depCmd}\n'.format(depName=dep, depDep = AdditionDeps[dep]['deps'], depCmd = AdditionDeps[dep]['cmd'])
-        if(AdditionDeps[dep].get('phony') == True):
-            str_builder +='.PHONY: {depName}\n'.format(depName=dep)
+        if(AdditionDeps[dep].get('deps') != None):
+            str_builder +='{depName}: {depDep}\n	{depCmd}\n'.format(depName=dep, depDep = AdditionDeps[dep]['deps'], depCmd = AdditionDeps[dep]['cmd'])
+            if(AdditionDeps[dep].get('phony') == True):
+                str_builder +='.PHONY: {depName}\n'.format(depName=dep)
     str_builder += '''
 build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
 	verilator --threads 4 --output-split 3000 --compiler clang -j 0 --assert --trace --trace-structs --trace-fst \

@@ -163,10 +163,10 @@ class DMATop(params: DMAParams, useAxi: Boolean) extends Module {
   // Note: Two Independent Tilelink Bus for Read / Write
   // tlWr can be mapped to AXI4 - AW+W+B, with no Burst Transaction, no ID reuse.
   // tlRd can be mapped to AXI4 - AR+R, with no Burst Transaction, no ID reuse.
-  val axi4Parms = new AXI4BundleParameters(
+  private val axi4Parms = AXI4BundleParameters(
     addressBits = params.addressBits, dataBits = params.dataBits, idBits = params.sourceBits
   )
-  val tlParms = new TLBundleParameters(addressBits = params.addressBits, dataBits = params.dataBits,
+  private val tlParms = TLBundleParameters(addressBits = params.addressBits, dataBits = params.dataBits,
     sourceBits = params.sourceBits, sinkBits = params.sinkBits, sizeBits = log2Ceil(params.dataBits / 8), hasBCE = false)
   val axi4 = if(useAxi) IO(new AXI4Bundle(axi4Parms)) else WireDefault(0.U.asTypeOf(new AXI4Bundle(axi4Parms)))
   val tlWr = if(!useAxi) IO(new TLBundle(tlParms)) else WireDefault(0.U.asTypeOf(new TLBundle(tlParms)))
@@ -196,7 +196,7 @@ class DMATestTop(params: DMAParams) extends Module {
     fifoSize = 16, N = uramPort, addrWidth = 24, idWidth = params.sourceBits, dataWidth = 64
   ))
 
-  val axi4Parms = new AXI4BundleParameters(
+  private val axi4Parms = AXI4BundleParameters(
     addressBits = params.addressBits, dataBits = params.dataBits, idBits = params.sourceBits
   )
   // DPI Instance
@@ -227,8 +227,6 @@ class DMATestTop(params: DMAParams) extends Module {
   })
 
 }
-
-
 
 object DMATestTop extends App {
   ChiselStage.emitSystemVerilog(
