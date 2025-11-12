@@ -37,6 +37,9 @@ class DPALoadStoreURAMMicroCommand(storageRatio: Int, mnkWidth: Int, addressWidt
   val baseDimMinorByte = UInt(mnkWidth.W)
   val pMajor = UInt(log2Ceil(cMNK).W) // pM <= sM
   val pMinor = UInt(log2Ceil(cMNK).W) // pN <= sN
+  val swizzleM = UInt(8.W)
+  val swizzleB = UInt(8.W)
+  val swizzleS = UInt(8.W)
 }
 
 // Mat RAM Shape -> Address
@@ -200,6 +203,9 @@ class DPArrayLoadStoreTaskSpilt(
   }
   cmdURAMQ.bits.pMinor := cmd.pMinor
   cmdURAMQ.bits.pMajor := cmd.pMajor
+  cmdURAMQ.bits.swizzleM := cmd.SwizzleMBS(23, 16)
+  cmdURAMQ.bits.swizzleB := cmd.SwizzleMBS(15,  8)
+  cmdURAMQ.bits.swizzleS := cmd.SwizzleMBS( 7,  0)
 }
 
 object DPArrayLoadStoreTaskSpilt extends App {

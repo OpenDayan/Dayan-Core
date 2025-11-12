@@ -18,6 +18,9 @@ class MatTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bundl
   val log2SubM = UInt(log2Ceil(storageRatio).W)
   val log2SubN = UInt(log2Ceil(storageRatio).W)
   val log2SubK = UInt(log2Ceil(storageRatio).W)
+  val ASwizzleMBS  = UInt(24.W)
+  val BSwizzleMBS  = UInt(24.W)
+  val CSwizzleMBS  = UInt(24.W)
   val persistentMode = UInt(2.W)
   // PM0 C Persist : M<-N<-K
   // PM1 A Persist : K<-M<-N
@@ -42,6 +45,9 @@ class MatSubTask(storageRatio: Int, mnkWidth: Int, addressWidth: Int) extends Bu
   val log2SubM = UInt(log2Ceil(1 + log2Ceil(storageRatio)).W) // 0 -> 1 1 -> 2 2 -> 4 3 -> 8 4 -> 16 5 -> 32
   val log2SubN = UInt(log2Ceil(1 + log2Ceil(storageRatio)).W)
   val log2SubK = UInt(log2Ceil(1 + log2Ceil(storageRatio)).W)
+  val ASwizzleMBS  = UInt(24.W)
+  val BSwizzleMBS  = UInt(24.W)
+  val CSwizzleMBS  = UInt(24.W)
 
   val aBank = Bool()
   val aLoad = Bool()
@@ -68,10 +74,10 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   val ldBar  = IO(Decoupled(Vec(3, Bool()))) // Ld Barrier
   val calcCmd = IO(Decoupled(new MatCalcCommand(storageRatio)))
   val stCmd = IO(Decoupled(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK)))
-  val log2CM = log2Ceil(cM)
-  val log2CN = log2Ceil(cN)
-  val log2CK = log2Ceil(cK)
-  val log2S = log2Ceil(storageRatio)
+  private val log2CM = log2Ceil(cM)
+  private val log2CN = log2Ceil(cN)
+  private val log2CK = log2Ceil(cK)
+  private val log2S = log2Ceil(storageRatio)
 
   // load/calc/st Cmd Queue should NEVER Stall!
   chisel3.assert(!(ldACmd.valid & !ldACmd.ready), "ldACmd OverFlow!")
@@ -100,29 +106,29 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   }
 
   // Input Task Queue
-  val taskQ = Queue(task)
+  private val taskQ = Queue(task)
   // Split Task Queue
-  val lTaskQ  = Module(new Queue(new MatSubTask(storageRatio, mnkWidth, addressWidth), 2)) // Stallable, No Credit Based FC
+  private val lTaskQ  = Module(new Queue(new MatSubTask(storageRatio, mnkWidth, addressWidth), 2)) // Stallable, No Credit Based FC
   // Compute Read Completion Queue
-  val crCompQ = Module(new Queue(Bool(), 2))
+  private val crCompQ = Module(new Queue(Bool(), 2))
   // Compute Task Queue
-  val cTaskQ  = Module(new Queue(new MatSubTask(storageRatio, mnkWidth, addressWidth), 2))
+  private val cTaskQ  = Module(new Queue(new MatSubTask(storageRatio, mnkWidth, addressWidth), 2))
   // Load Completion Queue
-  val lCompQ  = Module(new Queue(Bool(), 2))
+  private val lCompQ  = Module(new Queue(Bool(), 2))
   // Store Task Queue
-  val sTaskQ  = Module(new Queue(new MatSubTask(storageRatio, mnkWidth, addressWidth), 2))
+  private val sTaskQ  = Module(new Queue(new MatSubTask(storageRatio, mnkWidth, addressWidth), 2))
   // Compute Write Completion Queue
-  val cwCompQ = Module(new Queue(Bool(), 2))
+  private val cwCompQ = Module(new Queue(Bool(), 2))
   // Finish Command
-  val fTaskQ  = Module(new Queue(new MatSubTask(storageRatio, mnkWidth, addressWidth), 2))
+  private val fTaskQ  = Module(new Queue(new MatSubTask(storageRatio, mnkWidth, addressWidth), 2))
   // Fork Queue
-  val sCompQ4F  = Module(new Queue(Bool(), 2)) // Store Completion for Finish Stage
-  val sCompQ4L  = Module(new Queue(Bool(), 2)) // Store Completion for Load Stage(Loading C should not issued before C wb)
+  private val sCompQ4F  = Module(new Queue(Bool(), 2)) // Store Completion for Finish Stage
+  private val sCompQ4L  = Module(new Queue(Bool(), 2)) // Store Completion for Load Stage(Loading C should not issued before C wb)
 
   lCompQ.io.enq <> ldComp
   sCompQ4F.io.enq <> stComp
 
-  val compQInitializer = RegInit(2.U)
+  private val compQInitializer = RegInit(2.U)
   when(compQInitializer =/= 0.U) {
     compQInitializer := compQInitializer - 1.U
   }
@@ -142,19 +148,19 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   // Spilt Pipeline
   // Receive: Input Task Queue
   // Issuing: Split Task Queue
-  val spTaskBusy = RegInit(Bool(), 0.B)
-  val spTaskFirst = Reg(Bool())
-  val spABank = RegInit(Bool(), 1.B)
-  val spBBank = RegInit(Bool(), 1.B)
-  val spCBank = RegInit(Bool(), 1.B)
-  val spTask = RegEnable(taskQ.bits, taskQ.fire)
-  val spCurM = Reg(UInt(mnkWidth.W))
-  val spCurN = Reg(UInt(mnkWidth.W))
-  val spCurK = Reg(UInt(mnkWidth.W))
-  val spLastTask = Wire(Bool())
-  val spCurPM = getLowBits(spCurM, spTask.log2SubM +& log2CM.U, log2S + log2CM)
-  val spCurPN = getLowBits(spCurN, spTask.log2SubN +& log2CN.U, log2S + log2CN)
-  val spCurPK = getLowBits(spCurK, spTask.log2SubK +& log2CK.U, log2S + log2CK)
+  private val spTaskBusy = RegInit(Bool(), 0.B)
+  private val spTaskFirst = Reg(Bool())
+  private val spABank = RegInit(Bool(), 1.B)
+  private val spBBank = RegInit(Bool(), 1.B)
+  private val spCBank = RegInit(Bool(), 1.B)
+  private val spTask = RegEnable(taskQ.bits, taskQ.fire)
+  private val spCurM = Reg(UInt(mnkWidth.W))
+  private val spCurN = Reg(UInt(mnkWidth.W))
+  private val spCurK = Reg(UInt(mnkWidth.W))
+  private val spLastTask = Wire(Bool())
+  private val spCurPM = getLowBits(spCurM, spTask.log2SubM +& log2CM.U, log2S + log2CM)
+  private val spCurPN = getLowBits(spCurN, spTask.log2SubN +& log2CN.U, log2S + log2CN)
+  private val spCurPK = getLowBits(spCurK, spTask.log2SubK +& log2CK.U, log2S + log2CK)
   taskQ.ready := !spTaskBusy | (spLastTask & lTaskQ.io.enq.ready)
   lTaskQ.io.enq.valid := spTaskBusy
   lTaskQ.io.enq.bits.bf16 := spTask.bf16
@@ -174,16 +180,19 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   lTaskQ.io.enq.bits.log2SubM := spTask.log2SubM
   lTaskQ.io.enq.bits.log2SubN := spTask.log2SubN
   lTaskQ.io.enq.bits.log2SubK := spTask.log2SubK
-  val spCPersist = spTask.persistentMode === 0.U
-  val spAPersist = spTask.persistentMode === 1.U
-  val spBPersist = spTask.persistentMode === 2.U
-  val spLastK = lTaskQ.io.enq.bits.subK === 0.U
-  val spLastN = lTaskQ.io.enq.bits.subN === 0.U
-  val spLastM = lTaskQ.io.enq.bits.subM === 0.U
-  val spFirstK = spCurK === spTask.taskK - 1.U
-  val spFirstN = spCurN === spTask.taskN - 1.U
-  val spFirstM = spCurM === spTask.taskM - 1.U
-  val spCarryK, spCarryM, spCarryN = Wire(Bool())
+  lTaskQ.io.enq.bits.ASwizzleMBS := spTask.ASwizzleMBS
+  lTaskQ.io.enq.bits.BSwizzleMBS := spTask.BSwizzleMBS
+  lTaskQ.io.enq.bits.CSwizzleMBS := spTask.CSwizzleMBS
+  private val spCPersist = spTask.persistentMode === 0.U
+  private val spAPersist = spTask.persistentMode === 1.U
+  private val spBPersist = spTask.persistentMode === 2.U
+  private val spLastK = lTaskQ.io.enq.bits.subK === 0.U
+  private val spLastN = lTaskQ.io.enq.bits.subN === 0.U
+  private val spLastM = lTaskQ.io.enq.bits.subM === 0.U
+  private val spFirstK = spCurK === spTask.taskK - 1.U
+  private val spFirstN = spCurN === spTask.taskN - 1.U
+  private val spFirstM = spCurM === spTask.taskM - 1.U
+  private val spCarryK, spCarryM, spCarryN = Wire(Bool())
   spCarryK := spCPersist | ((spBPersist | (spAPersist & spLastN)) & spLastM)
   spCarryN := spAPersist | ((spCPersist | (spBPersist & spLastM)) & spLastK)
   spCarryM := spBPersist | ((spAPersist | (spCPersist & spLastK)) & spLastN)
@@ -235,21 +244,21 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   // Receive: Spilt Task Request and Compute Read Completion
   // Issuing: Load Command and Compute Request
   // TODO: Spilt LoadAB and LoadC
-  val lFinish = Wire(Bool())
+  private val lFinish = Wire(Bool())
   lTaskQ.io.deq.ready := crCompQ.io.deq.valid & lFinish
   crCompQ.io.deq.ready := lTaskQ.io.deq.valid & lFinish
   chisel3.assert(lTaskQ.io.deq.fire === crCompQ.io.deq.fire)
-  val lTaskFire = lTaskQ.io.deq.fire
-  val lTask = RegEnable(lTaskQ.io.deq.bits, lTaskFire)
-  val lTaskValid  = RegInit(Bool(), 0.B)
-  val lACmdFinish = RegInit(Bool(), 1.B)
-  val lBCmdFinish = RegInit(Bool(), 1.B)
-  val lCCmdFinish = RegInit(Bool(), 1.B)
-  val lBarFinish  = RegInit(Bool(), 1.B)
-  val lCmdLeft = RegInit(UInt(2.W), 0.U)
-  val lACmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
-  val lBCmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
-  val lCCmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
+  private val lTaskFire = lTaskQ.io.deq.fire
+  private val lTask = RegEnable(lTaskQ.io.deq.bits, lTaskFire)
+  private val lTaskValid  = RegInit(Bool(), 0.B)
+  private val lACmdFinish = RegInit(Bool(), 1.B)
+  private val lBCmdFinish = RegInit(Bool(), 1.B)
+  private val lCCmdFinish = RegInit(Bool(), 1.B)
+  private val lBarFinish  = RegInit(Bool(), 1.B)
+  private val lCmdLeft = RegInit(UInt(2.W), 0.U)
+  private val lACmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
+  private val lBCmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
+  private val lCCmd = Wire(new MatLoadStoreCommand(storageRatio, mnkWidth, addressWidth, cK))
   lACmd.ctrl := DPArrayStorageCmd.loadA
   lBCmd.ctrl := DPArrayStorageCmd.loadB
   lCCmd.ctrl := DPArrayStorageCmd.loadC
@@ -283,6 +292,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   lBCmd.log2SDimMinor := lTask.log2SubK
   lCCmd.log2SDimMajor := lTask.log2SubM
   lCCmd.log2SDimMinor := lTask.log2SubN
+  lACmd.SwizzleMBS    := lTask.ASwizzleMBS
+  lBCmd.SwizzleMBS    := lTask.BSwizzleMBS
+  lCCmd.SwizzleMBS    := lTask.CSwizzleMBS
 
   when(lTaskFire) {
     lACmdFinish := !lTaskQ.io.deq.bits.aLoad
@@ -322,8 +334,8 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   // Issuing: Compute Command, Store Request
   lCompQ.io.deq.ready := cTaskQ.io.deq.valid // & cReady
   cTaskQ.io.deq.ready := lCompQ.io.deq.valid // & cReady
-  val cVld = cTaskQ.io.deq.valid & lCompQ.io.deq.valid
-  val cTask = cTaskQ.io.deq.bits
+  private val cVld = cTaskQ.io.deq.valid & lCompQ.io.deq.valid
+  private val cTask = cTaskQ.io.deq.bits
   calcCmd.valid := cVld
   calcCmd.bits.bf16 := cTask.bf16
   calcCmd.bits.aBank := cTask.aBank
@@ -360,6 +372,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   stCmd.bits.majorStride  := sTask.cStride
   stCmd.bits.baseDimMajor := sTask.subM
   stCmd.bits.baseDimMinor := sTask.subN
+  stCmd.bits.SwizzleMBS   := sTask.CSwizzleMBS
   fTaskQ.io.enq.valid := sVld
   fTaskQ.io.enq.bits := sTask
 

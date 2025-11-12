@@ -15,6 +15,6 @@ class TensorResp extends Bundle {
 }
 
 class ScoreboardComp extends Bundle {
-  val entryId = UInt(32.W)
+  val entryId = UInt(64.W)
 }
 

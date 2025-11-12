@@ -174,52 +174,57 @@ static inline void checkMatrix()
 static inline void mainLoop()
 {
     static int lastFinishTime = 0;
-    dut->matInst_valid = (startTime == 0) || (finishTime != 0);
+    dut->instResp_ready = 1;
+    dut->instReq_valid = (startTime == 0) || (finishTime != 0);
     if(sim_time == 0) {
         // problemM
-        dut->matInst_bits_rdData = M;
-        dut->matInst_bits_instWord = (0b0000000 << 25) | (0 << 15);
+        dut->instReq_bits_rdData = M;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (0 << 15);
     } else if(sim_time == 1) {
         // problemN
-        dut->matInst_bits_rdData = N;
-        dut->matInst_bits_instWord = (0b0000000 << 25) | (1 << 15);
+        dut->instReq_bits_rdData = N;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (1 << 15);
     } else if(sim_time == 2) {
         // problemK
-        dut->matInst_bits_rdData = K;
-        dut->matInst_bits_instWord = (0b0000000 << 25) | (2 << 15);
+        dut->instReq_bits_rdData = K;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (2 << 15);
     } else if(sim_time == 3) {
         // strideA
-        dut->matInst_bits_rdData = K;
-        dut->matInst_bits_instWord = (0b0000000 << 25) | (3 << 15);
+        dut->instReq_bits_rdData = K;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (3 << 15);
     } else if(sim_time == 4) {
         // strideB
-        dut->matInst_bits_rdData = K;
-        dut->matInst_bits_instWord = (0b0000000 << 25) | (4 << 15);
+        dut->instReq_bits_rdData = K;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (4 << 15);
     } else if(sim_time == 5) {
         // strideC
-        dut->matInst_bits_rdData = N * 4;
-        dut->matInst_bits_instWord = (0b0000000 << 25) | (5 << 15);
+        dut->instReq_bits_rdData = N * 4;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (5 << 15);
     } else if(sim_time == 6) {
         // sM
-        dut->matInst_bits_rdData = sM;
-        dut->matInst_bits_instWord = (0b0000000 << 25) | (6 << 15);
+        dut->instReq_bits_rdData = 0;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (6 << 15);
     } else if(sim_time == 7) {
         // sN
-        dut->matInst_bits_rdData = sN;
-        dut->matInst_bits_instWord = (0b0000000 << 25) | (7 << 15);
+        dut->instReq_bits_rdData = 0;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (7 << 15);
     } else if(sim_time == 8) {
         // sK
-        dut->matInst_bits_rdData = sK;
-        dut->matInst_bits_instWord = (0b0000000 << 25) | (8 << 15);
+        dut->instReq_bits_rdData = 0;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (8 << 15);
     } else if(sim_time == 9) {
         // persistentMode
-        dut->matInst_bits_rdData = persistentMode;
-        dut->matInst_bits_instWord = (0b0000000 << 25) | (9 << 15);
+        dut->instReq_bits_rdData = persistentMode;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (9 << 15);
+    } else if(sim_time == 10) {
+        // persistentMode
+        dut->instReq_bits_rdData = 1;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (9 << 15);
     } else {
-        dut->matInst_bits_rs1Data = AAddr;
-        dut->matInst_bits_rs2Data = BAddr;
-        dut->matInst_bits_rdData  = CAddr;
-        dut->matInst_bits_instWord = (0b0001000 << 25) | (5 << 15);
+        dut->instReq_bits_rs1Data = AAddr;
+        dut->instReq_bits_rs2Data = BAddr;
+        dut->instReq_bits_rdData  = CAddr;
+        dut->instReq_bits_instWord = (0b0001000 << 25) | (5 << 15);
         if(startTime == 0) startTime = sim_time;
     }
     if(dut->finish) {

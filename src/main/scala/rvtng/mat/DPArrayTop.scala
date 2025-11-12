@@ -1,7 +1,7 @@
 package rvtng.mat
 
 import rvtng.fpmath.{FP8BF16FusedDPArray, U8m2n2k1U4m2n2k2Mul}
-import rvtng.uram.{AdvURAMReq, AdvURAMResp, AdvURAMWResp}
+import rvtng.uram.{AdvURAMReq, AdvURAMResp, AdvURAMWResp, SwizzleAddr}
 import rvtng.utils.genPipe
 import chisel3._
 import chisel3.util._
@@ -51,6 +51,7 @@ class MatLoadStoreCommand(storageRatio: Int, mnkWidth: Int, addressWidth: Int, c
   val majorStride  = UInt(addressWidth.W) // in Bytes
   val baseDimMajor = UInt(mnkWidth.W)
   val baseDimMinor = UInt(mnkWidth.W)
+  val SwizzleMBS   = UInt(24.W)
 }
 
 class DPArrayTop(
@@ -284,7 +285,8 @@ class DPArrayTop(
       // TODO: Timing! addr should be latched before send to uram request bus.
       // 开始连线
       wreq(channel * portsPerChannel + p).bits.id := 0.U
-      wreq(channel * portsPerChannel + p).bits.address := addr >> 3
+      wreq(channel * portsPerChannel + p).bits.address := SwizzleAddr(addr,
+        uramWPQ.io.deq.bits.swizzleS, uramWPQ.io.deq.bits.swizzleB, uramWPQ.io.deq.bits.swizzleM) >> 3
       wreq(channel * portsPerChannel + p).valid := uramWPQ.io.deq.valid & s2Valid
     })
     uramWPQ.io.deq.ready := wreq(channel * portsPerChannel).ready & s2Valid
@@ -323,7 +325,8 @@ class DPArrayTop(
       // TODO: Timing! addr should be latched before send to uram request bus.
       // 开始连线
       rreq0(channel * portsPerChannel + p).bits.id := 0.U
-      rreq0(channel * portsPerChannel + p).bits.address := addr >> 3
+      rreq0(channel * portsPerChannel + p).bits.address := SwizzleAddr(addr,
+        uramRP0Q.io.deq.bits.swizzleS, uramRP0Q.io.deq.bits.swizzleB, uramRP0Q.io.deq.bits.swizzleM) >> 3
       rreq0(channel * portsPerChannel + p).valid := uramRP0Q.io.deq.valid
     })
     bBuffer.wAddr(channel) := tileRP0Q.io.deq.bits.tileAddr
@@ -392,7 +395,8 @@ class DPArrayTop(
       // TODO: Timing! addr should be latched before send to uram request bus.
       // 开始连线
       rreq1(channel * portsPerChannel + p).bits.id := 0.U
-      rreq1(channel * portsPerChannel + p).bits.address := addr >> 3
+      rreq1(channel * portsPerChannel + p).bits.address := SwizzleAddr(addr,
+        RP1Arb.io.out.bits.swizzleS, RP1Arb.io.out.bits.swizzleB, RP1Arb.io.out.bits.swizzleM) >> 3
       rreq1(channel * portsPerChannel + p).valid := RP1Arb.io.out.valid
     })
     RP1Arb.io.out.ready    := rreq1(channel * portsPerChannel).ready

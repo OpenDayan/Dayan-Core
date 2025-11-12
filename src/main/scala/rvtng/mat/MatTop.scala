@@ -1,16 +1,17 @@
 package rvtng.mat
 
 import rvtng.uram.{Adv2R1WURAM, AdvURAMReq, AdvURAMResp, AdvURAMWResp}
-import rvtng.top.TensorInst
+import rvtng.top._
+
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
-case class MatParms(storageRatio: Int = 32, busWidth: Int = 256, mnkWidth: Int = 20,
-                    tcsrBanks: Int = 8,
-                    addressWidth: Int = 32, cM: Int = 16, cN: Int = 8, cK: Int= 32,
-                    kPerScale: Int = 32, idWidth: Int = 9,
-                    wE: Int = 9, wF: Int = 25) {
+case class MatParams(storageRatio: Int = 32, busWidth: Int = 256, mnkWidth: Int = 20,
+                     tcsrBanks: Int = 8,
+                     addressWidth: Int = 20, cM: Int = 16, cN: Int = 8, cK: Int= 32,
+                     kPerScale: Int = 32, idWidth: Int = 9,
+                     wE: Int = 9, wF: Int = 25) {
 }
 
 // Note: `storageRatio` Marks the biggest storageRatio in design.
@@ -22,146 +23,150 @@ case class MatParms(storageRatio: Int = 32, busWidth: Int = 256, mnkWidth: Int =
 // Requirement for URAM:
 //   busWidth === cK * AnyValue
 //   busGroupSize === cK
-class MatTop(params: MatParms) extends Module {
-  val matInst = IO(Flipped(Decoupled(new TensorInst)))
-  val matInstResp = IO(Decoupled(UInt(64.W)))
+class MatTop(params: MatParams) extends Module {
+  val instReq  = IO(Flipped(Decoupled(new TensorInst)))
+  val instResp = IO(Decoupled(new TensorResp))
+  val sbComp   = IO(Decoupled(new ScoreboardComp()))
+  val finish   = IO(Output(Bool()))
 
-  // Internal Configure Register
-  // Note: problemK Should Align to cK
-  private val problemM = Reg(UInt(32.W))   // tcsrID: 0
-  private val problemN = Reg(UInt(32.W))   // tcsrID: 1
-  private val problemK = Reg(UInt(32.W))   // tcsrID: 2
-  private val strideA = Reg(UInt(32.W))    // tcsrID: 3
-  private val strideB = Reg(UInt(32.W))    // tcsrID: 4
-  private val strideC = Reg(UInt(32.W))    // tcsrID: 5
-  private val sM = RegInit(UInt(3.W), 2.U) // tcsrID: 6
-  private val sN = RegInit(UInt(3.W), 2.U) // tcsrID: 7
-  private val sK = RegInit(UInt(3.W), 2.U) // tcsrID: 8
-  val persistentMode = RegInit(UInt(2.W), 0.U) // tcsrID: 9
+  // URAM Interface
+  private val ports = params.busWidth / 8
+  private val channelCount    = params.busWidth / params.cK
+  private val portsPerChannel = ports    / channelCount
+  val uramRReq0  = IO(Vec(ports, Decoupled(new AdvURAMReq(params.addressWidth, 0, 64))))
+  val uramRReq1  = IO(Vec(ports, Decoupled(new AdvURAMReq(params.addressWidth, 0, 64))))
+  val uramWReq   = IO(Vec(ports, Decoupled(new AdvURAMReq(params.addressWidth, 0, 64))))
+  val uramWData  = IO(Output(Vec(ports, UInt(64.W))))
+  val uramRResp0 = IO(Flipped(Vec(channelCount, Decoupled(Vec(portsPerChannel, new AdvURAMResp(params.addressWidth,  0, 64))))))
+  val uramRResp1 = IO(Flipped(Vec(channelCount, Decoupled(Vec(portsPerChannel, new AdvURAMResp(params.addressWidth,  0, 64))))))
+  val uramWResp  = IO(Flipped(Vec(channelCount, Decoupled(Vec(portsPerChannel, new AdvURAMWResp(params.addressWidth, 0, 64))))))
 
-  // Configure Instruction Handling
-  private val isCfgInst = matInst.bits.instWord(31, 25) === 0.U
-  private val isMatInst = matInst.bits.instWord(31, 25) === 0b0001000.U
-  private val isCfgWrite = isCfgInst & !matInst.bits.instWord(14)
-  private val tcsrID = matInst.bits.instWord(24, 15)
+  // Mat TCSR
+  private val csr = Module(new MatControlStatusRegisters(params))
 
-  when(isCfgWrite & matInst.fire) {
-    when(tcsrID === 0.U) { problemM := matInst.bits.rdData }
-    when(tcsrID === 1.U) { problemN := matInst.bits.rdData }
-    when(tcsrID === 2.U) { problemK := matInst.bits.rdData }
-    when(tcsrID === 3.U) { strideA := matInst.bits.rdData }
-    when(tcsrID === 4.U) { strideB := matInst.bits.rdData }
-    when(tcsrID === 5.U) { strideC := matInst.bits.rdData }
-    when(tcsrID === 6.U) { sM := matInst.bits.rdData }
-    when(tcsrID === 7.U) { sN := matInst.bits.rdData }
-    when(tcsrID === 8.U) { sK := matInst.bits.rdData }
-    when(tcsrID === 9.U) { persistentMode := matInst.bits.rdData }
-  }
-  // TODO: tcfg Read Handling
-  matInstResp.bits := 0.U
-  matInstResp.valid := 0.B
-  // TODO: ScoreBoard Logic Handling
+  // Mat Scoreboard
+  private val sb = Module(new MatScoreboard(params))
 
   // Mat Instruction Spilt logic
-  private val matSpilt = Module(new MatCtrlTaskGen(
-    storageRatio, mnkWidth, addressWidth, cM, cN, cK
+  private val taskGen = Module(new MatCtrlTaskGen(
+    params.storageRatio, params.mnkWidth, params.addressWidth, params.cM, params.cN, params.cK
   ))
-  matSpilt.task.valid := isMatInst & matInst.valid
-  matInst.ready := isCfgInst | (isMatInst & matSpilt.task.ready)
-  matSpilt.task.bits.bf16 := 0.B // Fixme: BF16/FP8
-  matSpilt.task.bits.aBaseAddr := matInst.bits.rs1Data
-  matSpilt.task.bits.bBaseAddr := matInst.bits.rs2Data
-  matSpilt.task.bits.cBaseAddr := matInst.bits.rdData
-  matSpilt.task.bits.aStride := strideA
-  matSpilt.task.bits.bStride := strideB
-  matSpilt.task.bits.cStride := strideC
-  matSpilt.task.bits.taskM := problemM
-  matSpilt.task.bits.taskN := problemN
-  matSpilt.task.bits.taskK := problemK << matSpilt.task.bits.bf16 // Scaled K if BF16
-  matSpilt.task.bits.log2SubM := sM
-  matSpilt.task.bits.log2SubN := sN
-  matSpilt.task.bits.log2SubK := sK
-  matSpilt.task.bits.persistentMode := persistentMode
 
   // DPArray Top
   private val dpa = Module(new DPArrayTop(
-    storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth, addressWidth = addressWidth,
-    cM = cM, cN = cN, cK = cK, sK = kPerScale, idWidth = idWidth, wE = wE, wF = wF, outStanding = 16
+    storageRatio = params.storageRatio, busWidth = params.busWidth,
+    mnkWidth = params.mnkWidth, addressWidth = params.addressWidth,
+    cM = params.cM, cN = params.cN, cK = params.cK, sK = params.kPerScale,
+    idWidth = params.idWidth, wE = params.wE, wF = params.wF, outStanding = 16
   ))
 
-  dpa.ldACmd <> Queue(matSpilt.ldACmd, 8)
-  dpa.ldBCmd <> Queue(matSpilt.ldBCmd, 8)
-  dpa.ldCCmd <> Queue(matSpilt.ldCCmd, 8)
-  dpa.ldBar  <> Queue(matSpilt.ldBar,  8)
-  dpa.stCmd <> Queue(matSpilt.stCmd, 2)
-  dpa.calcCmd <> Queue(matSpilt.calcCmd, 2)
+  // Instruction Decode
+  private val decodeTaskSpilt = instReq.bits.instWord(31, 28) === 0b0001.U
+  private val decodeCsrReq    = instReq.bits.instWord(31, 27) === 0b00000.U
+  private val decodeCompReq   = instReq.bits.instWord(31, 27) === 0b00001.U
+  private val decodeIllegal   = !(decodeTaskSpilt | decodeCsrReq | decodeCompReq)
 
-  matSpilt.ldComp <> dpa.ldComp
-  matSpilt.crComp <> dpa.crComp
-  matSpilt.cwComp <> dpa.cwComp
-  matSpilt.stComp <> dpa.stComp
+  // Instruction Generation
+  csr.sel.addr := instReq.bits.instWord(27, 25)
+  taskGen.task.valid := instReq.valid & decodeTaskSpilt
+  taskGen.task.bits.bf16 := csr.sel.ctrl.DataType === 0.U
+  taskGen.task.bits.aBaseAddr := instReq.bits.rs1Data
+  taskGen.task.bits.bBaseAddr := instReq.bits.rs2Data
+  taskGen.task.bits.cBaseAddr := instReq.bits.rdData
+  taskGen.task.bits.aStride   := csr.sel.ctrl.AStride
+  taskGen.task.bits.bStride   := csr.sel.ctrl.BStride
+  taskGen.task.bits.cStride   := csr.sel.ctrl.CStride
+  taskGen.task.bits.taskM     := csr.sel.ctrl.M
+  taskGen.task.bits.taskN     := csr.sel.ctrl.N
+  taskGen.task.bits.taskK     := csr.sel.ctrl.K
+  taskGen.task.bits.log2SubM  := 2.U
+  taskGen.task.bits.log2SubN  := 2.U
+  taskGen.task.bits.log2SubK  := 3.U
+  taskGen.task.bits.ASwizzleMBS := csr.sel.ctrl.ASwizzleMBS
+  taskGen.task.bits.BSwizzleMBS := csr.sel.ctrl.BSwizzleMBS
+  taskGen.task.bits.CSwizzleMBS := csr.sel.ctrl.CSwizzleMBS
+  taskGen.task.bits.persistentMode := csr.sel.ctrl.PersistentMode
+  finish := taskGen.fComp.valid
 
-  // TODO: Remove TEMP Finish Signals
-  val finish = IO(Output(Bool()))
-  finish := matSpilt.fComp.valid
-  matSpilt.fComp.ready := 1.B
+  // SB
+  sb.instReq.bits := instReq.bits
+  sb.instReq.valid := instReq.valid & decodeCompReq
+  sb.instIssue := taskGen.task.fire
+  sb.instCommit := taskGen.fComp.valid
+  sb.sbComp <> sbComp
 
-  // URAM Interface
-  val ports = busWidth / 8
-  val channelCount    = busWidth / cK
-  val portsPerChannel = ports    / channelCount
-  val rreq0  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-  val rreq1  = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-  val wreq   = IO(Vec(ports, Decoupled(new AdvURAMReq(addressWidth, 0, 64))))
-  val wdata  = IO(Output(Vec(ports, UInt(64.W))))
-  val rresp0 = IO(Flipped(Vec(channelCount, Decoupled(Vec(portsPerChannel, new AdvURAMResp(addressWidth,  0, 64))))))
-  val rresp1 = IO(Flipped(Vec(channelCount, Decoupled(Vec(portsPerChannel, new AdvURAMResp(addressWidth,  0, 64))))))
-  val wresp  = IO(Flipped(Vec(channelCount, Decoupled(Vec(portsPerChannel, new AdvURAMWResp(addressWidth, 0, 64))))))
-  rreq0 :<>= dpa.rreq0
-  rreq1 :<>= dpa.rreq1
-  wreq :<>= dpa.wreq
-  wdata := dpa.wdata
-  dpa.rresp0 :<>= rresp0
-  dpa.rresp1 :<>= rresp1
-  dpa.wresp  :<>= wresp
+  // CSR
+  csr.instReq.bits  := instReq.bits
+  csr.instReq.valid := instReq.valid & decodeCsrReq
+
+  // instReq Ready
+  instReq.ready := (decodeTaskSpilt & taskGen.task.ready) |
+                   (decodeCsrReq    & csr.instReq.ready) |
+                   (decodeCompReq   & sb.instReq.ready) | decodeIllegal
+
+  chisel3.assert(!(instReq.valid & decodeIllegal))
+
+  // Resp Arb
+  private val respArb = Module(new RRArbiter(instResp.bits.cloneType, 2)).io
+  instResp <> respArb.out
+  respArb.in(0) <> csr.instResp
+  respArb.in(1) <> sb.instResp
+
+  dpa.ldACmd <> Queue(taskGen.ldACmd, 8)
+  dpa.ldBCmd <> Queue(taskGen.ldBCmd, 8)
+  dpa.ldCCmd <> Queue(taskGen.ldCCmd, 8)
+  dpa.ldBar  <> Queue(taskGen.ldBar,  8)
+  dpa.stCmd <> Queue(taskGen.stCmd, 2)
+  dpa.calcCmd <> Queue(taskGen.calcCmd, 2)
+
+  taskGen.ldComp <> dpa.ldComp
+  taskGen.crComp <> dpa.crComp
+  taskGen.cwComp <> dpa.cwComp
+  taskGen.stComp <> dpa.stComp
+  taskGen.fComp.ready := 1.B
+
+  uramRReq0 :<>= dpa.rreq0
+  uramRReq1 :<>= dpa.rreq1
+  uramWReq :<>= dpa.wreq
+  uramWData := dpa.wdata
+  dpa.rresp0 :<>= uramRResp0
+  dpa.rresp1 :<>= uramRResp1
+  dpa.wresp  :<>= uramWResp
 }
 
-class MatTestTop(
-              storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int,
-              cM: Int, cN: Int, cK: Int, kPerScale: Int,
-              wE: Int = 9, wF: Int = 25) extends Module {
-  val mat = Module(new MatTop(
-    storageRatio = storageRatio, busWidth = busWidth, mnkWidth = mnkWidth,
-    addressWidth = addressWidth, cM = cM, cN = cN, cK = cK, kPerScale = kPerScale,
-    wE = wE, wF = wF))
-  val ports = busWidth / 8
+class MatTestTop(params: MatParams) extends Module {
+  private val mat = Module(new MatTop(params))
   // URAM Instance
-  val uram = Module(new Adv2R1WURAM(
-    R0Port = 2, R1Port = 1, W0Port = 2, GroupCount = cK / 8,
-    fifoSize = 16, N = busWidth / 8, addrWidth = addressWidth, idWidth = 0, dataWidth = 64
+  private val uram = Module(new Adv2R1WURAM(
+    R0Port = 2, R1Port = 1, W0Port = 2, GroupCount = params.cK / 8,
+    fifoSize = 16, N = params.busWidth / 8, addrWidth = params.addressWidth, idWidth = 0, dataWidth = 64
   ))
 
-  val matInst = IO(Flipped(Decoupled(new TensorInst)))
+  val instReq = IO(Flipped(Decoupled(new TensorInst)))
+  val instResp = IO(Decoupled(new TensorResp))
+  val sbComp   = IO(Decoupled(new ScoreboardComp()))
   val finish = IO(Output(Bool()))
-  mat.matInst :<>= matInst
-  mat.matInstResp.ready := 1.B
+  mat.instReq <> instReq
+  mat.instResp <> instResp
+  mat.sbComp <> sbComp
+
   finish := mat.finish
-  uram.r0req_i(0) :<>= mat.rreq0
-  uram.r1req_i(0) :<>= mat.rreq1
-  uram.wreq_i(0)  :<>= mat.wreq
-  uram.wdata_i(0) :<>= mat.wdata
-  mat.rresp0 :<>= uram.r0resp_o(0)
-  mat.rresp1 :<>= uram.r1resp_o(0)
-  mat.wresp  :<>= uram.wresp_o(0)
+  uram.r0req_i(0) :<>= mat.uramRReq0
+  uram.r1req_i(0) :<>= mat.uramRReq1
+  uram.wreq_i(0)  :<>= mat.uramWReq
+  uram.wdata_i(0) :<>= mat.uramWData
+  mat.uramRResp0 :<>= uram.r0resp_o(0)
+  mat.uramRResp1 :<>= uram.r1resp_o(0)
+  mat.uramWResp  :<>= uram.wresp_o(0)
 
   // Export uram Interface to prevent Vivado Optimize it.
-  val uram_r  = IO(Flipped(Vec(busWidth / 8, Decoupled(new AdvURAMReq(addressWidth, 0, 64)))))
-  val uram_w  = IO(Flipped(Vec(busWidth / 8, Decoupled(new AdvURAMReq(addressWidth, 0, 64)))))
-  val uram_rr = IO(Vec((busWidth / 8) / (cK / 8),
-    Decoupled(Vec(cK / 8, new AdvURAMResp(addressWidth, 0, 64)))))
-  val uram_wdata = IO(Input(Vec(busWidth / 8, UInt(64.W))))
-  val uram_wr = IO(Vec((busWidth / 8) / (cK / 8),
-    Decoupled(Vec((cK / 8), new AdvURAMWResp(addressWidth, 0, 64)))))
+  val uram_r  = IO(Flipped(Vec(params.busWidth / 8, Decoupled(new AdvURAMReq(params.addressWidth, 0, 64)))))
+  val uram_w  = IO(Flipped(Vec(params.busWidth / 8, Decoupled(new AdvURAMReq(params.addressWidth, 0, 64)))))
+  val uram_rr = IO(Vec((params.busWidth / 8) / (params.cK / 8),
+    Decoupled(Vec(params.cK / 8, new AdvURAMResp(params.addressWidth, 0, 64)))))
+  val uram_wdata = IO(Input(Vec(params.busWidth / 8, UInt(64.W))))
+  val uram_wr = IO(Vec((params.busWidth / 8) / (params.cK / 8),
+    Decoupled(Vec((params.cK / 8), new AdvURAMWResp(params.addressWidth, 0, 64)))))
   uram.r0req_i(1)  <> uram_r
   uram.wreq_i(1)   <> uram_w
   uram.r0resp_o(1) <> uram_rr
@@ -171,9 +176,9 @@ class MatTestTop(
 
 object MatTestTop extends App {
   ChiselStage.emitSystemVerilog(
-    new MatTestTop(storageRatio = 32,
+    new MatTestTop(MatParams(storageRatio = 32,
       busWidth = 256, mnkWidth = 20, addressWidth = 32,
-      cM = 16, cN = 8, cK = 32, kPerScale = 32),
+      cM = 16, cN = 8, cK = 32, kPerScale = 32)),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",
