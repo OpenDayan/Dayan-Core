@@ -6,11 +6,10 @@
 #include "dram_system.h"
 #include "rvtng-intf.h"
 
-#define NPU_FREQ (1000.f) // MHz
-#define MEM_FREQ (1200.f) // MHz
+extern double npu_cycle, dram_cycle, npu_freq, dram_freq;
 
-#define DRAM_CYCLE (1000.f / MEM_FREQ) // 1200MHz -> 0.833ns
-#define NPU_CYCLE  (1000.f / NPU_FREQ)  // 300MHz  -> 3.3ns
+#define DRAM_CYCLE (dram_cycle) // 1200MHz -> 0.833ns
+#define NPU_CYCLE  (npu_cycle) // 1000MHz -> 1ns
 
 std::string ini_file = "csrc/DRAMsim3/configs/DDR4_8Gb_x16_2400.ini";
 
@@ -84,28 +83,50 @@ extern "C" void DPIAXI4Tick(
         int *b_resp)
 {
     dramsim3::JedecDRAMSystem *sys = (dramsim3::JedecDRAMSystem *)channel;
-    if(ar_valid) {
-        if(sys->WillAcceptTransaction(ar_addr, false)) {
+    static bool local_aw_ready = 1;
+    static bool local_w_ready  = 1;
+    static bool local_ar_ready = 1;
+    static uint64_t local_ar_addr, local_ar_id, local_aw_addr, local_aw_id;
+    static char local_w_data[64];
+    bool ar_fire = local_ar_ready & ar_valid;
+    bool aw_fire = local_aw_ready & aw_valid;
+    bool w_fire  = local_w_ready  & w_valid;
+    bool aw_back_fire = false;
+    if(ar_fire) {
+        local_ar_ready = 0;
+        local_ar_addr = ar_addr;
+        local_ar_id   = ar_id;
+    }
+    if(!local_ar_ready){
+        if(sys->WillAcceptTransaction(local_ar_addr, false)) {
             // 添加请求进入队列
-            sys->AddTransaction(ar_addr, false);
-            *ar_ready = 1;
-        } else {
-            *ar_ready = 0;
+            sys->AddTransaction(local_ar_addr, false, local_ar_id);
+            local_ar_ready = 1;
         }
     }
-    // TODO: Fixme
-    if(aw_valid & w_valid) {
-        if(sys->WillAcceptTransaction(aw_addr, true)) {
-            // 添加请求进入队列
-            sys->AddTransaction(aw_addr, true);
-            *aw_ready = 1;
-            *w_ready = 1;
-            // 立即完成写请求
-            backend_dram_write(fdMsg, (char*)w_data, data_bytes_, aw_addr);
-        } else {
-            *aw_ready = 0;
-            *w_ready = 0;
+
+    if(aw_fire) {
+        local_aw_ready = 0;
+        local_aw_addr = aw_addr;
+        local_aw_id = aw_id;
+    }
+    if(!local_aw_ready) {
+        if(w_valid | (!local_w_ready)) {
+            if(sys->WillAcceptTransaction(local_aw_addr, true)) {
+                sys->AddTransaction(local_aw_addr, true, local_aw_id);
+                // 立即完成写请求
+                backend_dram_write(fdMsg, local_w_ready ? ((char*)svGetArrayPtr(w_data)) : local_w_data,
+                    data_bytes_, local_aw_addr);
+                local_aw_ready = 1;
+                local_w_ready = 1;
+                aw_back_fire = 1;
+            }
         }
+    }
+
+    if(w_fire & !aw_back_fire) {
+        local_w_ready = 0;
+        memcpy((void*)local_w_data, (void*)svGetArrayPtr(w_data), data_bytes_);
     }
     
     static double npu_time = 0;
@@ -126,7 +147,7 @@ extern "C" void DPIAXI4Tick(
             *r_id = resp.second;
             *r_last = 1;
             *r_resp = 0;
-            backend_dram_read(fdMsg, (char*)r_data, data_bytes_, resp.first);
+            backend_dram_read(fdMsg, (char*)svGetArrayPtr(r_data), data_bytes_, resp.first);
             read_resp.pop();
         } else {
             *r_valid = 0;
@@ -145,4 +166,7 @@ extern "C" void DPIAXI4Tick(
     } else {
         *b_valid = 0;
     }
+    *ar_ready = local_ar_ready;
+    *aw_ready = local_aw_ready;
+    *w_ready  = local_w_ready ;
 }

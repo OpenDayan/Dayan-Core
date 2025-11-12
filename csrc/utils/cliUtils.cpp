@@ -15,6 +15,9 @@
 #include <termios.h>
 #include <errno.h>
 
+// 供 DRAMsim3 使用，动态 CPU 频率调整
+double npu_cycle = 1000.f / 250.f, dram_cycle = 1000.f / 1200.f, npu_freq = 250.f, dram_freq = 1200.f;
+
 // 历史记录相关定义
 #define MAX_HISTORY_SIZE 100
 #define MAX_LINE_LENGTH 256
@@ -181,6 +184,40 @@ static inline void process_command(const char *command) {
             break;
         }
 
+        case 'f': {
+            const char *arg;
+            // f 命令：fn [十进制数字] or fd
+            arg = command + 2;
+
+            // 跳过空格
+            while (isspace((unsigned char)*arg)) {
+                arg++;
+            }
+
+            if (*arg == '\0') {
+                printf("错误：f 命令需要参数\n");
+                return;
+            }
+
+            uint64_t n;
+            if (parse_number(arg, &n)) {
+                if(command[1] == 'n') {
+                    npu_freq = (double) n;
+                    npu_cycle = 1000.f / npu_freq;
+                    printf("调整 NPU 频率为 %lfMHz (周期长 %0.4lf ns)\n", npu_freq, npu_cycle);
+                } else if(command[1] == 'd') {
+                    dram_freq = (double) n;
+                    dram_cycle = 1000.f / dram_freq;
+                    printf("调整 DRAM 频率为 %lfMHz (周期长 %0.4lf ns)\n", dram_freq, dram_cycle);
+                } else {
+                    printf("错误：f[d/n] 命令需要制定目标 [d/n]\n");
+                }
+            } else {
+                printf("错误：无效的数字参数 '%s'\n", arg);
+            }
+            break;
+        }
+
         case 'c':
             run_until_empty();
             break;
@@ -200,6 +237,7 @@ static inline void process_command(const char *command) {
             printf("  n [数字] - 执行指定的周期数\n");
             printf("  c        - 运行直到仿真终止标志指令\n");
             printf("  d        - 导出波形数据，并启用 surfer 查看\n");
+            printf("  f [数字] - 指定 NPU 或 DRAM 的频率\n");
             printf("  t        - 切换波形记录状态\n");
             printf("  q        - 退出\n");
             break;
@@ -429,6 +467,8 @@ int cli_main() {
             printf("可用命令：\n");
             printf("  n [十进制数字] - 调用函数 run_next_cycle(n)\n");
             printf("  nd [十进制数字] - 调用函数 run_next_cycle(n);dump_waveform();\n");
+            printf("  fd [数字]      - 指定 DRAM 的频率\n");
+            printf("  fn [数字]      - 指定 NPU 的频率\n");
             printf("  c              - 调用函数 run_until_empty()\n");
             printf("  d              - 调用函数 dump_waveform()\n");
             printf("  t              - 切换波形记录状态\n");

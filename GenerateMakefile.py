@@ -18,7 +18,7 @@ build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
 -CFLAGS -Wno-unknown-warning-option -CFLAGS -DVL_USER_FATAL -CFLAGS -DVL_USER_STOP -CFLAGS -Wno-narrowing '''
     str_builder += '''--top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f \
 -CFLAGS -I../../csrc/utils/ -CFLAGS -I../../csrc/gen/ -CFLAGS -I../../csrc/DRAMsim3/src \
--CFLAGS -I../../csrc/DRAMsim3/ext/headers \
+-CFLAGS -I../../csrc/DRAMsim3/ext/headers -CFLAGS -g \
 --exe csrc/test/{Name}Test.cpp{ADDITION_DEPS}
 	$(MAKE) CXX=clang++-15 CC=clang-15 -C build/V{Name} -f V{Name}.mk V{Name}
 

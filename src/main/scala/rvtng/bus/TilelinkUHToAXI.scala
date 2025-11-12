@@ -27,18 +27,25 @@ class TilelinkUHToAXI(val tlParms: TLBundleParameters) extends Module {
   axi4.ar.bits.len  := 1.U
   axi4.ar.bits.burst := 0.U
 
-  axi4.aw.valid := tlWr.a.valid & axi4.w.ready
-  tlWr.a.ready  := axi4.aw.ready & axi4.w.ready
-  axi4.aw.bits.addr := tlWr.a.bits.address
-  axi4.aw.bits.id   := tlWr.a.bits.source
-  axi4.aw.bits.size := log2Ceil(tlParms.dataBits / 8).U
-  axi4.aw.bits.len  := 1.U
-  axi4.aw.bits.burst := 0.U
+  private val awQ = Wire(axi4.aw.cloneType)
+  private val wQ  = Wire(axi4.w.cloneType)
 
-  axi4.w.valid := tlWr.a.valid & axi4.aw.ready
-  axi4.w.bits.data  := tlWr.a.bits.data
-  axi4.w.bits.strb  := tlWr.a.bits.mask
-  axi4.w.bits.last  := 1.B
+  axi4.aw <> Queue(awQ, 2)
+  axi4.w  <> Queue(wQ, 2)
+
+  tlWr.a.ready  := awQ.ready & wQ.ready
+
+  awQ.valid := tlWr.a.valid & wQ.ready
+  awQ.bits.addr := tlWr.a.bits.address
+  awQ.bits.id   := tlWr.a.bits.source
+  awQ.bits.size := log2Ceil(tlParms.dataBits / 8).U
+  awQ.bits.len  := 1.U
+  awQ.bits.burst := 0.U
+
+  wQ.valid := tlWr.a.valid & awQ.ready
+  wQ.bits.data  := tlWr.a.bits.data
+  wQ.bits.strb  := tlWr.a.bits.mask
+  wQ.bits.last  := 1.B
 
   tlRd.d.valid        := axi4.r.valid
   axi4.r.ready        := tlRd.d.ready
