@@ -17,6 +17,7 @@ case class DMAParams(
                       byteType: UInt = UInt(8.W),
                       uramAddrBits: Int = 20,
                       uramPortPerChannel: Int = 4,
+                      uramPortAlign: Int = 32,
                       dmaIQSize: Int = 32) {
   val log2MaxOutStanding: Int = sourceBits - 1
   val log2N: Int = log2Ceil(dataBits / byteType.getWidth)
@@ -46,21 +47,58 @@ class DMATop(params: DMAParams, useAxi: Boolean) extends Module {
   val sbComp  = IO(Decoupled(new ScoreboardComp()))
 
   private val uramPort = params.dataBits / 64
+  private val uramPortAlign = params.uramPortAlign
   private val uramPortPerChannel = params.uramPortPerChannel
   private val uramChannel = uramPort / uramPortPerChannel
+  private val uramChannelAlign = uramPortAlign / uramPortPerChannel
 
   // URAM 读口
-  val uramRReq  = IO(Vec(params.dataBits / 64, Decoupled(
+  val uramRReq  = IO(Vec(uramPortAlign, Decoupled(
     new AdvURAMReq(params.uramAddrBits, params.sourceBits - 1, 64))))
-  val uramRResp = IO(Flipped(Vec(uramChannel, Decoupled(Vec(uramPortPerChannel,
+  val uramRResp = IO(Flipped(Vec(uramChannelAlign, Decoupled(Vec(uramPortPerChannel,
     new AdvURAMResp(params.uramAddrBits,  params.sourceBits - 1, 64))))))
 
-  // URAM 写口
-  val uramWReq = IO(Vec(uramPort, Decoupled(
+  val uramRReqRaw  = Wire(Vec(uramPort, Decoupled(
     new AdvURAMReq(params.uramAddrBits, params.sourceBits - 1, 64))))
-  val uramWData = IO(Output(Vec(uramPort, UInt(64.W))))
-  val uramWResp = IO(Flipped(Vec(uramChannel, Decoupled(Vec(uramPortPerChannel,
+  val uramRRespRaw = Wire(Vec(uramChannel, Decoupled(Vec(uramPortPerChannel,
+    new AdvURAMResp(params.uramAddrBits,  params.sourceBits - 1, 64)))))
+
+  // URAM 写口
+  val uramWReq = IO(Vec(uramPortAlign, Decoupled(
+    new AdvURAMReq(params.uramAddrBits, params.sourceBits - 1, 64))))
+  val uramWResp = IO(Flipped(Vec(uramChannelAlign, Decoupled(Vec(uramPortPerChannel,
     new AdvURAMWResp(params.uramAddrBits,  params.sourceBits - 1, 64))))))
+  val uramWData = IO(Output(Vec(uramPortAlign, UInt(64.W))))
+
+  val uramWReqRaw = Wire(Vec(uramPort, DecoupledIO(
+    new AdvURAMReq(params.uramAddrBits, params.sourceBits - 1, 64))))
+  val uramWRespRaw = Wire(Vec(uramChannel, DecoupledIO(Vec(uramPortPerChannel,
+    new AdvURAMWResp(params.uramAddrBits,  params.sourceBits - 1, 64)))))
+  val uramWDataRaw = Wire(Vec(uramPort, UInt(64.W)))
+
+  // 连线补全 uram 接口
+  for(i <- 0 until uramPortAlign) {
+    if(i < uramPort) {
+      uramRReq(i) <> uramRReqRaw(i)
+      uramWReq(i) <> uramWReqRaw(i)
+      uramWData(i) := uramWDataRaw(i)
+    } else {
+      uramRReq(i).valid := 0.B
+      uramRReq(i).bits := DontCare
+      uramWReq(i).valid := 0.B
+      uramWReq(i).bits := DontCare
+      uramWData(i) := DontCare
+    }
+  }
+  for(c <- 0 until uramChannelAlign) {
+    if(c < uramChannel) {
+      uramRResp(c) <> uramRRespRaw(c)
+      uramWResp(c) <> uramWRespRaw(c)
+    } else {
+      uramRResp(c).ready := 1.B
+      uramWResp(c).ready := 1.B
+    }
+  }
 
   // 子模块
   private val issueQueue = Module(new DMAIssueQueue(params))
@@ -117,11 +155,11 @@ class DMATop(params: DMAParams, useAxi: Boolean) extends Module {
   pubWriter.outReqStream.ready := (tlWriter.writeReq.ready & pubWriter.outReqStream.bits.isDRAM) |
                                   (uramWriter.writeReq.ready & !pubWriter.outReqStream.bits.isDRAM)
 
-  uramReader.uramReq <> uramRReq
-  uramReader.uramResp <> uramRResp
-  uramWriter.uramReq <> uramWReq
-  uramWriter.uramWData <> uramWData
-  uramWriter.uramResp <> uramWResp
+  uramReader.uramReq <> uramRReqRaw
+  uramReader.uramResp <> uramRRespRaw
+  uramWriter.uramReq <> uramWReqRaw
+  uramWriter.uramWData <> uramWDataRaw
+  uramWriter.uramResp <> uramWRespRaw
   // Note: Two Independent Tilelink Bus for Read / Write
   // tlWr can be mapped to AXI4 - AW+W+B, with no Burst Transaction, no ID reuse.
   // tlRd can be mapped to AXI4 - AR+R, with no Burst Transaction, no ID reuse.
@@ -197,7 +235,7 @@ object DMATestTop extends App {
     new DMATestTop(DMAParams(
       addressBits = 48, dataBits = 512, sourceBits = 9,
       sinkBits = 4, tcsrBanks = 8, transposeLog2CNSize = 3,
-      byteType = UInt(8.W), uramAddrBits = 20, uramPortPerChannel = 4, dmaIQSize = 32
+      byteType = UInt(8.W), uramAddrBits = 20, uramPortPerChannel = 4, uramPortAlign = 8, dmaIQSize = 32
     )),
     firtoolOpts = Array(
       "-disable-all-randomization",

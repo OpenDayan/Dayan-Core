@@ -14,7 +14,7 @@ def generateOneModuleMakefile(moduleName: str, modulePackage: str, AdditionDeps:
             str_builder +='.PHONY: {depName}\n'.format(depName=dep)
     str_builder += '''
 build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
-	verilator --output-split 3000 --compiler clang -j 0 --assert --trace --trace-structs --trace-fst \
+	verilator --threads 4 --output-split 3000 --compiler clang -j 0 --assert --trace --trace-structs --trace-fst \
 -CFLAGS -Wno-unknown-warning-option -CFLAGS -DVL_USER_FATAL -CFLAGS -DVL_USER_STOP -CFLAGS -Wno-narrowing '''
     str_builder += '''--top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f \
 -CFLAGS -I../../csrc/utils/ -CFLAGS -I../../csrc/gen/ -CFLAGS -I../../csrc/DRAMsim3/src \
