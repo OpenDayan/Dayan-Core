@@ -10,14 +10,14 @@ import _root_.circt.stage.ChiselStage
 case class DMAParams(
                       addressBits: Int = 48,
                       dataBits: Int = 512,
-                      sourceBits: Int = 10,
+                      sourceBits: Int = 9,
                       sinkBits: Int = 4,
                       tcsrBanks: Int = 8,
                       transposeLog2CNSize: Int = 3,
                       byteType: UInt = UInt(8.W),
                       uramAddrBits: Int = 20,
                       uramPortPerChannel: Int = 4,
-                      dmaIQSize: Int = 64) {
+                      dmaIQSize: Int = 32) {
   val log2MaxOutStanding: Int = sourceBits - 1
   val log2N: Int = log2Ceil(dataBits / byteType.getWidth)
   val genD: UInt = byteType
@@ -195,9 +195,9 @@ class DMATestTop(params: DMAParams) extends Module {
 object DMATestTop extends App {
   ChiselStage.emitSystemVerilog(
     new DMATestTop(DMAParams(
-      addressBits = 48, dataBits = 512, sourceBits = 10,
+      addressBits = 48, dataBits = 512, sourceBits = 9,
       sinkBits = 4, tcsrBanks = 8, transposeLog2CNSize = 3,
-      byteType = UInt(8.W), uramAddrBits = 20, uramPortPerChannel = 4, dmaIQSize = 64
+      byteType = UInt(8.W), uramAddrBits = 20, uramPortPerChannel = 4, dmaIQSize = 32
     )),
     firtoolOpts = Array(
       "-disable-all-randomization",
