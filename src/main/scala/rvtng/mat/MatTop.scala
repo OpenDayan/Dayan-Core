@@ -6,6 +6,13 @@ import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
+case class MatParms(storageRatio: Int = 32, busWidth: Int = 256, mnkWidth: Int = 20,
+                    tcsrBanks: Int = 8,
+                    addressWidth: Int = 32, cM: Int = 16, cN: Int = 8, cK: Int= 32,
+                    kPerScale: Int = 32, idWidth: Int = 9,
+                    wE: Int = 9, wF: Int = 25) {
+}
+
 // Note: `storageRatio` Marks the biggest storageRatio in design.
 // StorageRatio form:
 // A: 16 >= MK 8 2
@@ -15,10 +22,7 @@ import _root_.circt.stage.ChiselStage
 // Requirement for URAM:
 //   busWidth === cK * AnyValue
 //   busGroupSize === cK
-class MatTop(
-              storageRatio: Int, busWidth: Int, mnkWidth: Int, addressWidth: Int,
-              cM: Int, cN: Int, cK: Int, kPerScale: Int, idWidth: Int = 5,
-              wE: Int = 9, wF: Int = 25) extends Module {
+class MatTop(params: MatParms) extends Module {
   val matInst = IO(Flipped(Decoupled(new TensorInst)))
   val matInstResp = IO(Decoupled(UInt(64.W)))
 

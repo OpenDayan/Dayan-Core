@@ -61,7 +61,7 @@ class DMAControlStatusRegisters(params: DMAParams) extends Module {
   }
   instReq.ready := instRespRaw.ready | !instDecode.re
 
-  instRespRaw.bits.rd  := Mux(instDecode.re, instDecode.rd, 0.U)
+  instRespRaw.bits.rd  := instDecode.rd
   instRespRaw.bits.data := DontCare
 
   instRespRaw.valid    := instReq.valid & instDecode.re
