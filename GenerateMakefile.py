@@ -5,7 +5,7 @@ with open('UnitTestConfig.json', 'r') as f:
     module_map = json.load(f)
 
 # Generate One Module Makefile
-def generateOneModuleMakefile(moduleName: str, modulePackage: str, AdditionDeps: dict, NeedEMU: bool):
+def generateOneModuleMakefile(moduleName: str, modulePackage: str, AdditionDeps: dict, NeedEMU: bool, threads: int):
     str_builder = ''
     for dep in AdditionDeps:
         str_builder +='build/V{Name}/V{Name}: {depName}\n'.format(Name=moduleName, depName=dep)
@@ -15,7 +15,7 @@ def generateOneModuleMakefile(moduleName: str, modulePackage: str, AdditionDeps:
                 str_builder +='.PHONY: {depName}\n'.format(depName=dep)
     str_builder += '''
 build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
-	verilator --threads 4 --output-split 3000 --compiler clang -j 0 --assert --trace --trace-structs --trace-fst \
+	verilator --threads {Threads} --output-split 3000 --compiler clang -j 0 --assert --trace --trace-structs --trace-fst \
 -CFLAGS -Wno-unknown-warning-option -CFLAGS -DVL_USER_FATAL -CFLAGS -DVL_USER_STOP -CFLAGS -Wno-narrowing '''
     str_builder += '''--top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f \
 -CFLAGS -I../../csrc/utils/ -CFLAGS -I../../csrc/gen/ -CFLAGS -I../../csrc/DRAMsim3/src \
@@ -46,7 +46,7 @@ surver_{Name}: wave/{Name}.fst
 run_{Name}:
 	build/V{Name}/V{Name} --trace-fst --trace-structs
 '''
-    return str_builder.format(Name=moduleName, Package=modulePackage, ADDITION_DEPS = ''' csrc/utils/bar.cpp \
+    return str_builder.format(Name=moduleName, Threads=threads, Package=modulePackage, ADDITION_DEPS = ''' csrc/utils/bar.cpp \
 csrc/utils/cliUtils.cpp csrc/utils/DPIAXI4.cpp -LDFLAGS ../../csrc/DRAMsim3/libdramsim3.a''' if(NeedEMU) else '')
 
 str_builder = 'all:'
@@ -57,12 +57,15 @@ for name in module_map:
 str_builder += '\n'
 for name in module_map:
     deps = module_map[name].get('AdditionDeps')
+    threads = 2
     if deps == None:
         deps = {}
     NeedEMU = module_map[name].get('NeedEMU')
     if NeedEMU == None:
         NeedEMU = False
-    str_builder += generateOneModuleMakefile(name, module_map[name]['Package'], deps, NeedEMU)
+    if module_map[name].get('Threads') != None:
+        threads = module_map[name].get('Threads')
+    str_builder += generateOneModuleMakefile(name, module_map[name]['Package'], deps, NeedEMU, threads)
 
 with open('UnitTest.mk', 'w') as f:
     f.write(str_builder)
