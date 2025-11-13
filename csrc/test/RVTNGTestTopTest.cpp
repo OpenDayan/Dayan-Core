@@ -17,10 +17,7 @@ unsigned int stopFlag = 0;
 // 交互 fd
 long fdInst, fdMsg;
 
-// Tiny Configuration, 向量寄存器车道宽度为 32， 运算器个数为 16， SFU 为 4 个。
-// URAM == (32 * 32) / 2 / 64 == 8 Banks
-
-#define LOG2BANK 3
+#define LOG2BANK 5
 #define URAMSIZE ((1 << LOG2BANK) * 32 * 1024ull)
 long int *uram = NULL; // 1024KBytes URAM
 

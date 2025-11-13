@@ -49,8 +49,8 @@ class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int, GroupCount: Int = 4, fifo
   }))
   val r0ValidResp = genPipe(r0RValid, 3)(3)
   val r1ValidResp = genPipe(r1RValid, 3)(3)
-  val r0IDResp = genPipe(VecInit(r0BankedReq.map(_.id)), 3)(3)
-  val r1IDResp = genPipe(VecInit(r1BankedReq.map(_.id)), 3)(3)
+  val r0IDResp = genPipe(VecInit.tabulate(N)(i => r0BankedReq(r0RRoute(i)).id), 3)(3)
+  val r1IDResp = genPipe(VecInit.tabulate(N)(i => r1BankedReq(r1RRoute(i)).id), 3)(3)
 
   val r0resp_o = IO(Vec(R0Port, Vec(N / GroupCount,
     Decoupled(Vec(GroupCount, new AdvURAMResp(addrWidth, idWidth, dataWidth))))))
@@ -173,7 +173,7 @@ class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int, GroupCount: Int = 4, fifo
   val wRValid = Wire(Vec(N, Bool()))
 
   // W Response Switch
-  val wIDResp = RegNext(VecInit(wBankedReq.map(_.ctrl.id)))
+  val wIDResp = RegNext(VecInit.tabulate(N)(i => wBankedReq(wRRoute(i)).ctrl.id))
   val wValidResp = RegNext(wRValid)
 
   val wresp_o = IO(Vec(W0Port, Vec(N / GroupCount,
