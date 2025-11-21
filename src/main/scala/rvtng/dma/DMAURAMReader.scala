@@ -44,7 +44,7 @@ class DMAURAMReader(params: DMAParams) extends Module {
   readResp.valid := respAll
   for(i <- 0 until uramChannel) {
     respVec(i) := uramResp(i).valid
-    uramResp(i).ready := respAll
+    uramResp(i).ready := readResp.fire
   }
   readResp.bits.tid := uramResp(0).bits(0).id
   readResp.bits.data := VecInit(uramResp.map(c => VecInit(c.bits.map(_.data)))).asTypeOf(readResp.bits.data)

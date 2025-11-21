@@ -10,6 +10,7 @@ class RF1R1WRamBase(addressWidth: Int, dataWidth: Int) extends
     val clk = Input(Clock())
     val reset = Input(Reset())
 
+    val re = Input(UInt(1.W))
     val raddr = Input(UInt(addressWidth.W))
     val rdata = Output(UInt(dataWidth.W))
 
@@ -31,6 +32,7 @@ class RF1R1WRam(addressWidth: Int, dataWidth: Int) extends Module {
   val core = Module(new RF1R1WRamBase(addressWidth = addressWidth, dataWidth = dataWidth))
   core.io.clk := clock
   core.io.reset := reset
+  core.io.re := 1.B
   core.io.raddr := raddr
   rdata := core.io.rdata
   core.io.we := we
@@ -49,6 +51,27 @@ class RF1R1WRamGen[D <: Data](addressWidth: Int, gen: D) extends Module {
   val core = Module(new RF1R1WRamBase(addressWidth = addressWidth, dataWidth = gen.getWidth))
   core.io.clk := clock
   core.io.reset := reset
+  core.io.re := 1.B
+  core.io.raddr := raddr
+  rdata := core.io.rdata.asTypeOf(gen)
+  core.io.we := we
+  core.io.waddr := waddr
+  core.io.wdata := wdata.asUInt
+}
+
+// 1-Cycle Fixed Latency with clock enable
+class RF1R1WRamGenEN[D <: Data](addressWidth: Int, gen: D) extends Module {
+  val re = IO(Input(UInt(1.W)))
+  val raddr = IO(Input(UInt(addressWidth.W)))
+  val rdata = IO(Output(gen))
+  val we = IO(Input(UInt(1.W)))
+  val waddr = IO(Input(UInt(addressWidth.W)))
+  val wdata = IO(Input(gen))
+
+  val core = Module(new RF1R1WRamBase(addressWidth = addressWidth, dataWidth = gen.getWidth))
+  core.io.clk := clock
+  core.io.reset := reset
+  core.io.re := re
   core.io.raddr := raddr
   rdata := core.io.rdata.asTypeOf(gen)
   core.io.we := we

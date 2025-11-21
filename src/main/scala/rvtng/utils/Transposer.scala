@@ -62,8 +62,9 @@ class Transposer[T <: Data](S: Int, N: Int, gen: T) extends Module{
   val s0Ror = s0Round << ctrlOut.bits
   ctrlOut.ready := s0Last & out.ready
   val s1Ror = RegEnable(s0Ror, !s1Deny)
-  val s1Valid = RegEnable(ctrlOut.valid, !s1Deny)
-  when(!s1Deny & ctrlOut.valid) {
+  // TODO: Refractor handshake
+  val s1Valid = RegEnable(ctrlOut.valid & s0Base =/= inBase, !s1Deny)
+  when(!s1Deny & ctrlOut.valid & s0Base =/= inBase) {
     when(s0Last) {
       s0Round := 0.U
       s0Base  := s0Base + (N.U(log2Ceil(2 * N).W) >> ctrlOut.bits)

@@ -30,7 +30,8 @@
         "id": "testName",
         "description": "选择希望运行的 RVTNG 测试用例",
         "options": [
-            "VDMATestTop"
+            "VDMATestTop",
+            "VRVTNGTestTop"
         ],
         "type": "pickString"
         }

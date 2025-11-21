@@ -190,19 +190,23 @@ module DPIAXI4Base #(
         __aw_ready_reg <= __aw_ready;
         __w_ready_reg  <= __w_ready;
 
-        __r_valid_reg <= __r_valid;
-        __r_id_reg    <= __r_id[ID_BITS-1:0];
-        __r_resp_reg  <= __r_resp[1:0];
-        __r_last_reg  <= __r_last;
-        __r_data_bits = '0;
-        for (int i = 0; i < DATA_BITS / 8; i++) begin
-          __r_data_bits[i * 8 +: 8] = __r_data[i];
+        if(!__r_valid_reg | __r_ready) begin
+          __r_valid_reg <= __r_valid;
+          __r_id_reg    <= __r_id[ID_BITS-1:0];
+          __r_resp_reg  <= __r_resp[1:0];
+          __r_last_reg  <= __r_last;
+          __r_data_bits = '0;
+          for (int i = 0; i < DATA_BITS / 8; i++) begin
+            __r_data_bits[i * 8 +: 8] = __r_data[i];
+          end
+          __r_data_reg  <= __r_data_bits;
         end
-        __r_data_reg  <= __r_data_bits;
 
-        __b_valid_reg <= __b_valid;
-        __b_id_reg    <= __b_id[ID_BITS-1:0];
-        __b_resp_reg  <= __b_resp[1:0];
+        if(!__b_valid_reg | __b_ready) begin
+          __b_valid_reg <= __b_valid;
+          __b_id_reg    <= __b_id[ID_BITS-1:0];
+          __b_resp_reg  <= __b_resp[1:0];
+        end
     end
   end
 

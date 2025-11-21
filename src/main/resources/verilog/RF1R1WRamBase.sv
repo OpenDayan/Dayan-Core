@@ -5,6 +5,7 @@ module RF1R1WRamBase#(
     input  wire clk,
     input  wire reset,
     
+    input  wire re,
     input  wire [addressWidth - 1 : 0] raddr,
     output wire [dataWidth    - 1 : 0] rdata,
 
@@ -19,7 +20,7 @@ module RF1R1WRamBase#(
     always_ff @(posedge clk)
     begin
         if(we) ram[waddr] <= wdata;
-        ramQPort <= ram[raddr];
+        if(re) ramQPort <= ram[raddr];
     end
 
     assign rdata = ramQPort;

@@ -90,19 +90,21 @@ class DMAPublicWriter(params: DMAParams) extends Module{
 
   // Completion Logic
   // Last request FIFO
+  // TODO: Use flow control, and limit size. (32 is fairly enough?)
   private val lrQ = Module(new Queue(Bool(), maxOutStanding, false, false)).io
   lrQ.enq.bits := lastBlock & inReqStream.bits.info.isLastInst
   lrQ.enq.valid := outReqStream.fire
 
   // Reorder Scoreboard
+  // TODO: Use flow control, and limit size. (32 is fairly enough?)
   private val scoreboard = Module(new ReorderScoreboard(maxOutStanding, 1))
   scoreboard.comp.valid := outCompStream.valid
   scoreboard.comp.reqGroupID := outCompStream.bits
   scoreboard.comp.reqGroupSize := DontCare
   scoreboard.check.reqGroupID := curIdReleaseHead
   lrQ.deq.ready := scoreboard.check.reqGroupValid
-  scoreboard.check.fire := scoreboard.check.reqGroupValid
   instFinish := lrQ.deq.bits & scoreboard.check.reqGroupValid
+  scoreboard.check.fire := scoreboard.check.reqGroupValid
   when(scoreboard.check.reqGroupValid) {
     curIdReleaseHead := curIdReleaseHead + 1.U
   }

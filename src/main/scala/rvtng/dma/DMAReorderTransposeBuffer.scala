@@ -1,6 +1,6 @@
 package rvtng.dma
 
-import rvtng.utils.{RF1R1WRamGen, ReorderScoreboard, Transposer}
+import rvtng.utils._
 import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
@@ -119,7 +119,7 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
 
   // DMA Buffer
   private val dmaBuffer = (0 until BANK).map(i => {
-    Module(new RF1R1WRamGen(log2MaxOutStanding, Vec(CN, genD)))
+    Module(new RF1R1WRamGenEN(log2MaxOutStanding, Vec(CN, genD)))
   })
 
   // Reorder Counter
@@ -240,11 +240,11 @@ class DMAReorderTransposeBuffer(params: DMAParams) extends Module {
   }
   // raddr == ((((b * CN) / (transpose)) - idx) & (BlockSz - 1)) + base
   private val t1OutDataRaw = VecInit.tabulate(BANK)(b => {
-    dmaBuffer(b).raddr := Mux(!trInReady, RegNext(dmaBuffer(b).raddr),
-      // TODO: Check Me
-      t0OutCurBlockHead + (((Cat(b.U(log2BANK.W), 0.U(log2CN.W)) >> t0OutInfo.transpose).asUInt
-        + t0OutCurCIdx - (Cat(0.U(log2CN.W), t0OutCurBankIdx) << t0Outlog2CNCycle).asUInt) & t0OutCurBlockSz)
-    )
+    // Note: if re is not unset during trInReady not valid, the dmaBuffer maybe overflow.
+    dmaBuffer(b).re := trInReady
+    // TODO: Check Me
+    dmaBuffer(b).raddr := t0OutCurBlockHead + (((Cat(b.U(log2BANK.W), 0.U(log2CN.W)) >> t0OutInfo.transpose).asUInt
+      + t0OutCurCIdx - (Cat(0.U(log2CN.W), t0OutCurBankIdx) << t0Outlog2CNCycle).asUInt) & t0OutCurBlockSz)
     dmaBuffer(b).rdata
   })
   private val t1OutValid = RegEnable(t0OutCurBlockValid, trInReady)

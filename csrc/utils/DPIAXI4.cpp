@@ -86,11 +86,15 @@ extern "C" void DPIAXI4Tick(
     static bool local_aw_ready = 1;
     static bool local_w_ready  = 1;
     static bool local_ar_ready = 1;
+    static bool local_r_valid  = 0;
+    static bool local_b_valid  = 0;
     static uint64_t local_ar_addr, local_ar_id, local_aw_addr, local_aw_id;
     static char local_w_data[64];
     bool ar_fire = local_ar_ready & ar_valid;
     bool aw_fire = local_aw_ready & aw_valid;
     bool w_fire  = local_w_ready  & w_valid;
+    bool r_deny = local_r_valid & (!r_ready);
+    bool b_deny = local_b_valid & (!b_ready);
     bool aw_back_fire = false;
     if(ar_fire) {
         local_ar_ready = 0;
@@ -139,34 +143,34 @@ extern "C" void DPIAXI4Tick(
         dram_time += DRAM_CYCLE;
     }
 
-    if(!read_resp.empty()) {
-        // TODO: Note, this is not actually correct with axi standard.
-        if(r_ready) {
+    if(!r_deny) {
+        if(!read_resp.empty()) {
+            // TODO: Note, this is not actually correct with axi standard.
             auto resp = read_resp.front();
-            *r_valid = 1;
+            local_r_valid = 1;
             *r_id = resp.second;
             *r_last = 1;
             *r_resp = 0;
             backend_dram_read(fdMsg, (char*)svGetArrayPtr(r_data), data_bytes_, resp.first);
             read_resp.pop();
         } else {
-            *r_valid = 0;
+            local_r_valid = 0;
         }
-    } else {
-        *r_valid = 0;
     }
 
-    if(!write_resp.empty()) {
-        *b_valid = 1;
-        *b_resp = 0;
-        *b_id = write_resp.front().second;
-        if(b_ready) {
+    if(!b_deny) {
+        if(!write_resp.empty()) {
+            local_b_valid = 1;
+            *b_resp = 0;
+            *b_id = write_resp.front().second;
             write_resp.pop();
+        } else {
+            local_b_valid = 0;
         }
-    } else {
-        *b_valid = 0;
     }
     *ar_ready = local_ar_ready;
     *aw_ready = local_aw_ready;
     *w_ready  = local_w_ready ;
+    *r_valid = local_r_valid;
+    *b_valid = local_b_valid;
 }
