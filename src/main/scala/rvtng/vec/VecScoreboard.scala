@@ -25,7 +25,7 @@ class VecScoreboard(params: VecParams) extends Module {
   val busy = IO(Input(Bool())) // 外部有模块正忙
 
   val instRebuild = VecInstRebuild(instReq.bits)
-  val instIsBar = instRebuild(12)
+  val instIsBar = instRebuild(14)
 
   instReq.ready := !busy & Mux(instIsBar, instResp.ready, sbComp.ready)
   instResp.valid := !busy & instReq.valid & instIsBar

@@ -189,9 +189,9 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   private val spLastK = lTaskQ.io.enq.bits.subK === 0.U
   private val spLastN = lTaskQ.io.enq.bits.subN === 0.U
   private val spLastM = lTaskQ.io.enq.bits.subM === 0.U
-  private val spFirstK = spCurK === spTask.taskK - 1.U
-  private val spFirstN = spCurN === spTask.taskN - 1.U
-  private val spFirstM = spCurM === spTask.taskM - 1.U
+  private val spFirstK = spCurK === spTask.taskK
+  private val spFirstN = spCurN === spTask.taskN
+  private val spFirstM = spCurM === spTask.taskM
   private val spCarryK, spCarryM, spCarryN = Wire(Bool())
   spCarryK := spCPersist | ((spBPersist | (spAPersist & spLastN)) & spLastM)
   spCarryN := spAPersist | ((spCPersist | (spBPersist & spLastM)) & spLastK)
@@ -200,19 +200,19 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
   when(taskQ.fire) {
     spTaskBusy := 1.B
     spTaskFirst := 1.B
-    spCurM := taskQ.bits.taskM - 1.U
-    spCurN := taskQ.bits.taskN - 1.U
-    spCurK := taskQ.bits.taskK - 1.U
+    spCurM := taskQ.bits.taskM
+    spCurN := taskQ.bits.taskN
+    spCurK := Mux(taskQ.bits.bf16, Cat(taskQ.bits.taskK, 1.U(1.W)), taskQ.bits.taskK)
   }.elsewhen(spTaskBusy & lTaskQ.io.enq.ready) {
     spTaskFirst := 0.B
     spTaskBusy := !spLastTask
-    when(spCarryK) { when(spLastK) { spCurK := spTask.taskK - 1.U }.otherwise {
+    when(spCarryK) { when(spLastK) { spCurK := spTask.taskK }.otherwise {
       spCurK := lTaskQ.io.enq.bits.subK - 1.U
     }}
-    when(spCarryN) { when(spLastN) { spCurN := spTask.taskN - 1.U }.otherwise {
+    when(spCarryN) { when(spLastN) { spCurN := spTask.taskN }.otherwise {
       spCurN := lTaskQ.io.enq.bits.subN - 1.U
     }}
-    when(spCarryM) { when(spLastM) { spCurM := spTask.taskM - 1.U }.otherwise {
+    when(spCarryM) { when(spLastM) { spCurM := spTask.taskM }.otherwise {
       spCurM := lTaskQ.io.enq.bits.subM - 1.U
     }}
   }

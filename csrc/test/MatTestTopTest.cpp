@@ -178,53 +178,53 @@ static inline void mainLoop()
     dut->instReq_valid = (startTime == 0) || (finishTime != 0);
     if(sim_time == 0) {
         // problemM
-        dut->instReq_bits_rdData = M;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (0 << 15);
+        dut->instReq_bits_rdData = M - 1;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (0 << 15) | 0xb;
     } else if(sim_time == 1) {
         // problemN
-        dut->instReq_bits_rdData = N;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (1 << 15);
+        dut->instReq_bits_rdData = N - 1;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (1 << 15) | 0xb;
     } else if(sim_time == 2) {
         // problemK
-        dut->instReq_bits_rdData = K;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (2 << 15);
+        dut->instReq_bits_rdData = K - 1;
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (2 << 15) | 0xb;
     } else if(sim_time == 3) {
         // strideA
         dut->instReq_bits_rdData = K;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (3 << 15);
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (3 << 15) | 0xb;
     } else if(sim_time == 4) {
         // strideB
         dut->instReq_bits_rdData = K;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (4 << 15);
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (4 << 15) | 0xb;
     } else if(sim_time == 5) {
         // strideC
         dut->instReq_bits_rdData = N * 4;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (5 << 15);
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (5 << 15) | 0xb;
     } else if(sim_time == 6) {
-        // sM
+        // A Swizzle MBS
         dut->instReq_bits_rdData = 0;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (6 << 15);
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (6 << 15) | 0xb;
     } else if(sim_time == 7) {
-        // sN
+        // B Swizzle MBS
         dut->instReq_bits_rdData = 0;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (7 << 15);
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (7 << 15) | 0xb;
     } else if(sim_time == 8) {
-        // sK
+        // C Swizzle MBS
         dut->instReq_bits_rdData = 0;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (8 << 15);
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (8 << 15) | 0xb;
     } else if(sim_time == 9) {
-        // persistentMode
+        // Persistent Mode
         dut->instReq_bits_rdData = persistentMode;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (9 << 15);
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (9 << 15) | 0xb;
     } else if(sim_time == 10) {
-        // persistentMode
+        // Data Type
         dut->instReq_bits_rdData = 1;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (9 << 15);
+        dut->instReq_bits_instWord = (0b0000000 << 25) | (10 << 15) | 0xb;
     } else {
         dut->instReq_bits_rs1Data = AAddr;
         dut->instReq_bits_rs2Data = BAddr;
         dut->instReq_bits_rdData  = CAddr;
-        dut->instReq_bits_instWord = (0b0001000 << 25) | (5 << 15);
+        dut->instReq_bits_instWord = (0b0001000 << 25) | (5 << 15) | 0xb;
         if(startTime == 0) startTime = sim_time;
     }
     if(dut->finish) {

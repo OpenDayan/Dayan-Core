@@ -34,7 +34,7 @@ class MatScoreboard(params: MatParams) extends Module {
   sbInst.valid := instReq.valid
   instReq.ready := sbInst.ready
   sbInst.bits.isCount := isCounter
-  sbInst.bits.isBar   := instReq.bits.instWord(12)
+  sbInst.bits.isBar   := instReq.bits.instWord(14)
   sbInst.bits.rd      := instReq.bits.instWord(11, 7)
   sbInst.bits.rdData  := instReq.bits.rdData
 
@@ -43,10 +43,10 @@ class MatScoreboard(params: MatParams) extends Module {
   private val highBitsCmp = cmCounter(log2MaxOnTheFlyInst + 1) === compQ.bits.isCount(log2MaxOnTheFlyInst + 1)
   private val hasCommit = Mux(highBitsCmp, lowBitsCmp, !lowBitsCmp)
 
-  instResp.valid := compQ.valid & !compQ.bits.isBar & hasCommit
+  instResp.valid := compQ.valid & compQ.bits.isBar & hasCommit
   instResp.bits.rd := compQ.bits.rd
   instResp.bits.data := compQ.bits.rdData
-  sbComp.valid := compQ.valid & compQ.bits.isBar & hasCommit
+  sbComp.valid := compQ.valid & !compQ.bits.isBar & hasCommit
   sbComp.bits.entryId := compQ.bits.rdData
 
   compQ.ready := hasCommit & Mux(compQ.bits.isBar, sbComp.ready, instResp.ready)
