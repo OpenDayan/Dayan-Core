@@ -16,9 +16,9 @@ case class MatParams(storageRatio: Int = 32, busWidth: Int = 256, mnkWidth: Int 
 
 // Note: `storageRatio` Marks the biggest storageRatio in design.
 // StorageRatio form:
-// A: 16 >= MK 8 2
-// B: 16 >= NK 4 2
-// C: 32 >= MN 8 4
+// A: 32 >= MK 4 8
+// B: 32 >= NK 4 8
+// C: 32 >= MN 4 4
 
 // Requirement for URAM:
 //   busWidth === cK * AnyValue
@@ -67,9 +67,10 @@ class MatTop(params: MatParams) extends Module {
   private val decodeIllegal   = !(decodeTaskSpilt | decodeCsrReq | decodeCompReq)
 
   // Instruction Generation
+  val curIsBF16 = csr.sel.ctrl.DataType === 0.U
   csr.sel.addr := instReq.bits.instWord(27, 25)
   taskGen.task.valid := instReq.valid & decodeTaskSpilt
-  taskGen.task.bits.bf16 := csr.sel.ctrl.DataType === 0.U
+  taskGen.task.bits.bf16 := curIsBF16
   taskGen.task.bits.aBaseAddr := instReq.bits.rs1Data
   taskGen.task.bits.bBaseAddr := instReq.bits.rs2Data
   taskGen.task.bits.cBaseAddr := instReq.bits.rdData
@@ -78,7 +79,7 @@ class MatTop(params: MatParams) extends Module {
   taskGen.task.bits.cStride   := csr.sel.ctrl.CStride
   taskGen.task.bits.taskM     := csr.sel.ctrl.M
   taskGen.task.bits.taskN     := csr.sel.ctrl.N
-  taskGen.task.bits.taskK     := csr.sel.ctrl.K
+  taskGen.task.bits.     := Mux(curIsBF16, Cat(csr.sel.ctrl.K, 1.U(1.W)), csr.sel.ctrl.K)
   taskGen.task.bits.log2SubM  := 2.U
   taskGen.task.bits.log2SubN  := 2.U
   taskGen.task.bits.log2SubK  := 3.U

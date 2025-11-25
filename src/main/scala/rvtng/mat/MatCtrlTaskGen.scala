@@ -202,7 +202,7 @@ class MatCtrlTaskGen(storageRatio: Int, mnkWidth: Int, addressWidth: Int, cM: In
     spTaskFirst := 1.B
     spCurM := taskQ.bits.taskM
     spCurN := taskQ.bits.taskN
-    spCurK := Mux(taskQ.bits.bf16, Cat(taskQ.bits.taskK, 1.U(1.W)), taskQ.bits.taskK)
+    spCurK := taskQ.bits.taskK
   }.elsewhen(spTaskBusy & lTaskQ.io.enq.ready) {
     spTaskFirst := 0.B
     spTaskBusy := !spLastTask
