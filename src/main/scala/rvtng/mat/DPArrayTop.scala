@@ -264,11 +264,11 @@ class DPArrayTop(
     val s2RAddr = RegEnable(s1RAddr, tileWPQ.io.deq.fire)
     val s2RBeat = RegEnable(s1RBeat, tileWPQ.io.deq.fire)
     val s2Valid = RegInit(0.B)
-    when(wreq(channel * portsPerChannel).ready | !s2Valid) {
+    when(wreq(channel * portsPerChannel).fire | !s2Valid) {
       s2Valid := tileWPQ.io.deq.valid
     }
-    val s2Deny = s2Valid & !wreq(channel * portsPerChannel).ready
-    tileWPQ.io.deq.ready := !s2Valid | wreq(channel * portsPerChannel).ready
+    val s2Deny = s2Valid & !wreq(channel * portsPerChannel).fire
+    tileWPQ.io.deq.ready := wreq(channel * portsPerChannel).fire | !s2Valid
     cBuffer.extRe(channel) := s2Deny | tileWPQ.io.deq.valid
     cBuffer.extRAddr(channel) := Mux(s2Deny, s2RAddr, s1RAddr)
     cBuffer.extRBeat(channel) := Mux(s2Deny, s2RBeat, s1RBeat)
@@ -289,7 +289,7 @@ class DPArrayTop(
         uramWPQ.io.deq.bits.swizzleS, uramWPQ.io.deq.bits.swizzleB, uramWPQ.io.deq.bits.swizzleM) >> 3
       wreq(channel * portsPerChannel + p).valid := uramWPQ.io.deq.valid & s2Valid
     })
-    uramWPQ.io.deq.ready := wreq(channel * portsPerChannel).ready & s2Valid
+    uramWPQ.io.deq.ready := wreq(channel * portsPerChannel).fire & s2Valid
     wresp(channel).ready := tileIsLastWPQ.io.deq.valid
 
     // RP0
