@@ -47,6 +47,7 @@ static inline void mainLoop()
         rvt_commit_t commit;
         commit.data = dut->instResp_bits_data;
         commit.rd   = dut->instResp_bits_rd;
+        commit.timestamp = sim_time;
         backend_instruction_commit(fdMsg, 0, &commit);
     }
 
