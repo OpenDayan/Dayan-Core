@@ -76,7 +76,9 @@ package object converter {
     // E4M3 S7 E6 5 4 3 M2 1 0
     val rawSign = input(7)
     val rawFrac = input(6, 3)
-    val rawMantissa = Cat(Mux(rawFrac === 0.U, 0.U(1.W), 1.U(1.W)) ,input(2, 0))
+//    val rawMantissa = Cat(Mux(rawFrac === 0.U, 0.U(1.W), 1.U(1.W)) ,input(2, 0))
+    // TODO: Support SubNorm
+    val rawMantissa = Cat(1.U(1.W), input(2, 0))
     fp8Val.s := rawSign
     fp8Val.f := rawFrac
     fp8Val.m := rawMantissa
@@ -87,7 +89,9 @@ package object converter {
     // BF16 S15 E14 13 12 11 10 9 8 7 M6 5 4 3 2 1 0
     val rawSign = input(15)
     val rawFrac = input(14, 7)
-    val rawMantissa = Cat(Mux(rawFrac === 0.U, 0.U(1.W), 1.U(1.W)) ,input(6, 0))
+//    val rawMantissa = Cat(Mux(rawFrac === 0.U, 0.U(1.W), 1.U(1.W)) ,input(6, 0))
+    // TODO: Support SubNorm
+    val rawMantissa = Cat(1.U(1.W), input(6, 0))
     bf16Val.s := rawSign
     bf16Val.f := rawFrac
     bf16Val.m := rawMantissa
