@@ -51,6 +51,10 @@
         "NeedEMU": true,
         "Threads": 6
     },
+    "RISCVCoreTestTop": {
+        "Package": "rvcore",
+        "Threads": 4
+    },
     "TestFPUnpackPack": {
         "Package": "rvtng.fpmath"
     },

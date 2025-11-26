@@ -79,7 +79,7 @@ class MatTop(params: MatParams) extends Module {
   taskGen.task.bits.cStride   := csr.sel.ctrl.CStride
   taskGen.task.bits.taskM     := csr.sel.ctrl.M
   taskGen.task.bits.taskN     := csr.sel.ctrl.N
-  taskGen.task.bits.     := Mux(curIsBF16, Cat(csr.sel.ctrl.K, 1.U(1.W)), csr.sel.ctrl.K)
+  taskGen.task.bits.taskK     := Mux(curIsBF16, Cat(csr.sel.ctrl.K, 1.U(1.W)), csr.sel.ctrl.K)
   taskGen.task.bits.log2SubM  := 2.U
   taskGen.task.bits.log2SubN  := 2.U
   taskGen.task.bits.log2SubK  := 3.U
