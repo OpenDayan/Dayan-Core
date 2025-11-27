@@ -67,5 +67,8 @@
     "VecTinyTestTop": {
         "Package": "rvtng.vec",
         "NeedEMU": true
+    },
+    "KulischAccumulatorTestTop": {
+        "Package": "rvtng.neomat"
     }
 }

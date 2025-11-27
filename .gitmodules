@@ -1,3 +1,6 @@
 [submodule "csrc/DRAMsim3"]
 	path = csrc/DRAMsim3
 	url = https://gitservice.cstcloud.cn/r-project/DRAMsim3
+[submodule "dependencies/berkeley-hardfloat"]
+	path = dependencies/berkeley-hardfloat
+	url = git@github.com:gmlayer0/berkeley-hardfloat.git

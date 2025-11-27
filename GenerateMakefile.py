@@ -25,7 +25,7 @@ build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
 
 .PHONY: generated/{Name}/filelist.f
 generated/{Name}/filelist.f:
-	./mill -i RVTNG-Chisel.runMain {Package}.{Name}
+	./mill -i 'rvtng[6.6.0].runMain' {Package}.{Name}
 
 build/V{Name}:
 	mkdir -p build/V{Name}
