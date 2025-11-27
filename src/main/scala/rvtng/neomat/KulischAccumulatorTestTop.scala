@@ -26,7 +26,8 @@ class KulischAccumulatorTestTop extends Module {
     inSigWidth = sigWidth,
     outExpWidth = expWidth,
     outSigWidth = sigWidth,
-    numInputs = 4
+    numInputs = 4,
+    accWidth = Some(32)
   )
   
   val dut = Module(new KulischAccumulator(kConfig))

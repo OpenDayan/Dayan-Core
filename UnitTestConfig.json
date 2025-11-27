@@ -70,5 +70,8 @@
     },
     "KulischAccumulatorTestTop": {
         "Package": "rvtng.neomat"
+    },
+    "GetMaxDiffTop": {
+        "Package": "rvtng.neomat"
     }
 }

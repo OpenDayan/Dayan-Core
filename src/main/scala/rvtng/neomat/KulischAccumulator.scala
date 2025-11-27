@@ -3,6 +3,7 @@ package rvtng.neomat
 import chisel3._
 import chisel3.util._
 import hardfloat._
+import _root_.circt.stage.ChiselStage
 
 case class KulischAccConfig(
   inExpWidth: Int,
@@ -14,118 +15,73 @@ case class KulischAccConfig(
   accWidth: Option[Int] = None
 )
 
+class GetMaxDiff(log2N: Int, w: Int) extends Module {
+  val io = IO(new Bundle {
+    val in = Input(Vec(1 << log2N, SInt(w.W)))
+    val out_diff = Output(Vec(1 << log2N, UInt(w.W)))
+    val max  = Output(SInt(w.W))
+    val max_diff = Input(UInt(w.W))
+  })
+  //         --------------------------------|
+  //         ^                               |
+  // in -> diff -> max -> | external | -> max_diff -> in_diff
+  if(log2N == 0) {
+    io.max := io.in(0)
+    io.out_diff(0) := io.max_diff
+  } else {
+    val l = Module(new GetMaxDiff(log2N - 1, w))
+    val r = Module(new GetMaxDiff(log2N - 1, w))
+    l.io.in := VecInit.tabulate(1 << (log2N - 1))(i => io.in(i))
+    r.io.in := VecInit.tabulate(1 << (log2N - 1))(i => io.in((1 << (log2N - 1)) + i))
+    for(i <- 0 until (1 << log2N - 1)) {
+      io.out_diff(i) := l.io.out_diff(i)
+      io.out_diff((1 << (log2N - 1)) + i) := r.io.out_diff(i)
+    }
+    val local_l_sub_r = l.io.max -& r.io.max
+    val local_r_sub_l = r.io.max -& l.io.max
+    val local_max = Mux(local_l_sub_r(w), r.io.max, l.io.max)
+    io.max := local_max
+    l.io.max_diff := io.max_diff + Mux(local_r_sub_l(w), 0.U, local_r_sub_l(w-1,0))
+    r.io.max_diff := io.max_diff + Mux(local_l_sub_r(w), 0.U, local_l_sub_r(w-1,0))
+  }
+}
+
 class KulischAccumulator(c: KulischAccConfig) extends Module {
   val io = IO(new Bundle {
     // Input and Output are now RawFloat
     val in = Input(Vec(c.numInputs, new RawFloat(c.inExpWidth, c.inSigWidth)))
-    val out = Output(new RawFloat(c.outExpWidth, c.outSigWidth))
+    // Alignment
+    val out = Output(new RawFloat(c.outExpWidth, c.outSigWidth)) // 注意，输出没有做 Rounding
   })
 
-  // --------------------------------------------------------------------------
-  // 1. Inputs
-  // --------------------------------------------------------------------------
-  val rawInputs = io.in
+  // 1. 对齐
+  // 先获取所有指数中的最大值
 
-  // --------------------------------------------------------------------------
-  // 2. Configure Accumulator Range
-  // --------------------------------------------------------------------------
-  // Calculate dynamic range required.
-  val maxExp = BigInt(1) << (c.inExpWidth - 1)
-  val minExp = -(BigInt(1) << (c.inExpWidth - 1)) - BigInt(c.inSigWidth) // ample guard
-  
-  // Ensure sufficient width to hold the smallest denormal to largest normal
-  // Plus log2(numInputs) to handle sum overflow
-  val sumGuardBits = log2Ceil(c.numInputs + 1)
-  val defaultAccWidth = (maxExp - minExp).toInt + 64 + sumGuardBits
-  val accWidth = c.accWidth.getOrElse(defaultAccWidth)
-  val bias = -minExp
+  val maxExp = io.in.map(_.sExp).reduce(_ max _)
 
-  // --------------------------------------------------------------------------
-  // 3. Align and Sum Inputs (Combinational)
-  // --------------------------------------------------------------------------
-  // Value = raw.sig * 2^(sExp - (sigWidth - 1))
-  // Aligned Value (integer) = raw.sig << (sExp + bias - (sigWidth - 1))
-  
-  val shiftedInputs = rawInputs.map { raw =>
-    // Determine shift amount
-    // Shift = sExp + bias - (inSigWidth - 1)
-    // raw.sExp is SInt. bias is BigInt.
-    
-    val shiftAmtSInt = raw.sExp +& (bias - (c.inSigWidth - 1)).S
-    val shiftAmt = shiftAmtSInt.asUInt 
+}
+class GetMaxDiffTop(log2N: Int, w: Int) extends Module {
+  val io = IO(new Bundle {
+    val in = Input(Vec(1 << log2N, SInt(w.W)))
+    val out_diff = Output(Vec(1 << log2N, UInt(w.W)))
+    val max  = Output(SInt(w.W))
+  })
+  val core = Module(new GetMaxDiff(3, 32))
+  core.io.in := io.in
+  core.io.max_diff := 0.U
+  io.out_diff := core.io.out_diff
+  io.max := core.io.max
+}
 
-    val sigSInt = Wire(SInt((c.inSigWidth + 2).W))
-    // Note: RawFloat(E, S).sig has width S+1.
-    // For valid inputs, MSB (index S) is 0. S-1 is the leading 1 (or 0 for denorm).
-    // We can just extend it.
-    sigSInt := Mux(raw.sign, -raw.sig.zext, raw.sig.zext)
-    
-    // Shift
-    val shifted = (sigSInt << shiftAmt)(accWidth - 1, 0).asSInt
-    
-    Mux(raw.isZero || raw.isNaN || raw.isInf, 0.S, shifted)
-  }
-
-  // Tree Adder
-  val sumInputs = shiftedInputs.reduce(_ +& _)
-
-  // --------------------------------------------------------------------------
-  // 4. Normalization and Output Generation
-  // --------------------------------------------------------------------------
-  // Logic is now purely combinational based on sumInputs
-  
-  val accSign = sumInputs(accWidth - 1)
-  val accAbs = Mux(accSign, -sumInputs, sumInputs).asUInt
-
-  // Find MSB position (Leading Zeros)
-  val lzCount = PriorityEncoder(Reverse(accAbs))
-  val msbIndex = (accWidth - 1).U - lzCount
-  
-  val isZero = accAbs === 0.U
-
-  // Calculate Exponent
-  // sExp = msbIndex + minExp
-  val rawSExp = msbIndex.asSInt +& minExp.S
-
-  // Normalize Accumulator to extract significand
-  val normAcc = (accAbs << lzCount)(accWidth - 1, 0)
-  
-  // Use an intermediate precision for rounding
-  val interSigWidth = c.outSigWidth + 6
-  val interExpWidth = c.outExpWidth + 16 
-  
-  // Extract top bits. 
-  val topBits = normAcc(accWidth - 1, accWidth - interSigWidth)
-  
-  // Calculate sticky bit from the remaining lower bits
-  val sticky = normAcc(accWidth - interSigWidth - 1, 0).orR
-  
-  // Construct RawFloat for the rounder
-  val rawSig = Wire(UInt((interSigWidth + 1).W))
-  rawSig := 0.U(1.W) ## (topBits(interSigWidth - 1, 1) ## (topBits(0) | sticky))
-
-  val interRaw = Wire(new RawFloat(interExpWidth, interSigWidth))
-  interRaw.isNaN := false.B 
-  interRaw.isInf := false.B
-  interRaw.isZero := isZero
-  interRaw.sign := accSign
-  interRaw.sExp := rawSExp
-  interRaw.sig := rawSig
-
-  // Use RoundAnyRawFNToRecFN to perform correct rounding
-  val rounder = Module(new RoundAnyRawFNToRecFN(
-    interExpWidth, interSigWidth,
-    c.outExpWidth, c.outSigWidth,
-    options = 0
-  ))
-
-  rounder.io.invalidExc := false.B
-  rounder.io.infiniteExc := false.B
-  rounder.io.in := interRaw
-  rounder.io.roundingMode := consts.round_near_even 
-  rounder.io.detectTininess := consts.tininess_afterRounding
-  
-  // Convert RecFN output back to RawFloat
-  io.out := rawFloatFromRecFN(c.outExpWidth, c.outSigWidth, rounder.io.out)
-
+object GetMaxDiffTop extends App {
+  ChiselStage.emitSystemVerilog(
+    new GetMaxDiffTop(3, 8),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/GetMaxDiffTop"
+    )
+  )
 }
