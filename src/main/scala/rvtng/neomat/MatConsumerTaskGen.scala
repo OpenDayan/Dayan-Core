@@ -31,7 +31,7 @@ class MatConsumerTaskGen(params: NMatParams) extends Module {
     val cmdOut = Decoupled(new DPACalcCmd(params))
     val aAck = Flipped(Decoupled(new MatProducerAck(params, params.log2CountATile)))
     val bAck = Flipped(Decoupled(new MatProducerAck(params, params.log2CountBTile)))
-    val peAlloc = Flipped(Decoupled(Bool()))
+    val ppAlloc = Flipped(Decoupled(Bool()))
   })
 
   // 当前正在处理任务的信号
@@ -43,9 +43,11 @@ class MatConsumerTaskGen(params: NMatParams) extends Module {
 
   // 内部记分板，记录 Mat Tile -> RegID 的映射关系
   // 1r1w, 1r 用于命令生成，1w来自 Producer 接口
-  // TODO: Optimize me, use macro rather then infered.
-  val aScoreBoard = Reg(Vec(params.sM, Vec(params.sK, UInt(params.log2CountATile.W))))
-  val bScoreBoard = Reg(Vec(params.sN, Vec(params.sK, UInt(params.log2CountBTile.W))))
+  //  val aScoreBoard = Reg(Vec(params.sM, Vec(params.sK, UInt(params.log2CountATile.W))))
+  //  val bScoreBoard = Reg(Vec(params.sN, Vec(params.sK, UInt(params.log2CountBTile.W))))
+
+  val aScoreBoard = Mem(params.countATile, UInt(params.log2CountATile.W))
+  val bScoreBoard = Mem(params.countATile, UInt(params.log2CountATile.W))
 
   // 主要循环状态机
   val curBaseM = Reg(UInt(params.MNKWidth.W))
@@ -61,9 +63,14 @@ class MatConsumerTaskGen(params: NMatParams) extends Module {
   val lastSubK = curSubK === (params.sK - 1).U
 
   // 真实下标计算
-  val curM = curBaseM | lastSubM
-  val curN = curBaseN | lastSubN
-  val curK = curBaseK | lastSubK
+  val curM = curBaseM | curSubM
+  val curN = curBaseN | curSubN
+  val curK = curBaseK | curSubK
+
+  // Debug 接口调试用
+  dontTouch(curM)
+  dontTouch(curN)
+  dontTouch(curK)
 
   // 真实边界计算
   val lastM = curM === cmd.mTile
@@ -72,6 +79,13 @@ class MatConsumerTaskGen(params: NMatParams) extends Module {
 
   // 结束情况
   finish := lastM & lastN & lastK & io.cmdOut.fire
+
+  // Valid 维护
+  when(io.cmdIn.fire) {
+    valid := 1.B
+  }.elsewhen(finish) {
+    valid := 0.B
+  }
 
   when(io.cmdIn.fire) {
     curBaseM := 0.U
@@ -121,9 +135,15 @@ class MatConsumerTaskGen(params: NMatParams) extends Module {
   val bFetch = curSubM === 0.U
   val aRelease = lastN
   val bRelease = lastM | lastSubM
-  io.cmdOut.valid := valid & (!aFetch | io.aAck.valid) & (!bFetch | io.bAck.valid) & (cWriteback & io.peAlloc.valid)
-  io.cmdOut.bits.regA := Mux(aFetch, io.aAck.bits.regId, aScoreBoard(curSubM)(curSubK))
-  io.cmdOut.bits.regB := Mux(bFetch, io.bAck.bits.regId, bScoreBoard(curSubN)(curSubK))
+  io.cmdOut.valid := valid & (!aFetch | io.aAck.valid) & (!bFetch | io.bAck.valid) & (!cWriteback | io.ppAlloc.valid)
+  io.cmdOut.bits.regA := Mux(aFetch, io.aAck.bits.regId,
+  //  aScoreBoard(curSubM)(curSubK)
+    aScoreBoard.read((curSubM << params.log2SK).asUInt | curSubK)
+  )
+  io.cmdOut.bits.regB := Mux(bFetch, io.bAck.bits.regId,
+  //  bScoreBoard(curSubN)(curSubK)
+    bScoreBoard.read((curSubN << params.log2SK).asUInt | curSubK)
+  )
   io.cmdOut.bits.regC := (curSubM << params.log2SN).asUInt | curSubN
   io.cmdOut.bits.releaseA := aRelease
   io.cmdOut.bits.releaseB := bRelease
@@ -132,14 +152,16 @@ class MatConsumerTaskGen(params: NMatParams) extends Module {
 
   io.aAck.ready := aFetch & io.cmdOut.fire
   io.bAck.ready := bFetch & io.cmdOut.fire
-  io.peAlloc.ready := cWriteback & io.cmdOut.fire
+  io.ppAlloc.ready := cWriteback & io.cmdOut.fire
 
   // 更新 Scoreboard
   when(io.aAck.fire) {
-    aScoreBoard(curSubM)(curSubK) := io.aAck.bits.regId
+//    aScoreBoard(curSubM)(curSubK) := io.aAck.bits.regId
+    aScoreBoard((curSubM << params.log2SK).asUInt | curSubK) := io.aAck.bits.regId
   }
   when(io.bAck.fire) {
-    bScoreBoard(curSubN)(curSubK) := io.bAck.bits.regId
+//    bScoreBoard(curSubN)(curSubK) := io.bAck.bits.regId
+    bScoreBoard((curSubN << params.log2SK).asUInt | curSubK) := io.bAck.bits.regId
   }
 
 }

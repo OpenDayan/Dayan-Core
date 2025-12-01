@@ -18,6 +18,9 @@ case class NMatParams(
   val log2SM = log2Ceil(sM)
   val log2SN = log2Ceil(sN)
   val log2SK = log2Ceil(sK)
+  val log2CM = log2Ceil(cM)
+  val log2CN = log2Ceil(cN)
+  val log2CK = log2Ceil(cK)
   val countATile = sM * sK
   val countBTile = sN * sK
   val countCTile = sM * sN

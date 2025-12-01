@@ -8,7 +8,7 @@ import _root_.circt.stage.ChiselStage
 class MatProducerTaskGenCmd(params: NMatParams) extends Bundle {
   val addr    = UInt(params.addrWidth.W)
   val stride  = UInt(params.addrWidth.W)
-  val swizzle = UInt(8.W)
+  val swizzle = UInt(24.W)
   val major  = UInt(params.MNKWidth.W) // Major dec 1
   val repeat = UInt(params.MNKWidth.W) // Repeat dec 1
   val minor  = UInt(params.MNKWidth.W) // Minor dec 1
@@ -19,7 +19,7 @@ class DPALoadCmd(params: NMatParams, log2CountXTile: Int) extends Bundle {
   val regId = UInt(log2CountXTile.W)
   val addr = UInt(params.addrWidth.W)
   val stride = UInt(params.addrWidth.W)
-  val swizzle = UInt(8.W)
+  val swizzle = UInt(24.W)
 }
 
 // MatProducer Ack
@@ -59,7 +59,7 @@ class MatProducerAck(params: NMatParams, log2CountXTile: Int) extends Bundle {
   *   每次任务输出都分配一个regId，保持与Ack/Release计数、指针一致，确保不会资源冲突。子任务全部完成后才允许接受新任务，防止乱序。
   *   支持外部通过ackIn和releaseIn及时归还寄存器资源，保障并发与资源利用效率。
   */
-class MatProducerTaskGen(params: NMatParams, log2CountXTile: Int, sMajor: Int, sMinor: Int, majorStride: Int) extends Module {
+class MatProducerTaskGen(params: NMatParams, log2CountXTile: Int, sMajor: Int, sMinor: Int, minorStride: Int) extends Module {
   // IO
   val io = IO(new Bundle {
     val cmdIn = Flipped(Decoupled(new MatProducerTaskGenCmd(params)))
@@ -173,7 +173,7 @@ class MatProducerTaskGen(params: NMatParams, log2CountXTile: Int, sMajor: Int, s
   // 生成控制命令
   io.cmdOut.bits.swizzle := cmd.swizzle
   io.cmdOut.bits.stride := cmd.stride
-  io.cmdOut.bits.addr := cmd.addr + cmd.stride * (majorStride.U * curMajor + curMinor)
+  io.cmdOut.bits.addr := cmd.addr + cmd.stride * curMajor + minorStride.U * curMinor
 }
 
 object MatProducerTaskGen extends App {

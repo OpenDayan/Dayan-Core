@@ -76,5 +76,8 @@
     },
     "MatProducerTaskGen": {
         "Package": "rvtng.neomat"
+    },
+    "MatTaskGen": {
+        "Package": "rvtng.neomat"
     }
 }
