@@ -15,6 +15,7 @@ case class KulischAccConfig(
   accWidth: Option[Int] = None
 )
 
+// 递归的获取所有输入中的最大值，及输入距离最大值的差值
 class GetMaxDiff(log2N: Int, w: Int) extends Module {
   val io = IO(new Bundle {
     val in = Input(Vec(1 << log2N, SInt(w.W)))
@@ -45,21 +46,6 @@ class GetMaxDiff(log2N: Int, w: Int) extends Module {
     r.io.max_diff := io.max_diff + Mux(local_l_sub_r(w), 0.U, local_l_sub_r(w-1,0))
   }
 }
-
-class KulischAccumulator(c: KulischAccConfig) extends Module {
-  val io = IO(new Bundle {
-    // Input and Output are now RawFloat
-    val in = Input(Vec(c.numInputs, new RawFloat(c.inExpWidth, c.inSigWidth)))
-    // Alignment
-    val out = Output(new RawFloat(c.outExpWidth, c.outSigWidth)) // 注意，输出没有做 Rounding
-  })
-
-  // 1. 对齐
-  // 先获取所有指数中的最大值
-
-  val maxExp = io.in.map(_.sExp).reduce(_ max _)
-
-}
 class GetMaxDiffTop(log2N: Int, w: Int) extends Module {
   val io = IO(new Bundle {
     val in = Input(Vec(1 << log2N, SInt(w.W)))
@@ -71,6 +57,32 @@ class GetMaxDiffTop(log2N: Int, w: Int) extends Module {
   core.io.max_diff := 0.U
   io.out_diff := core.io.out_diff
   io.max := core.io.max
+}
+
+class KulischAccumulator(c: KulischAccConfig) extends Module {
+  val io = IO(new Bundle {
+    // Input and Output are now RawFloat
+    val in = Input(Vec(c.numInputs, new RawFloat(c.inExpWidth, c.inSigWidth)))
+    // Alignment
+    val out = Output(new RawFloat(c.outExpWidth, c.outSigWidth)) // 注意，输出没有做 Rounding
+  })
+
+  // 1. 对齐
+  // 先获取所有指数中的最大值及每个指数的偏移值
+  val expMaxDiff = Module(new GetMaxDiffTop(log2Ceil(c.numInputs), c.inExpWidth)).io
+  for(i <- 0 until (1 << log2Ceil(c.numInputs))) {
+    if(i < c.numInputs) {
+      expMaxDiff.in(i) := io.in(i).sExp
+    } else {
+      expMaxDiff.in(i) := (BigInt(1) << (c.inExpWidth-1)).S(c.inExpWidth.W)
+    }
+  }
+  // 将所有输入的尾数，右移动展开到内部加法树位宽上
+  // 加法输出构成：log2N | sign | inSigWidth | expand  == c.outSigWidth
+  // 加法输入构成：
+
+  // 开始累加，累加前先对齐内部精度
+
 }
 
 object GetMaxDiffTop extends App {

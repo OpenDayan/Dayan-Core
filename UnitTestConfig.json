@@ -73,5 +73,8 @@
     },
     "GetMaxDiffTop": {
         "Package": "rvtng.neomat"
+    },
+    "MatProducerTaskGen": {
+        "Package": "rvtng.neomat"
     }
 }
