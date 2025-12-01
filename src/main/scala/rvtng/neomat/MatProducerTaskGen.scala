@@ -4,6 +4,15 @@ import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
+// Producer 指令，用于触发一组 Load/Store 任务
+class MatProducerTaskGenCmd(params: NMatParams) extends Bundle {
+  val addr    = UInt(params.addrWidth.W)
+  val stride  = UInt(params.addrWidth.W)
+  val swizzle = UInt(8.W)
+  val major  = UInt(params.MNKWidth.W) // Major dec 1
+  val repeat = UInt(params.MNKWidth.W) // Repeat dec 1
+  val minor  = UInt(params.MNKWidth.W) // Minor dec 1
+}
 
 // 原始 DPArray 指令
 class DPALoadCmd(params: NMatParams, log2CountXTile: Int) extends Bundle {
@@ -18,6 +27,38 @@ class MatProducerAck(params: NMatParams, log2CountXTile: Int) extends Bundle {
   val regId = UInt(log2CountXTile.W)
 }
 
+/**
+  * 矩阵Producer任务生成器（MatProducerTaskGen）
+  *
+  * ## 参数说明
+  * - params: NMatParams
+  *   - addrWidth: 地址位宽
+  *   - MNKWidth: 主/副循环次数（Tile切分维度）
+  *   - sM, sN, sK: DPArray形状，Tile寄存器数量
+  *   - cM, cN, cK: 运算器尺寸
+  * - log2CountXTile: Tile寄存器数量的对数，决定分配和回收指针宽度
+  * - sMajor: major子分组位宽
+  * - sMinor: minor子分组位宽
+  * - majorStride: major步长，实际为运算器 major 维度尺寸
+  * 
+  * ## 接口说明
+  * - io.cmdIn (Flipped Decoupled[MatProducerTaskGenCmd]):
+  *     任务指令输入，包括 Tile 起始地址、步距、swizzle、major、repeat、minor 分组尺寸
+  * - io.cmdOut (Decoupled[DPALoadCmd]):
+  *     输出分配好寄存器ID、地址等信息的 Load / Store 子任务（一个 Tile 一个任务）
+  * - io.ackIn (Input Bool):
+  *     外部 Tile 读取完成的确认信号
+  * - io.ackOut (Decoupled[MatProducerAck]):
+  *     反馈给 Consumer 的完成信号，说明一个 Tile 已就绪，包含regId。
+  * - io.releaseIn (Input Bool):
+  *     Tile寄存器释放信号，用于回收 Tile，说明相应 Tile 不会被再次读取。
+  *
+  * ## 功能说明
+  *   按照cmdIn接收到的Producer任务描述（起始地址、步进、切分主次序号、循环次数等），
+  *   状态机遍历major/minor/repeat三重循环，分配Tile寄存器并生成Load/Store子任务命令序列输出给cmdOut。
+  *   每次任务输出都分配一个regId，保持与Ack/Release计数、指针一致，确保不会资源冲突。子任务全部完成后才允许接受新任务，防止乱序。
+  *   支持外部通过ackIn和releaseIn及时归还寄存器资源，保障并发与资源利用效率。
+  */
 class MatProducerTaskGen(params: NMatParams, log2CountXTile: Int, sMajor: Int, sMinor: Int, majorStride: Int) extends Module {
   // IO
   val io = IO(new Bundle {
@@ -106,6 +147,7 @@ class MatProducerTaskGen(params: NMatParams, log2CountXTile: Int, sMajor: Int, s
       // Zigzag 遍历，之后可读取下一行
       curSubMajor := 0.U
       when(lastMinor | lastSubMinor) {
+        curSubMinor := 0.U
         when(lastMajor) {
           // 循环完一行块
           curBaseMajor := 0.U
@@ -119,7 +161,6 @@ class MatProducerTaskGen(params: NMatParams, log2CountXTile: Int, sMajor: Int, s
         }.otherwise {
           curBaseMajor := curBaseMajor + sMajor.U
         }
-        curSubMinor := 0.U
       }.otherwise {
         curSubMinor := curSubMinor + 1.U
       }
@@ -137,7 +178,9 @@ class MatProducerTaskGen(params: NMatParams, log2CountXTile: Int, sMajor: Int, s
 
 object MatProducerTaskGen extends App {
   ChiselStage.emitSystemVerilog(
-    new MatProducerTaskGen(NMatParams(), 5, 2, 16, 16),
+    new MatProducerTaskGen(NMatParams(
+      sM = 2, sN = 2, sK = 16
+    ), 5, 2, 16, 16),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",

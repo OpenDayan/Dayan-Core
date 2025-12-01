@@ -17,7 +17,7 @@ static inline void mainLoop() {
     dut->io_cmdIn_bits_stride = 1024;
     dut->io_cmdIn_bits_swizzle = 0;
     dut->io_cmdIn_bits_major = 2;
-    dut->io_cmdIn_bits_repeat = 0;
+    dut->io_cmdIn_bits_repeat = 7;
     dut->io_cmdIn_bits_minor = 59;
     dut->io_cmdOut_ready = 1;
     dut->io_ackIn = dut->io_cmdOut_valid;
