@@ -1,9 +1,10 @@
-package rvtng.fpmath
+package rvtng.fpmath.DPArray
 
-import rvtng.utils.UnsignedMulBase
+import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
-import _root_.circt.stage.ChiselStage
+import rvtng.fpmath.U8U4FusedMxNyKzMul
+import rvtng.utils.UnsignedMulBase
 
 class U8m2n2k1U4m2n2k2Mul(tM: Int, tN: Int, tK: Int) extends Module with U8U4FusedMxNyKzMul{
   require(tM == 2)

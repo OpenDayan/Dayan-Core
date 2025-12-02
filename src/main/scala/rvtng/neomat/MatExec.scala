@@ -3,16 +3,16 @@ package rvtng.neomat
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
-import rvtng.fpmath.{FP8BF16FusedDPArray, U8m2n2k1U4m2n2k2Mul}
+import rvtng.fpmath.DPArray.{FP8BF16FusedDPArray, U8m2n2k1U4m2n2k2Mul}
+import rvtng.fpmath.signedFP.SignedFP
 import rvtng.utils.genPipe
 
 // 内部浮点数
-class MatInnerSingedFP(params: NMatParams) extends Bundle {
-  val exp = SInt(params.wE.W)
-  val frac = SInt(params.wF.W)
+object MatInnerSingedFP {
+  def apply(params: NMatParams): SignedFP = new SignedFP(params.wE, params.wF)
 }
 
-// 内部寄存器写控制
+// 内部总线抽象
 class MatInnerTileReadReq(params: NMatParams, regIdWidth: Int, posWidth: Int) extends Bundle {
   val regId = UInt(regIdWidth.W)
   val position = UInt(posWidth.W) // 一个 Tile Register Fetch 请求，可能会切分为多个 transaction 去执行，此时用 position 区别。
@@ -26,6 +26,18 @@ class MatInnerTileChannelReadResp(params: NMatParams, regIdWidth: Int, posWidth:
   val regId = UInt(regIdWidth.W)
   val position = UInt(posWidth.W) // 一个 Tile Register Fetch 请求，可能会切分为多个 transaction 去执行，此时用 position 区别。
   val data = Vec(params.channelWidth, UInt(8.W))
+}
+
+class MatInnerTileWriteReq(params: NMatParams, regIdWidth: Int, posWidth: Int) extends Bundle {
+  val addr = UInt(params.addrWidth.W)
+  val swizzle = UInt(24.W)
+  val last = Bool()
+  val data = Vec(params.channelWidth, UInt(8.W))
+}
+
+class MatInnerTileChannelWriteResp(params: NMatParams, regIdWidth: Int, posWidth: Int) extends Bundle {
+  val valid = Bool()
+  val last = Bool()
 }
 
 // 该模块作为执行后段，接收来自前端发来的 load / calc 指令，完成矩阵乘法运算并将结果流式输出给 PE 做后处理。
@@ -46,7 +58,7 @@ class MatExec(params: NMatParams) extends Module {
     val calc = Flipped(Decoupled(new DPACalcCmd(params)))
 
     // 结果流式输出
-    val result = Decoupled(Vec(params.cM * params.cN, new MatInnerSingedFP(params)))
+    val result = Decoupled(Vec(params.cM * params.cN, MatInnerSingedFP(params)))
 
     // 简化总线接口
     val busAReq = Decoupled(new MatInnerTileReadReq(params, params.log2CountATile, log2ATransactionCount))
@@ -108,16 +120,16 @@ class MatExec(params: NMatParams) extends Module {
   dpa.b_scale := 0.U.asTypeOf(dpa.b_scale)
 
   // 内建的小型 cBuffer
-  val cTile = Reg(Vec(params.sM * params.sN, Vec(params.cM * params.cN, new MatInnerSingedFP(params))))
+  val cTile = Reg(Vec(params.sM * params.sN, Vec(params.cM * params.cN, MatInnerSingedFP(params))))
 
   // 时序模块，硬流水处理 r0 及 cout 的输出问题
   val delayedVld = genPipe(io.calc.valid, dpa.r0Latency + 3)
   val delayedCmd = genPipe(io.calc.bits, dpa.r0Latency + 3)
   dpa.r0_cin_exp_in := RegNext(Mux(!delayedVld(dpa.r0Latency) | delayedCmd(dpa.r0Latency).clear,
-    0.U, VecInit(cTile(delayedCmd(dpa.r0Latency).regC).map(_.exp)).asTypeOf(dpa.r0_cin_exp_in)))
+    (BigInt(1) << (params.wE-1)).S(params.wE.W), VecInit(cTile(delayedCmd(dpa.r0Latency).regC).map(_.exp)).asTypeOf(dpa.r0_cin_exp_in)))
   dpa.r0_cin_frac_in := RegNext(Mux(!delayedVld(dpa.r0Latency) | delayedCmd(dpa.r0Latency).clear,
-    0.U, VecInit(cTile(delayedCmd(dpa.r0Latency).regC).map(_.frac)).asTypeOf(dpa.r0_cin_exp_in)))
-  val dpaOut = Wire(Vec(params.cM * params.cN, new MatInnerSingedFP(params)))
+    0.S, VecInit(cTile(delayedCmd(dpa.r0Latency).regC).map(_.frac)).asTypeOf(dpa.r0_cin_exp_in)))
+  val dpaOut = Wire(Vec(params.cM * params.cN, MatInnerSingedFP(params)))
   val dpaOutExp = dpa.cout_exp.asTypeOf(Vec(params.cM * params.cN, SInt(params.wE.W)))
   val dpaOutFrac = dpa.cout_frac.asTypeOf(Vec(params.cM * params.cN, SInt(params.wF.W)))
   // 补全 zip 展开

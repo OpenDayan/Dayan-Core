@@ -1,9 +1,8 @@
-package rvtng.fpmath
+package rvtng.fpmath.DPArray
 
-import rvtng.utils
 import chisel3._
 import chisel3.util._
-import _root_.circt.stage.ChiselStage
+import rvtng.fpmath.converter
 
 // wF: Width of Fraction Input
 // wI: Width of Fraction Shifter

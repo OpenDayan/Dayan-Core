@@ -1,8 +1,10 @@
-package rvtng.fpmath
+package rvtng.fpmath.DPArray
 
+import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
-import _root_.circt.stage.ChiselStage
+import rvtng.fpmath.DPArray.U8m2n2k1U4m2n2k2Mul
+import rvtng.fpmath.{FPRoundingModule, U8U4FusedMxNyKzMul, converter}
 
 // Generic Module, Support tM tN Configuration.
 // In Xilinx FPGA: tM==tN==2, for better Utilization of DSP48E2

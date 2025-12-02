@@ -16,7 +16,9 @@ case class NMatParams(
   // 内部精度：累加器
   wE: Int = 9, wF: Int = 25,
   // 总线参数
-  busChannel: Int = 8, channelWidth: Int = 32
+  busChannel: Int = 8, channelWidth: Int = 32,
+  // 写总线异构参数
+  busWriteChannel: Int = 2
 ) {
   // Tile 寄存器数量
   val log2SM = log2Ceil(sM)

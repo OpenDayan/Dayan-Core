@@ -1,9 +1,10 @@
-package rvtng.fpmath
+package rvtng.fpmath.DPArray
 
-import rvtng.utils
+import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
-import _root_.circt.stage.ChiselStage
+import rvtng.fpmath.DPArray.U8m2n2k1U4m2n2k2Mul
+import rvtng.fpmath._
 
 // M: M Dim for FP8/BF16
 // N: N Dim for FP8/BF16

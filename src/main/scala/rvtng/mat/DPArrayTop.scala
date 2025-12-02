@@ -1,11 +1,11 @@
 package rvtng.mat
 
-import rvtng.fpmath.{FP8BF16FusedDPArray, U8m2n2k1U4m2n2k2Mul}
 import rvtng.uram.{AdvURAMReq, AdvURAMResp, AdvURAMWResp, SwizzleAddr}
 import rvtng.utils.genPipe
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
+import rvtng.fpmath.DPArray.{FP8BF16FusedDPArray, U8m2n2k1U4m2n2k2Mul}
 
 object DPArrayStorageCmd extends ChiselEnum {
   val loadA, loadB, loadC = Value
