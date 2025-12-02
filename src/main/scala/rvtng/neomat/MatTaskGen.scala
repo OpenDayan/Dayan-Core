@@ -95,6 +95,7 @@ class MatTaskGen(params: NMatParams) extends Module {
   cCmd.bits.mTile := tileM
   cCmd.bits.nTile := tileN
   cCmd.bits.kTile := tileK
+  cCmd.bits.bf16  := io.cmdIn.bits.bf16
 
   val ppCmd = Wire(DecoupledIO(new MatPostProcessTaskGenCmd(params)))
   ppCmd.valid := io.cmdIn.fire

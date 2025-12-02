@@ -8,6 +8,7 @@ class MatConsumerTaskGenCmd(params: NMatParams) extends Bundle {
   val mTile = UInt(params.MNKWidth.W) // M Tile Count
   val nTile = UInt(params.MNKWidth.W) // N Tile Count
   val kTile = UInt(params.MNKWidth.W) // K Tile Count
+  val bf16 = Bool()
 }
 
 // 原始 DPArray 指令
@@ -17,6 +18,7 @@ class DPACalcCmd(params: NMatParams) extends Bundle {
   val regC = UInt(params.log2CountCTile.W)
   val releaseA = Bool() // 读出数据后立即释放一个 A Tile，可以提前释放以掩盖延迟
   val releaseB = Bool() // 读出数据后立即释放一个 B Tile，可以提前释放以掩盖延迟
+  val bf16 = Bool() // 使用 BF16
   val clear = Bool()     // 清空累加器
   val writeback = Bool() // 读出到 PE 等待后处理及写回
 }
@@ -147,6 +149,7 @@ class MatConsumerTaskGen(params: NMatParams) extends Module {
   io.cmdOut.bits.regC := (curSubM << params.log2SN).asUInt | curSubN
   io.cmdOut.bits.releaseA := aRelease
   io.cmdOut.bits.releaseB := bRelease
+  io.cmdOut.bits.bf16 := cmd.bf16
   io.cmdOut.bits.clear := cClear
   io.cmdOut.bits.writeback := cWriteback
 
