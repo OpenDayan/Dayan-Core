@@ -69,10 +69,10 @@
         "NeedEMU": true
     },
     "KulischAccumulatorTestTop": {
-        "Package": "rvtng.neomat"
+        "Package": "rvtng.fpmath.signedFP"
     },
     "GetMaxDiffTop": {
-        "Package": "rvtng.neomat"
+        "Package": "rvtng.fpmath"
     },
     "MatProducerTaskGen": {
         "Package": "rvtng.neomat"
