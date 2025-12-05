@@ -50,6 +50,7 @@ class KulischAccumulator(c: KulischAccConfig) extends Module {
 
   // 开始累加
   io.out.exp := exp
+  // TODO: Use CSA73 CSA53 CSA32 Here to speedup.
   io.out.frac := frac.reduceTree(_ +& _)
 }
 
@@ -61,12 +62,12 @@ class KulischAccumulatorTestTop extends Module {
   })
   val dut = Module(new KulischAccumulator(KulischAccConfig(
     numInputs = 4,
-    inExpWidth = 10,
+    inExpWidth = 9,
     inSigWidth = 25,
     outExpWidth = 10,
     outSigWidth = 70
   )))
-  dut.io.in := VecInit(io.in.map(SignedFPFrom(8, 24, _)))
+  dut.io.in := VecInit(io.in.map(SignedFPFrom(9, 25, _)))
   io.out := FNFromSignedFP(SignedFPNorm(dut.io.out))
 }
 

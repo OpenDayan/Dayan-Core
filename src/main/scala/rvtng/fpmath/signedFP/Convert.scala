@@ -6,15 +6,13 @@ import rvtng.fpmath._
 import hardfloat._
 
 object SignedFPFrom {
-  def apply(in: RawFloat): SignedFP = {
-    val ret = Wire(new SignedFP(in.expWidth + 2, in.sigWidth + 1))
-    val fracRaw = Cat(1.U(2.W), in.sig(in.sigWidth - 2, 0)).asSInt // sigWidth + 1 bits
-    ret.exp := in.sExp - ((BigInt(1) << in.expWidth) - 1).S
-    ret.frac := Mux(in.sign, -fracRaw, fracRaw)
+  def apply(wE: Int, wF: Int, in: UInt): SignedFP = {
+    val m = Module(new FPUnpackModule(wE, wF, 0))
+    m.fp := in
+    val ret = Wire(new SignedFP(8, 25))
+    ret.exp := m.exp
+    ret.frac := m.frac.asSInt
     ret
-  }
-  def apply(expWidth: Int, sigWidth: Int, in: Bits): SignedFP = {
-    SignedFPFrom(rawFloatFromFN(expWidth, sigWidth, in))
   }
 }
 
