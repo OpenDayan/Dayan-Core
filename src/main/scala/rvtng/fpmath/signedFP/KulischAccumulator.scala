@@ -64,10 +64,10 @@ class KulischAccumulatorTestTop extends Module {
     inExpWidth = 10,
     inSigWidth = 25,
     outExpWidth = 10,
-    outSigWidth = 64
+    outSigWidth = 70
   )))
   dut.io.in := VecInit(io.in.map(SignedFPFrom(8, 24, _)))
-  io.out := FNFromSignedFP(dut.io.out)
+  io.out := FNFromSignedFP(SignedFPNorm(dut.io.out))
 }
 
 

@@ -12,7 +12,7 @@ object SignedFPNorm {
     val frac = Mux(sign, -in.frac(in.wF - 2, 0), in.frac(in.wF - 2, 0))
     // 统计前导零数目
     val clz = CLZ(frac)
-    ret.exp := in.exp - clz.asSInt
+    ret.exp := in.exp - clz.zext
     ret.frac := in.frac << clz
     ret
   }
