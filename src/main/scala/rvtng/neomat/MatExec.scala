@@ -28,14 +28,14 @@ class MatInnerTileChannelReadResp(params: NMatParams, regIdWidth: Int, posWidth:
   val data = Vec(params.channelWidth, UInt(8.W))
 }
 
-class MatInnerTileWriteReq(params: NMatParams, regIdWidth: Int, posWidth: Int) extends Bundle {
+class MatInnerTileWriteReq(params: NMatParams) extends Bundle {
   val addr = UInt(params.addrWidth.W)
   val swizzle = UInt(24.W)
   val last = Bool()
   val data = Vec(params.channelWidth, UInt(8.W))
 }
 
-class MatInnerTileChannelWriteResp(params: NMatParams, regIdWidth: Int, posWidth: Int) extends Bundle {
+class MatInnerTileChannelWriteResp extends Bundle {
   val valid = Bool()
   val last = Bool()
 }

@@ -32,10 +32,9 @@ class MatPostProcess(params: NMatParams) extends Module {
 
     // URAM 写回接口，低速率
     val busWReq = Vec(params.busWriteChannel,
-      Decoupled(new MatInnerTileWriteReq(params, params.log2CountCTile, log2CReadTransactionCount))
+      Decoupled(new MatInnerTileWriteReq(params))
     )
-    val busWResp = Vec(params.busWriteChannel, new MatInnerTileChannelWriteResp(params,
-      params.log2CountCTile, log2CReadTransactionCount))
+    val busWResp = Input(Vec(params.busWriteChannel, new MatInnerTileChannelWriteResp))
 
     // 完成信号
     val finish = Output(Bool())
@@ -100,7 +99,7 @@ class MatPostProcess(params: NMatParams) extends Module {
     cnt := cnt - io.ppAlloc.fire + resultInQ(idx).deq.fire.asUInt
     resultInQFree(idx) := cnt =/= 0.U
   })
-  io.ppAlloc.valid := resultInQFree.reduceTree(_ | _)
+  io.ppAlloc.valid := resultInQFree.reduceTree(_ & _)
   // bus 写地址队列
   class busWriteAddrT extends Bundle {
     val addr = UInt(params.addrWidth.W)
@@ -174,11 +173,6 @@ class MatPostProcess(params: NMatParams) extends Module {
   io.busRReq.bits.stride := readCmd.stride
   io.busRReq.bits.swizzle := readCmd.swizzle
 
-  // bus 写请求队列
-  val busWriteQ = VecInit.tabulate(params.busWriteChannel)(i =>
-    Module(new Queue(new MatInnerTileWriteReq(params, params.log2CountCTile, log2CReadTransactionCount), 2)).io
-  )
-
   // bus 完成请求队列
   val busFinishQ = VecInit.tabulate(params.busWriteChannel)(i => {
       Module(new Queue(Bool(), 2)).io
@@ -187,7 +181,7 @@ class MatPostProcess(params: NMatParams) extends Module {
 
   // URAM 接线逻辑
 
-  val busFinishAll = busFinishQ.map(i => i.deq.valid & i.deq.bits).reduce(_ | _)
+  val busFinishAll = VecInit(busFinishQ.map(i => i.deq.valid & i.deq.bits)).reduceTree(_ & _)
   busFinishQ.zipWithIndex.foreach(iter => {
     val (busFinishIO, idx) = iter
     busFinishIO.enq.valid := io.busWResp(idx).valid
@@ -198,10 +192,10 @@ class MatPostProcess(params: NMatParams) extends Module {
 
   // 计算流水线
   // 获取 resultQ, busWriteAddrQ 压入 busWriteQ
-  resultQ.zip(busReadQ).zip(busWriteAddrQ).zip(busWriteQ).foreach(iter => {
+  resultQ.zip(busReadQ).zip(busWriteAddrQ).zip(io.busWReq).foreach(iter => {
     val (((lQ, rQ), aQ), tQ) = iter
-    tQ.enq.valid := lQ.deq.valid & aQ.deq.valid & (aQ.deq.bits.clear | rQ.deq.valid)
-    tQ.enq.bits.data := VecInit(lQ.deq.bits.zip(rQ.deq.bits).map(adders => {
+    tQ.valid := lQ.deq.valid & aQ.deq.valid & (aQ.deq.bits.clear | rQ.deq.valid)
+    tQ.bits.data := VecInit(lQ.deq.bits.zip(rQ.deq.bits).map(adders => {
       val fpAdder = Module(new KulischAccumulator(KulischAccConfig(
         numInputs = 2,
         inExpWidth = params.wE,
@@ -215,12 +209,12 @@ class MatPostProcess(params: NMatParams) extends Module {
       fpAdder.io.in(0) := adders._1
       fpAdder.io.in(1) := Mux(aQ.deq.bits.clear, zeroFp, adders._2)
       FNFromSignedFP(SignedFPNorm(fpAdder.io.out))
-    })).asTypeOf(tQ.enq.bits.data)
-    tQ.enq.bits.last := aQ.deq.bits.last
-    tQ.enq.bits.addr := aQ.deq.bits.addr
-    tQ.enq.bits.swizzle := aQ.deq.bits.swizzle
-    lQ.deq.ready := tQ.enq.fire
-    rQ.deq.ready := tQ.enq.fire & !aQ.deq.bits.clear
-    aQ.deq.ready := tQ.enq.fire
+    })).asTypeOf(tQ.bits.data)
+    tQ.bits.last := aQ.deq.bits.last
+    tQ.bits.addr := aQ.deq.bits.addr
+    tQ.bits.swizzle := aQ.deq.bits.swizzle
+    lQ.deq.ready := tQ.fire
+    rQ.deq.ready := tQ.fire & !aQ.deq.bits.clear
+    aQ.deq.ready := tQ.fire
   })
 }
