@@ -5,7 +5,7 @@ import chisel3.util._
 import rvtng.uram.Adv2R1WURAM
 import rvtng.vec.{VecParams, VecTop}
 //import rvtng.mat.{MatParams, MatTop}
-import rvtng.neomat.{MatParams, NMatTop}
+import rvtng.neomat.{MatParams, MatTop}
 import rvtng.dma.{DMAParams, DMATop}
 import _root_.circt.stage.ChiselStage
 import rvtng.bus.{AXI4Bundle, AXI4BundleParameters, DPIAXI4}
@@ -41,7 +41,7 @@ class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams,
 
   // SubModule Instance
   private val vec = Module(new VecTop(vecParams))
-  private val mat = Module(new MatTop(matParams))
+  private val mat = Module(new MatTop(matParams)).io
   private val dma = Module(new DMATop(dmaParams, true))
 
   // Instruction Dispatch logic
@@ -57,9 +57,28 @@ class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams,
   mat.uramRResp0 <> uram.r0resp_o(0)
   mat.uramRReq1 <> uram.r1req_i(0)
   mat.uramRResp1 <> uram.r1resp_o(0)
-  mat.uramWReq <> uram.wreq_i(0)
-  mat.uramWResp <> uram.wresp_o(0)
-  uram.wdata_i(0) := mat.uramWData
+//  mat.uramWReq <> uram.wreq_i(0)
+//  mat.uramWResp <> uram.wresp_o(0)
+//  uram.wdata_i(0) := mat.uramWData
+
+  for(i <- 0 until matParams.busChannel * uramPortPerChannel) {
+    if(i < matParams.busWriteChannel * uramPortPerChannel) {
+      // Avoid DMA Write Port
+      uram.wreq_i(0)( (matParams.busChannel - matParams.busWriteChannel) * uramPortPerChannel + i) <> mat.uramWReq(i)
+      uram.wdata_i(0)((matParams.busChannel - matParams.busWriteChannel) * uramPortPerChannel + i) := mat.uramWData(i)
+    } else {
+      uram.wreq_i(0)(i - matParams.busWriteChannel * uramPortPerChannel).valid := 0.B
+      uram.wreq_i(0)(i - matParams.busWriteChannel * uramPortPerChannel).bits := DontCare
+      uram.wdata_i(0)(i - matParams.busWriteChannel * uramPortPerChannel) := DontCare
+    }
+  }
+  for(i <- 0 until matParams.busChannel) {
+    if(i < matParams.busWriteChannel) {
+      mat.uramWResp(i) <> uram.wresp_o(0)(matParams.busChannel - matParams.busWriteChannel + i)
+    } else {
+      uram.wresp_o(0)(i - matParams.busWriteChannel).ready := 1.B
+    }
+  }
 
   // Vec Connection
   vec.instReq <> disp.vecReq

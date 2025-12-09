@@ -42,7 +42,7 @@ case class MatParams(
 }
 
 // 注意：所有指令顺序执行顺序完成，因此返回信号采用脉冲就绪格式。
-class NMatTop(params: MatParams) extends Module {
+class MatTop(params: MatParams) extends Module {
   private val readPorts   = (params.busChannel * params.channelWidth) / 8
   private val readChannel = params.busChannel
   private val writePorts = (params.busWriteChannel * params.channelWidth) / 8
@@ -192,7 +192,7 @@ class NMatTop(params: MatParams) extends Module {
 
 
 class MatTestTop(params: MatParams) extends Module {
-  private val mat = Module(new NMatTop(params)).io
+  private val mat = Module(new MatTop(params)).io
   // URAM Instance
   private val uram = Module(new Adv2R1WURAM(
     R0Port = 1, R1Port = 1, W0Port = 1, GroupCount = params.cK / 8,
