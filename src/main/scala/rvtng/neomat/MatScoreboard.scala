@@ -7,7 +7,7 @@ import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
 // Note: Scoreboard write back can be reordered with CSR Instruction write back.
-class MatScoreboard(params: NMatParams) extends Module {
+class MatScoreboard(params: MatParams) extends Module {
   val io = IO(new Bundle{
       val instReq = Flipped(Decoupled(new TensorInst()))
       val instResp = Decoupled(new TensorResp())

@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
-class MatTask(params: NMatParams) extends Bundle {
+class MatTask(params: MatParams) extends Bundle {
   val bf16 = Bool()
   val mma = Bool() // 是否是 MMA 指令
   val aBaseAddr = UInt(params.addrWidth.W)
@@ -27,7 +27,7 @@ class MatTask(params: NMatParams) extends Bundle {
 *  - 该模块用于矩阵乘法任务拆分，内部例化两个 Producer Task Gen，一个 Consumer Task Gen 及一个 PostProcessTaskGen
 *  - 该模块对外，暴露三组指令接口(ldA, ldB, calc)，及对应指令的完成接口，及 Post-Processing 单元接口(cmd、allocate(Credit-FIFO))。
 * */
-class MatTaskGen(params: NMatParams) extends Module {
+class MatTaskGen(params: MatParams) extends Module {
   val io = IO(new Bundle{
     val cmdIn = Flipped(Decoupled(new MatTask(params)))
     val ldA = Decoupled(new DPALoadCmd(params, params.log2CountATile))
@@ -118,7 +118,7 @@ class MatTaskGen(params: NMatParams) extends Module {
 
 object MatTaskGen extends App {
   ChiselStage.emitSystemVerilog(
-    new MatTaskGen(NMatParams(
+    new MatTaskGen(MatParams(
       sM = 2, sN = 2, sK = 16
     )),
     firtoolOpts = Array(

@@ -5,7 +5,7 @@ import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
 // Producer 指令，用于触发一组 Load/Store 任务
-class MatProducerTaskGenCmd(params: NMatParams) extends Bundle {
+class MatProducerTaskGenCmd(params: MatParams) extends Bundle {
   val addr    = UInt(params.addrWidth.W)
   val stride  = UInt(params.addrWidth.W)
   val swizzle = UInt(24.W)
@@ -15,7 +15,7 @@ class MatProducerTaskGenCmd(params: NMatParams) extends Bundle {
 }
 
 // 原始 DPArray 指令
-class DPALoadCmd(params: NMatParams, log2CountXTile: Int) extends Bundle {
+class DPALoadCmd(params: MatParams, log2CountXTile: Int) extends Bundle {
   val regId = UInt(log2CountXTile.W)
   val addr = UInt(params.addrWidth.W)
   val stride = UInt(params.addrWidth.W)
@@ -23,7 +23,7 @@ class DPALoadCmd(params: NMatParams, log2CountXTile: Int) extends Bundle {
 }
 
 // MatProducer Ack
-class MatProducerAck(params: NMatParams, log2CountXTile: Int) extends Bundle {
+class MatProducerAck(params: MatParams, log2CountXTile: Int) extends Bundle {
   val regId = UInt(log2CountXTile.W)
 }
 
@@ -59,7 +59,7 @@ class MatProducerAck(params: NMatParams, log2CountXTile: Int) extends Bundle {
   *   每次任务输出都分配一个regId，保持与Ack/Release计数、指针一致，确保不会资源冲突。子任务全部完成后才允许接受新任务，防止乱序。
   *   支持外部通过ackIn和releaseIn及时归还寄存器资源，保障并发与资源利用效率。
   */
-class MatProducerTaskGen(params: NMatParams, log2CountXTile: Int, sMajor: Int, sMinor: Int, minorStride: Int) extends Module {
+class MatProducerTaskGen(params: MatParams, log2CountXTile: Int, sMajor: Int, sMinor: Int, minorStride: Int) extends Module {
   // IO
   val io = IO(new Bundle {
     val cmdIn = Flipped(Decoupled(new MatProducerTaskGenCmd(params)))
@@ -178,7 +178,7 @@ class MatProducerTaskGen(params: NMatParams, log2CountXTile: Int, sMajor: Int, s
 
 object MatProducerTaskGen extends App {
   ChiselStage.emitSystemVerilog(
-    new MatProducerTaskGen(NMatParams(
+    new MatProducerTaskGen(MatParams(
       sM = 2, sN = 2, sK = 16
     ), 5, 2, 16, 16),
     firtoolOpts = Array(

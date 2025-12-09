@@ -4,9 +4,9 @@ import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
 import rvtng.top.{ScoreboardComp, TensorInst, TensorResp}
-import rvtng.uram.{AdvURAMReq, AdvURAMResp, AdvURAMWResp}
+import rvtng.uram._
 
-case class NMatParams(
+case class MatParams(
   // 地址位宽
   val addrWidth: Int = 20,
   val MNKWidth: Int = 16,
@@ -14,7 +14,7 @@ case class NMatParams(
   // 存驻比
   sM: Int = 2, sN: Int = 2, sK: Int = 16,
   // 运算器尺寸
-  cM: Int = 16, cN: Int = 16, cK: Int = 32,
+  cM: Int = 16, cN: Int = 8, cK: Int = 32,
   // 内部精度：累加器
   wE: Int = 9, wF: Int = 25,
   // 总线参数
@@ -42,7 +42,7 @@ case class NMatParams(
 }
 
 // 注意：所有指令顺序执行顺序完成，因此返回信号采用脉冲就绪格式。
-class NMatTop(params: NMatParams) extends Module {
+class NMatTop(params: MatParams) extends Module {
   private val readPorts   = (params.busChannel * params.channelWidth) / 8
   private val readChannel = params.busChannel
   private val writePorts = (params.busWriteChannel * params.channelWidth) / 8
@@ -58,22 +58,22 @@ class NMatTop(params: NMatParams) extends Module {
   private val cTransactionCount = (cTileSize + (params.busChannel * params.channelWidth) - 1) / (params.busChannel * params.channelWidth)
   private val log2CTransactionCount = log2Ceil(cTransactionCount)
   val io = IO(new Bundle {
-    val instReq = IO(Flipped(Decoupled(new TensorInst)))
-    val instResp = IO(Decoupled(new TensorResp))
-    val sbComp = IO(Decoupled(new ScoreboardComp()))
-    val finish = IO(Output(Bool()))
+    val instReq = Flipped(Decoupled(new TensorInst))
+    val instResp = Decoupled(new TensorResp)
+    val sbComp = Decoupled(new ScoreboardComp())
+    val finish = Output(Bool())
 
     // URAM Interface
-    val uramRReq0 = IO(Vec(readPorts, Decoupled(new AdvURAMReq(params.addrWidth, params.idWidth, 64))))
-    val uramRReq1 = IO(Vec(readPorts, Decoupled(new AdvURAMReq(params.addrWidth, params.idWidth, 64))))
-    val uramWReq = IO(Vec(writePorts, Decoupled(new AdvURAMReq(params.addrWidth, params.idWidth, 64))))
-    val uramWData = IO(Output(Vec(writePorts, UInt(64.W))))
-    val uramRResp0 = IO(Flipped(Vec(readChannel, Decoupled(Vec(portsPerChannel,
-      new AdvURAMResp(params.addrWidth, params.idWidth, 64))))))
-    val uramRResp1 = IO(Flipped(Vec(readChannel, Decoupled(Vec(portsPerChannel,
-      new AdvURAMResp(params.addrWidth, params.idWidth, 64))))))
-    val uramWResp = IO(Flipped(Vec(writeChannel, Decoupled(Vec(portsPerChannel,
-      new AdvURAMWResp(params.addrWidth, params.idWidth, 64))))))
+    val uramRReq0 = Vec(readPorts, Decoupled(new AdvURAMReq(params.addrWidth, params.idWidth, 64)))
+    val uramRReq1 = Vec(readPorts, Decoupled(new AdvURAMReq(params.addrWidth, params.idWidth, 64)))
+    val uramWReq = Vec(writePorts, Decoupled(new AdvURAMReq(params.addrWidth, params.idWidth, 64)))
+    val uramWData = Output(Vec(writePorts, UInt(64.W)))
+    val uramRResp0 = Flipped(Vec(readChannel, Decoupled(Vec(portsPerChannel,
+      new AdvURAMResp(params.addrWidth, params.idWidth, 64)))))
+    val uramRResp1 = Flipped(Vec(readChannel, Decoupled(Vec(portsPerChannel,
+      new AdvURAMResp(params.addrWidth, params.idWidth, 64)))))
+    val uramWResp = Flipped(Vec(writeChannel, Decoupled(Vec(portsPerChannel,
+      new AdvURAMWResp(params.addrWidth, params.idWidth, 64)))))
   })
 
   // MAT CSR
@@ -85,9 +85,6 @@ class NMatTop(params: NMatParams) extends Module {
 
   // Mat Task Generator
   private val tgen = Module(new MatTaskGen(params)).io
-
-  // Mat Exec
-  private val exe = Module(new MatExec(params)).io
 
   // Mat Post-Process
   private val pp = Module(new MatPostProcess(params)).io
@@ -102,6 +99,9 @@ class NMatTop(params: NMatParams) extends Module {
   // URAM Switch-2 (C Write)
   private val us2 = Module(new MatMemStoreTaskIssue(params)).io
 
+  // Mat Exec
+  private val exe = Module(new MatExec(params)).io
+
   // 互联部分
   // 1. Input Instruction -> tgen / tcsr
   private val decodeTaskSpilt = io.instReq.bits.instWord(31, 28) === 0b0001.U
@@ -115,6 +115,7 @@ class NMatTop(params: NMatParams) extends Module {
   sb.instIssue := tgen.cmdIn.fire
   sb.instCommit := pp.finish
   sb.sbComp <> io.sbComp
+  io.finish := pp.finish
 
   // CSR
   csr.instReq.bits  := io.instReq.bits
@@ -134,10 +135,11 @@ class NMatTop(params: NMatParams) extends Module {
   respArb.in(1) <> sb.instResp
 
   // mat tgen cmdIn generation
-  tgen.cmdIn.bits
   private val curIsBF16 = csr.sel.ctrl.DataType === 0.U
+  csr.sel.addr := io.instReq.bits.instWord(27, 25)
   tgen.cmdIn.valid := io.instReq.valid & decodeTaskSpilt
   tgen.cmdIn.bits.bf16 := curIsBF16
+  tgen.cmdIn.bits.mma  := 1.B // 是否是 MMA 指令
   tgen.cmdIn.bits.aBaseAddr := io.instReq.bits.rs1Data
   tgen.cmdIn.bits.bBaseAddr := io.instReq.bits.rs2Data
   tgen.cmdIn.bits.cBaseAddr := io.instReq.bits.rdData
@@ -151,6 +153,117 @@ class NMatTop(params: NMatParams) extends Module {
   tgen.cmdIn.bits.BSwizzleMBS := csr.sel.ctrl.BSwizzleMBS
   tgen.cmdIn.bits.CSwizzleMBS := csr.sel.ctrl.CSwizzleMBS
   tgen.cmdIn.bits.persistentMode := csr.sel.ctrl.PersistentMode
+
+  // tgen connection
+  tgen.ldA        <> exe.ldA
+  tgen.ldAAck     := exe.ldAAck
+  tgen.ldARelease := exe.ldARelease
+  tgen.ldB        <> exe.ldB
+  tgen.ldBAck     := exe.ldBAck
+  tgen.ldBRelease := exe.ldBRelease
+  tgen.calc       <> exe.calc
+
+  // pp connection
+  pp.cmdIn   <> tgen.pp
+  pp.ppAlloc <> tgen.ppAlloc
+  pp.result  <> exe.result
+
+  // mem connection
+  exe.busAReq  <> us0.busRReq(0)
+  exe.busAResp := us0.busRResp(0)
+  exe.busAAck  := us0.busRAck(0)
+  exe.busBReq  <> us1.busRReq(0)
+  exe.busBResp := us1.busRResp(0)
+  exe.busBAck  := us1.busRAck(0)
+  pp.busRReq   <> us0.busRReq(1)
+  pp.busRResp  := us0.busRResp(1)
+  pp.busWReq   <> us2.busWReq
+  pp.busWResp  := us2.busWResp
+
+  // uram connection
+  us0.uramReq   <> io.uramRReq0
+  us0.uramResp  <> io.uramRResp0
+  us1.uramReq   <> io.uramRReq1
+  us1.uramResp  <> io.uramRResp1
+  us2.uramWReq  <> io.uramWReq
+  io.uramWData  := us2.uramWdata
+  us2.uramWResp <> io.uramWResp
 }
+
+
+class MatTestTop(params: MatParams) extends Module {
+  private val mat = Module(new NMatTop(params)).io
+  // URAM Instance
+  private val uram = Module(new Adv2R1WURAM(
+    R0Port = 1, R1Port = 1, W0Port = 1, GroupCount = params.cK / 8,
+    fifoSize = 16, N = (params.busChannel * params.channelWidth) / 8, addrWidth = params.addrWidth,
+    idWidth = params.idWidth, dataWidth = 64
+  ))
+
+  val instReq = IO(Flipped(Decoupled(new TensorInst)))
+  val instResp = IO(Decoupled(new TensorResp))
+  val sbComp   = IO(Decoupled(new ScoreboardComp()))
+  val finish = IO(Output(Bool()))
+  mat.instReq <> instReq
+  mat.instResp <> instResp
+  mat.sbComp <> sbComp
+
+  finish := mat.finish
+  uram.r0req_i(0) :<>= mat.uramRReq0
+  uram.r1req_i(0) :<>= mat.uramRReq1
+  mat.uramRResp0 :<>= uram.r0resp_o(0)
+  mat.uramRResp1 :<>= uram.r1resp_o(0)
+  private val ports = (params.busChannel * params.channelWidth) / 8
+  private val writePorts = (params.busWriteChannel * params.channelWidth) / 8
+  for(i <- 0 until ports) {
+    if(i < writePorts) {
+      uram.wreq_i(0)(i) <> mat.uramWReq(i)
+      uram.wdata_i(0)(i) := mat.uramWData(i)
+    } else {
+      uram.wreq_i(0)(i).valid := 0.B
+      uram.wreq_i(0)(i).bits := DontCare
+      uram.wdata_i(0)(i) := DontCare
+    }
+  }
+  for(i <- 0 until params.busChannel) {
+    if(i < params.busWriteChannel) {
+      mat.uramWResp(i) <> uram.wresp_o(0)(i)
+    } else {
+      uram.wresp_o(0)(i).ready := 1.B
+    }
+  }
+
+  // Export uram Interface to prevent Vivado Optimize it.
+//  val uram_r  = IO(Flipped(Vec(params.busWidth / 8, Decoupled(new AdvURAMReq(params.addressWidth, 0, 64)))))
+//  val uram_w  = IO(Flipped(Vec(params.busWidth / 8, Decoupled(new AdvURAMReq(params.addressWidth, 0, 64)))))
+//  val uram_rr = IO(Vec((params.busWidth / 8) / (params.cK / 8),
+//    Decoupled(Vec(params.cK / 8, new AdvURAMResp(params.addressWidth, 0, 64)))))
+//  val uram_wdata = IO(Input(Vec(params.busWidth / 8, UInt(64.W))))
+//  val uram_wr = IO(Vec((params.busWidth / 8) / (params.cK / 8),
+//    Decoupled(Vec((params.cK / 8), new AdvURAMWResp(params.addressWidth, 0, 64)))))
+//  uram.r0req_i(1)  <> uram_r
+//  uram.wreq_i(1)   <> uram_w
+//  uram.r0resp_o(1) <> uram_rr
+//  uram.wresp_o(1)  <> uram_wr
+//  uram.wdata_i(1) := uram_wdata
+}
+
+object MatTestTop extends App {
+  ChiselStage.emitSystemVerilog(
+    new MatTestTop(MatParams(
+      addrWidth = 20, MNKWidth = 16, sM = 2, sN = 2, sK = 16, cM = 16, cN = 8, cK = 32,
+      wE = 9, wF = 25, busChannel = 8, channelWidth = 32, idWidth = 9,
+      busWriteChannel = 2, tcsrBanks = 8
+    )),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/MatTestTop"
+    )
+  )
+}
+
 
 

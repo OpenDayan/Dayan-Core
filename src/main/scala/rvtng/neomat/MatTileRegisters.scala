@@ -9,7 +9,7 @@ import rvtng.utils.RF1R1WRamGenEN
 // 接口包含：
 //  - 用于控制的指令接口 + 简化 URAM 接口
 //  - 用于运算器读出的读接口（RegID + 单周期后返回查询结果）
-class MatTileRegisters(params: NMatParams, log2CountXTile: Int, dataWidth: Int) extends Module {
+class MatTileRegisters(params: MatParams, log2CountXTile: Int, dataWidth: Int) extends Module {
   // 计算需要进行的请求数目
   val transactionCount = (dataWidth + (params.busChannel * params.channelWidth) - 1) / (params.busChannel * params.channelWidth)
   val log2TransactionCount = log2Ceil(transactionCount)
@@ -18,7 +18,8 @@ class MatTileRegisters(params: NMatParams, log2CountXTile: Int, dataWidth: Int) 
     val cmdIn = Flipped(Decoupled(new DPALoadCmd(params, log2CountXTile)))
     // URAM 或者其它总线接口
     val busReq = Decoupled(new MatInnerTileReadReq(params, log2CountXTile, log2TransactionCount))
-    val busResp = Vec(params.busChannel, new MatInnerTileChannelReadResp(params, log2CountXTile, log2TransactionCount))
+    val busResp = Input(Vec(params.busChannel,
+      new MatInnerTileChannelReadResp(params, log2CountXTile, log2TransactionCount)))
     // 读取接口，单周期返回结果
     val re = Input(Bool())
     val regId = Input(UInt(log2CountXTile.W))
@@ -34,7 +35,7 @@ class MatTileRegisters(params: NMatParams, log2CountXTile: Int, dataWidth: Int) 
 
   // 当前正在进行的 transaction id
   val curPos = Reg(UInt(log2TransactionCount.W))
-  finish := curPos === (transactionCount - 1).U
+  finish := (curPos === (transactionCount - 1).U) & io.busReq.fire
 
   // Valid 维护
   when(io.cmdIn.fire) {
@@ -58,6 +59,7 @@ class MatTileRegisters(params: NMatParams, log2CountXTile: Int, dataWidth: Int) 
   io.busReq.bits.stride := cmd.stride
   io.busReq.bits.swizzle := cmd.swizzle
   io.busReq.bits.position := curPos
+  io.busReq.bits.last := curPos === (transactionCount - 1).U
 
   // 内部存储器结构: 1R1W
   val rawData = Wire(Vec(transactionCount, Vec(params.busChannel, Vec(params.channelWidth, UInt(8.W)))))
@@ -74,4 +76,19 @@ class MatTileRegisters(params: NMatParams, log2CountXTile: Int, dataWidth: Int) 
     }
   }
   io.data := rawData.asTypeOf(io.data.cloneType)
+}
+
+object MatTileRegisters extends App {
+  ChiselStage.emitSystemVerilog(
+    new MatTileRegisters(MatParams(
+      sM = 2, sN = 2, sK = 16
+    ), 5, 32),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/MatTileRegisters"
+    )
+  )
 }

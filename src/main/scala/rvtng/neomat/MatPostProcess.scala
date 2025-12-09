@@ -8,7 +8,7 @@ import rvtng.fpmath.signedFP._
 // 注意：该模块用于矩阵乘法后处理，包括简单激活、反量化、累加等操作
 // 目前仅实现累加
 
-class MatPostProcess(params: NMatParams) extends Module {
+class MatPostProcess(params: MatParams) extends Module {
   val cTileSize = params.cM * params.cN * 4
   val cReadTransactionCount = (cTileSize + (params.busChannel * params.channelWidth) - 1) /
     (params.busChannel * params.channelWidth)
@@ -27,8 +27,8 @@ class MatPostProcess(params: NMatParams) extends Module {
 
     // URAM 读取接口，全速率
     val busRReq = Decoupled(new MatInnerTileReadReq(params, params.log2CountCTile, log2CReadTransactionCount))
-    val busRResp = Vec(params.busChannel, new MatInnerTileChannelReadResp(params,
-      params.log2CountCTile, log2CReadTransactionCount))
+    val busRResp = Input(Vec(params.busChannel, new MatInnerTileChannelReadResp(params,
+      params.log2CountCTile, log2CReadTransactionCount)))
 
     // URAM 写回接口，低速率
     val busWReq = Vec(params.busWriteChannel,
@@ -43,22 +43,29 @@ class MatPostProcess(params: NMatParams) extends Module {
   // bus 读取结果队列
   val busReadInQ = VecInit.tabulate(params.cM)(i => {
     val m = Module(new Queue(Vec(params.cN, MatInnerSingedFP(params)), params.sM * params.sN)).io
-    m.enq.valid := io.busRResp(i % params.busChannel).valid &&
-      io.busRResp(i % params.busChannel).position === (i / params.busChannel).U
-    val extFP32 = io.busRResp(i % params.busChannel).data.asTypeOf(Vec(params.cN, UInt(32.W)))
-    m.enq.bits := VecInit(extFP32.map(SignedFPFrom(params.wE, params.wF, _)))
-    m.deq.ready := 0.B
     m
   })
+  for(i <- 0 until params.cM) {
+    busReadInQ(i).enq.valid := io.busRResp(i % params.busChannel).valid &&
+      io.busRResp(i % params.busChannel).position === (i / params.busChannel).U
+    val extFP32 = io.busRResp(i % params.busChannel).data.asTypeOf(Vec(params.cN, UInt(32.W)))
+    busReadInQ(i).enq.bits := VecInit(extFP32.map(SignedFPFrom(params.wE, params.wF, _)))
+    busReadInQ(i).deq.ready := 0.B
+  }
   // 重整 bus 读取结果
   val busReadQ = VecInit.tabulate(params.busWriteChannel)(i => {
     val m = Module(new Queue(Vec(params.cN, MatInnerSingedFP(params)), 2)).io
-    val curResultPos = RegInit(0.U(log2CWriteTransactionCount.W))
-    m.enq.valid := busReadInQ(curResultPos * params.busWriteChannel.U).deq.valid
-    m.enq.bits := busReadInQ(curResultPos * params.busWriteChannel.U).deq.bits
-    busReadInQ(curResultPos * params.busWriteChannel.U).deq.ready := m.enq.ready
     m
   })
+  for(i <- 0 until params.busWriteChannel) {
+    val m = busReadQ(i)
+    val curResultPos = RegInit(0.U(log2CWriteTransactionCount.W))
+    m.enq.valid := busReadInQ((i.U + curResultPos * params.busWriteChannel.U)(log2Ceil(params.cM) - 1, 0)).deq.valid
+    m.enq.bits := busReadInQ((i.U + curResultPos * params.busWriteChannel.U)(log2Ceil(params.cM) - 1, 0)).deq.bits
+    busReadInQ((i.U + curResultPos * params.busWriteChannel.U)(log2Ceil(params.cM) - 1, 0)).deq.ready := m.enq.ready
+    curResultPos := curResultPos +
+      busReadInQ((i.U + curResultPos * params.busWriteChannel.U)(log2Ceil(params.cM) - 1, 0)).deq.fire.asUInt
+  }
 
   // busQ 表项计数器
   val busReadInQFree = Wire(Vec(params.cM, Bool()))
@@ -74,22 +81,30 @@ class MatPostProcess(params: NMatParams) extends Module {
   io.result.ready := 1.B
   val resultInQ = VecInit.tabulate(params.cM)(i => {
     val m = Module(new Queue(Vec(params.cN, MatInnerSingedFP(params)), params.sM * params.sN)).io
-    m.enq.valid := io.result.valid
-    m.enq.bits := io.result.bits(i)
-    chisel3.assert(!(m.enq.valid & !m.enq.ready))
-    m.deq.ready := 0.B
     m
   })
+  for(i <- 0 until params.cM) {
+    val m = resultInQ(i)
+    m.enq.valid := io.result.valid
+    m.enq.bits := io.result.bits.asTypeOf(Vec(params.cM, Vec(params.cN, MatInnerSingedFP(params))))(i)
+    chisel3.assert(!(m.enq.valid & !m.enq.ready))
+    m.deq.ready := 0.B
+  }
 
   // 重整输入
   val resultQ = VecInit.tabulate(params.busWriteChannel)(i => {
     val m = Module(new Queue(Vec(params.cN, MatInnerSingedFP(params)), 2)).io
-    val curResultPos = RegInit(0.U(log2CWriteTransactionCount.W))
-    m.enq.valid := resultInQ(curResultPos * params.busWriteChannel.U).deq.valid
-    m.enq.bits := resultInQ(curResultPos * params.busWriteChannel.U).deq.bits
-    resultInQ(curResultPos * params.busWriteChannel.U).deq.ready := m.enq.ready
     m
   })
+  for(i <- 0 until params.busWriteChannel) {
+    val m = resultQ(i)
+    val curResultPos = RegInit(0.U(log2CWriteTransactionCount.W))
+    m.enq.valid := resultInQ((i.U + curResultPos * params.busWriteChannel.U)(log2Ceil(params.cM) - 1, 0)).deq.valid
+    m.enq.bits := resultInQ((i.U + curResultPos * params.busWriteChannel.U)(log2Ceil(params.cM) - 1, 0)).deq.bits
+    resultInQ((i.U + curResultPos * params.busWriteChannel.U)(log2Ceil(params.cM) - 1, 0)).deq.ready := m.enq.ready
+    curResultPos := curResultPos +
+      resultInQ((i.U + curResultPos * params.busWriteChannel.U)(log2Ceil(params.cM) - 1, 0)).deq.fire.asUInt
+  }
 
   // result 表项计数器
   val resultInQFree = Wire(Vec(params.cM, Bool()))
@@ -100,6 +115,7 @@ class MatPostProcess(params: NMatParams) extends Module {
     resultInQFree(idx) := cnt =/= 0.U
   })
   io.ppAlloc.valid := resultInQFree.reduceTree(_ & _)
+  io.ppAlloc.bits := 0.B
   // bus 写地址队列
   class busWriteAddrT extends Bundle {
     val addr = UInt(params.addrWidth.W)
@@ -118,12 +134,15 @@ class MatPostProcess(params: NMatParams) extends Module {
   io.cmdIn.ready := loadCmdQ.enq.ready & storeCmdQ.enq.ready
   loadCmdQ.enq.valid  := io.cmdIn.fire & !io.cmdIn.bits.clear
   storeCmdQ.enq.valid := io.cmdIn.fire
+  loadCmdQ.enq.bits := io.cmdIn.bits
+  storeCmdQ.enq.bits := io.cmdIn.bits
 
   // 写入地址生成逻辑
   // 当前正在处理任务的信号
   val writeValid = RegInit(0.B)
   val writeFinish = Wire(Bool())
   val writeCmd = RegEnable(storeCmdQ.deq.bits, storeCmdQ.deq.fire)
+  storeCmdQ.deq.ready := writeFinish | !writeValid
   val busWriteAddrQFire = busWriteAddrQRdy & writeValid
   val curWritePosition = Reg(UInt(log2CWriteTransactionCount.W))
   when(storeCmdQ.deq.fire) {
@@ -172,6 +191,7 @@ class MatPostProcess(params: NMatParams) extends Module {
   io.busRReq.bits.addr := readCmd.addr + curReadPosition * readCmd.stride * (params.cM / cReadTransactionCount).U
   io.busRReq.bits.stride := readCmd.stride
   io.busRReq.bits.swizzle := readCmd.swizzle
+  io.busRReq.bits.last := 0.B
 
   // bus 完成请求队列
   val busFinishQ = VecInit.tabulate(params.busWriteChannel)(i => {

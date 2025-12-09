@@ -11,10 +11,16 @@ object SwizzleAddr {
     val shiftedMask = (mask << M).asUInt(addr.getWidth - 1, 0)
     addr ^ (shiftedAddr & shiftedMask)
   }
-  def apply(addr: UInt, MBS: UInt, maxMask : Int = 8): UInt = {
+  def apply(addr: UInt, MBS: UInt, maxMask: Int): UInt = {
     val M = MBS(23, 16)
     val B = MBS(15,  8)
     val S = MBS( 7,  0)
     SwizzleAddr(addr, S, B, M, maxMask)
+  }
+  def apply(addr: UInt, MBS: UInt): UInt = {
+    val M = MBS(23, 16)
+    val B = MBS(15,  8)
+    val S = MBS( 7,  0)
+    SwizzleAddr(addr, S, B, M)
   }
 }

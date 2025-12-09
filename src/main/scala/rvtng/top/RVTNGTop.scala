@@ -4,7 +4,8 @@ import chisel3._
 import chisel3.util._
 import rvtng.uram.Adv2R1WURAM
 import rvtng.vec.{VecParams, VecTop}
-import rvtng.mat.{MatParams, MatTop}
+//import rvtng.mat.{MatParams, MatTop}
+import rvtng.neomat.{MatParams, NMatTop}
 import rvtng.dma.{DMAParams, DMATop}
 import _root_.circt.stage.ChiselStage
 import rvtng.bus.{AXI4Bundle, AXI4BundleParameters, DPIAXI4}

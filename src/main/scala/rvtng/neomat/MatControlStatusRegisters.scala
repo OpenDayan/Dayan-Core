@@ -19,7 +19,7 @@ class MatCSRStorage extends Bundle {
   val DataType = UInt(8.W)
 }
 
-class MatCSRGroupFetchIF(params: NMatParams) extends Bundle {
+class MatCSRGroupFetchIF(params: MatParams) extends Bundle {
   val addr = Input(UInt(log2Ceil(params.tcsrBanks).W))
   val ctrl = Output(new MatCSRStorage)
 }
@@ -33,7 +33,7 @@ class MatCSRGroupFetchIF(params: NMatParams) extends Bundle {
 *    张量指令返回接口：流式接口，用于返回 TCSR 请求结果（如果有）
 *    组配置端口：1R，读取一组张量配置信息，供指令发射逻辑逻辑使用。
 * */
-class MatControlStatusRegisters(params: NMatParams) extends Module {
+class MatControlStatusRegisters(params: MatParams) extends Module {
   val io = IO(new Bundle{
       val instReq = Flipped(Decoupled(new TensorInst()))
       val instResp = Decoupled(new TensorResp())

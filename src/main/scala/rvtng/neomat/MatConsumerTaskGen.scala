@@ -4,7 +4,7 @@ import chisel3._
 import chisel3.util._
 
 // Consumer 指令，用于触发一组 Calc 任务
-class MatConsumerTaskGenCmd(params: NMatParams) extends Bundle {
+class MatConsumerTaskGenCmd(params: MatParams) extends Bundle {
   val mTile = UInt(params.MNKWidth.W) // M Tile Count
   val nTile = UInt(params.MNKWidth.W) // N Tile Count
   val kTile = UInt(params.MNKWidth.W) // K Tile Count
@@ -12,7 +12,7 @@ class MatConsumerTaskGenCmd(params: NMatParams) extends Bundle {
 }
 
 // 原始 DPArray 指令
-class DPACalcCmd(params: NMatParams) extends Bundle {
+class DPACalcCmd(params: MatParams) extends Bundle {
   val regA = UInt(params.log2CountATile.W)
   val regB = UInt(params.log2CountATile.W)
   val regC = UInt(params.log2CountCTile.W)
@@ -26,7 +26,7 @@ class DPACalcCmd(params: NMatParams) extends Bundle {
 // 接口：来自 A、B 的 Producer Ack 接口和 Release 接口，用于适时的获取 Tile 并释放 Tile Register
 // 接口：来自 PE Controller 的 Acquire 接口，用于适时的获取 C Tile Buffer Space，并进行反压避免 Overflow
 
-class MatConsumerTaskGen(params: NMatParams) extends Module {
+class MatConsumerTaskGen(params: MatParams) extends Module {
   val io = IO(new Bundle {
     val cmdIn = Flipped(Decoupled(new MatConsumerTaskGenCmd(params)))
     // Note: User may add flip-flop in cmdOut Interface for better timming.

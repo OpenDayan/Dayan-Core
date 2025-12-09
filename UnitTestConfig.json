@@ -41,7 +41,7 @@
         "Package": "rvtng.utils"
     },
     "MatTestTop": {
-        "Package": "rvtng.mat"
+        "Package": "rvtng.neomat"
     },
     "RVTNGTestTop": {
         "Package": "rvtng.top",
@@ -78,6 +78,12 @@
         "Package": "rvtng.neomat"
     },
     "MatTaskGen": {
+        "Package": "rvtng.neomat"
+    },
+    "MatExec": {
+        "Package": "rvtng.neomat"
+    },
+    "MatTileRegisters": {
         "Package": "rvtng.neomat"
     }
 }

@@ -5,7 +5,7 @@ import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
 // Post Process 指令，用于触发一组 Post-Processing 任务
-class MatPostProcessTaskGenCmd(params: NMatParams) extends Bundle {
+class MatPostProcessTaskGenCmd(params: MatParams) extends Bundle {
   val addr    = UInt(params.addrWidth.W) // A 地址
   val stride  = UInt(params.addrWidth.W)
   val swizzle = UInt(24.W)
@@ -16,7 +16,7 @@ class MatPostProcessTaskGenCmd(params: NMatParams) extends Bundle {
 }
 
 // 后端实际执行的 Post Process 指令
-class DPAPostProcessCmd(params: NMatParams) extends Bundle {
+class DPAPostProcessCmd(params: MatParams) extends Bundle {
   val addr = UInt(params.addrWidth.W)
   val stride = UInt(params.addrWidth.W)
   val swizzle = UInt(24.W)
@@ -28,7 +28,7 @@ class DPAPostProcessCmd(params: NMatParams) extends Bundle {
  * 接口：
  *  - 指向 Post Processor 的 PostProcess 指令
  * */
-class MatPostProcessTaskGen(params: NMatParams, nStride: Int) extends Module {
+class MatPostProcessTaskGen(params: MatParams, nStride: Int) extends Module {
   val io = IO(new Bundle {
     val cmdIn = Flipped(Decoupled(new MatPostProcessTaskGenCmd(params)))
     val cmdOut = Decoupled(new DPAPostProcessCmd(params))

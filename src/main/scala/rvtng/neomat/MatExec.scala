@@ -9,26 +9,27 @@ import rvtng.utils.genPipe
 
 // 内部浮点数
 object MatInnerSingedFP {
-  def apply(params: NMatParams): SignedFP = new SignedFP(params.wE, params.wF)
+  def apply(params: MatParams): SignedFP = new SignedFP(params.wE, params.wF)
 }
 
 // 内部总线抽象
-class MatInnerTileReadReq(params: NMatParams, regIdWidth: Int, posWidth: Int) extends Bundle {
+class MatInnerTileReadReq(params: MatParams, regIdWidth: Int, posWidth: Int) extends Bundle {
   val regId = UInt(regIdWidth.W)
   val position = UInt(posWidth.W) // 一个 Tile Register Fetch 请求，可能会切分为多个 transaction 去执行，此时用 position 区别。
   val addr = UInt(params.addrWidth.W)
   val stride = UInt(params.addrWidth.W)
   val swizzle = UInt(24.W)
+  val last = Bool() // 最后一个请求
 }
 
-class MatInnerTileChannelReadResp(params: NMatParams, regIdWidth: Int, posWidth: Int) extends Bundle {
+class MatInnerTileChannelReadResp(params: MatParams, regIdWidth: Int, posWidth: Int) extends Bundle {
   val valid = Bool()
   val regId = UInt(regIdWidth.W)
   val position = UInt(posWidth.W) // 一个 Tile Register Fetch 请求，可能会切分为多个 transaction 去执行，此时用 position 区别。
   val data = Vec(params.channelWidth, UInt(8.W))
 }
 
-class MatInnerTileWriteReq(params: NMatParams) extends Bundle {
+class MatInnerTileWriteReq(params: MatParams) extends Bundle {
   val addr = UInt(params.addrWidth.W)
   val swizzle = UInt(24.W)
   val last = Bool()
@@ -41,7 +42,7 @@ class MatInnerTileChannelWriteResp extends Bundle {
 }
 
 // 该模块作为执行后段，接收来自前端发来的 load / calc 指令，完成矩阵乘法运算并将结果流式输出给 PE 做后处理。
-class MatExec(params: NMatParams) extends Module {
+class MatExec(params: MatParams) extends Module {
   val aTileSize = params.cM * params.cK
   val bTileSize = params.cN * params.cK
   val aTransactionCount = (aTileSize + (params.busChannel * params.channelWidth) - 1) / (params.busChannel * params.channelWidth)
@@ -63,8 +64,8 @@ class MatExec(params: NMatParams) extends Module {
     // 简化总线接口
     val busAReq = Decoupled(new MatInnerTileReadReq(params, params.log2CountATile, log2ATransactionCount))
     val busBReq = Decoupled(new MatInnerTileReadReq(params, params.log2CountBTile, log2BTransactionCount))
-    val busAResp = Vec(params.busChannel, new MatInnerTileChannelReadResp(params, params.log2CountATile, log2ATransactionCount))
-    val busBResp = Vec(params.busChannel, new MatInnerTileChannelReadResp(params, params.log2CountBTile, log2BTransactionCount))
+    val busAResp = Input(Vec(params.busChannel, new MatInnerTileChannelReadResp(params, params.log2CountATile, log2ATransactionCount)))
+    val busBResp = Input(Vec(params.busChannel, new MatInnerTileChannelReadResp(params, params.log2CountBTile, log2BTransactionCount)))
     val busAAck = Input(Bool())
     val busBAck = Input(Bool())
   })
@@ -100,9 +101,11 @@ class MatExec(params: NMatParams) extends Module {
   aTile.io.cmdIn <> io.ldA
   io.ldAAck := io.busAAck
   io.busAReq <> aTile.io.busReq
+  aTile.io.busResp := io.busAResp
   bTile.io.cmdIn <> io.ldB
   io.ldBAck := io.busBAck
   io.busBReq <> bTile.io.busReq
+  bTile.io.busResp := io.busBResp
 
   // Calc Handshake
   io.calc.ready := 1.B
@@ -114,6 +117,10 @@ class MatExec(params: NMatParams) extends Module {
   // TODO: Connect me
   dpa.valid := RegNext(io.calc.fire)
   dpa.bf16 := RegNext(io.calc.bits.bf16)
+  aTile.io.re := io.calc.fire
+  bTile.io.re := io.calc.fire
+  aTile.io.regId := io.calc.bits.regA
+  bTile.io.regId := io.calc.bits.regB
   dpa.a := aTileFP8
   dpa.b := bTileFP8
   dpa.a_scale := 0.U.asTypeOf(dpa.a_scale)
@@ -126,9 +133,11 @@ class MatExec(params: NMatParams) extends Module {
   val delayedVld = genPipe(io.calc.valid, dpa.r0Latency + 3)
   val delayedCmd = genPipe(io.calc.bits, dpa.r0Latency + 3)
   dpa.r0_cin_exp_in := RegNext(Mux(!delayedVld(dpa.r0Latency) | delayedCmd(dpa.r0Latency).clear,
-    (BigInt(1) << (params.wE-1)).S(params.wE.W), VecInit(cTile(delayedCmd(dpa.r0Latency).regC).map(_.exp)).asTypeOf(dpa.r0_cin_exp_in)))
+    VecInit.tabulate(params.cM)(m => VecInit.tabulate(params.cN)(n => (BigInt(1) << (params.wE-1)).S(params.wE.W))),
+    VecInit(cTile(delayedCmd(dpa.r0Latency).regC).map(_.exp)).asTypeOf(dpa.r0_cin_exp_in)))
   dpa.r0_cin_frac_in := RegNext(Mux(!delayedVld(dpa.r0Latency) | delayedCmd(dpa.r0Latency).clear,
-    0.S, VecInit(cTile(delayedCmd(dpa.r0Latency).regC).map(_.frac)).asTypeOf(dpa.r0_cin_exp_in)))
+    VecInit.tabulate(params.cM)(m => VecInit.tabulate(params.cN)(n => 0.S(params.wF.W))),
+    VecInit(cTile(delayedCmd(dpa.r0Latency).regC).map(_.frac)).asTypeOf(dpa.r0_cin_frac_in)))
   val dpaOut = Wire(Vec(params.cM * params.cN, MatInnerSingedFP(params)))
   val dpaOutExp = dpa.cout_exp.asTypeOf(Vec(params.cM * params.cN, SInt(params.wE.W)))
   val dpaOutFrac = dpa.cout_frac.asTypeOf(Vec(params.cM * params.cN, SInt(params.wF.W)))
@@ -147,4 +156,19 @@ class MatExec(params: NMatParams) extends Module {
   io.result.bits := dpaOut
 
   chisel3.assert(!(io.result.valid & !io.result.ready))
+}
+
+object MatExec extends App {
+  ChiselStage.emitSystemVerilog(
+    new MatExec(MatParams(
+      sM = 2, sN = 2, sK = 16
+    )),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/MatExec"
+    )
+  )
 }
