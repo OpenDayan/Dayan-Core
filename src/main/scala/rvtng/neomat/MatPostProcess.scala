@@ -80,7 +80,7 @@ class MatPostProcess(params: MatParams) extends Module {
   // result 结果队列
   io.result.ready := 1.B
   val resultInQ = VecInit.tabulate(params.cM)(i => {
-    val m = Module(new Queue(Vec(params.cN, MatInnerSingedFP(params)), 2 * params.sM * params.sN)).io
+    val m = Module(new Queue(Vec(params.cN, MatInnerSingedFP(params)), params.sM * params.sN)).io
     m
   })
   for(i <- 0 until params.cM) {
@@ -108,7 +108,7 @@ class MatPostProcess(params: MatParams) extends Module {
 
   // result 表项计数器
   val resultInQFree = Wire(Vec(params.cM, Bool()))
-  val resultInQFreeCnt = RegInit(VecInit.tabulate(params.cM)(i => (2 * params.sM * params.sN).U))
+  val resultInQFreeCnt = RegInit(VecInit.tabulate(params.cM)(i => (params.sM * params.sN).U))
   resultInQFreeCnt.zipWithIndex.foreach(iter => {
     val (cnt, idx) = iter
     cnt := cnt - io.ppAlloc.fire + resultInQ(idx).deq.fire.asUInt
@@ -188,7 +188,7 @@ class MatPostProcess(params: MatParams) extends Module {
   }
   io.busRReq.bits.regId := 0.U // No Use
   io.busRReq.bits.position := curReadPosition
-  io.busRReq.bits.addr := readCmd.addr + curReadPosition * readCmd.stride * (params.cM / cReadTransactionCount).U
+  io.busRReq.bits.addr := readCmd.addr + curReadPosition * (params.cM / cReadTransactionCount).U * readCmd.stride
   io.busRReq.bits.stride := readCmd.stride
   io.busRReq.bits.swizzle := readCmd.swizzle
   io.busRReq.bits.last := 0.B

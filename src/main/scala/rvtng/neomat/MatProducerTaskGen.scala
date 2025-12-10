@@ -59,7 +59,7 @@ class MatProducerAck(params: MatParams, log2CountXTile: Int) extends Bundle {
   *   每次任务输出都分配一个regId，保持与Ack/Release计数、指针一致，确保不会资源冲突。子任务全部完成后才允许接受新任务，防止乱序。
   *   支持外部通过ackIn和releaseIn及时归还寄存器资源，保障并发与资源利用效率。
   */
-class MatProducerTaskGen(params: MatParams, log2CountXTile: Int, sMajor: Int, sMinor: Int, minorStride: Int) extends Module {
+class MatProducerTaskGen(params: MatParams, log2CountXTile: Int, sMajor: Int, sMinor: Int, majorStride: Int, minorStride: Int) extends Module {
   // IO
   val io = IO(new Bundle {
     val cmdIn = Flipped(Decoupled(new MatProducerTaskGenCmd(params)))
@@ -173,14 +173,14 @@ class MatProducerTaskGen(params: MatParams, log2CountXTile: Int, sMajor: Int, sM
   // 生成控制命令
   io.cmdOut.bits.swizzle := cmd.swizzle
   io.cmdOut.bits.stride := cmd.stride
-  io.cmdOut.bits.addr := cmd.addr + cmd.stride * curMajor + minorStride.U * curMinor
+  io.cmdOut.bits.addr := cmd.addr + cmd.stride * curMajor * majorStride.U + minorStride.U * curMinor
 }
 
 object MatProducerTaskGen extends App {
   ChiselStage.emitSystemVerilog(
     new MatProducerTaskGen(MatParams(
       sM = 2, sN = 2, sK = 16
-    ), 5, 2, 16, 16),
+    ), 5, 2, 16, 16, 16),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",

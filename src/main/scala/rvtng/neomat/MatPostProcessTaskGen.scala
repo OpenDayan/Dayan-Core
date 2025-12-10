@@ -28,7 +28,7 @@ class DPAPostProcessCmd(params: MatParams) extends Bundle {
  * 接口：
  *  - 指向 Post Processor 的 PostProcess 指令
  * */
-class MatPostProcessTaskGen(params: MatParams, nStride: Int) extends Module {
+class MatPostProcessTaskGen(params: MatParams) extends Module {
   val io = IO(new Bundle {
     val cmdIn = Flipped(Decoupled(new MatPostProcessTaskGenCmd(params)))
     val cmdOut = Decoupled(new DPAPostProcessCmd(params))
@@ -113,7 +113,7 @@ class MatPostProcessTaskGen(params: MatParams, nStride: Int) extends Module {
   io.cmdOut.bits.clear := !cmd.accumulate & (curRepeat === 0.U)
   io.cmdOut.bits.swizzle := cmd.swizzle
   io.cmdOut.bits.stride := cmd.stride
-  io.cmdOut.bits.addr := cmd.addr + cmd.stride * curM + nStride.U * curN
+  io.cmdOut.bits.addr := cmd.addr + cmd.stride * curM * params.cM.U + (4 * params.cN).U * curN
   io.cmdOut.bits.last := lastM & lastN & lastRepeat
 
 }

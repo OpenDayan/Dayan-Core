@@ -47,14 +47,14 @@ class MatTaskGen(params: MatParams) extends Module {
   val tileK = io.cmdIn.bits.taskK >> (params.log2CK)
 
   // Producer 例化
-  val pA = Module(new MatProducerTaskGen(params, params.log2CountATile, params.sM, params.sK, params.cK))
-  val pB = Module(new MatProducerTaskGen(params, params.log2CountBTile, params.sN, params.sK, params.cK))
+  val pA = Module(new MatProducerTaskGen(params, params.log2CountATile, params.sM, params.sK, params.cM, params.cK))
+  val pB = Module(new MatProducerTaskGen(params, params.log2CountBTile, params.sN, params.sK, params.cN, params.cK))
 
   // Consumer 例化
   val c = Module(new MatConsumerTaskGen(params))
 
   // Post-Processor 例化
-  val pp = Module(new MatPostProcessTaskGen(params, 4 * params.cN))
+  val pp = Module(new MatPostProcessTaskGen(params))
 
   // 连线
   io.ldA <> Queue(pA.io.cmdOut, 2)

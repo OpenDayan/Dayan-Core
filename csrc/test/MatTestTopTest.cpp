@@ -109,18 +109,18 @@ static inline void initMatrix()
             }
         }
     } else {
+        setMatrixElemFP8(AAddr, 0, 32, 1.0f);
+        setMatrixElemFP8(BAddr, 0, 32, 1.0f);
+        setMatrixElemFP8(AAddr, 0, 4, 1.0f);
+        setMatrixElemFP8(BAddr, 0, 4, 1.0f);
         setMatrixElemFP8(AAddr, 0, 0, 1.0f);
-        setMatrixElemFP8(AAddr, 0, 1, 2.0f);
-        setMatrixElemFP8(AAddr, 0, 2, 3.0f);
-        setMatrixElemFP8(AAddr, 5, 0, 4.0f);
-        setMatrixElemFP8(AAddr, 5, 1, 5.0f);
-        setMatrixElemFP8(AAddr, 5, 2, 6.0f);
         setMatrixElemFP8(BAddr, 0, 0, 1.0f);
-        setMatrixElemFP8(BAddr, 0, 1, 2.0f);
-        setMatrixElemFP8(BAddr, 0, 2, 3.0f);
-        setMatrixElemFP8(BAddr, 3, 0, 4.0f);
-        setMatrixElemFP8(BAddr, 3, 1, 5.0f);
-        setMatrixElemFP8(BAddr, 3, 2, 6.0f);
+        setMatrixElemFP8(AAddr, 1, 32, 1.0f);
+        setMatrixElemFP8(BAddr, 1, 32, 1.0f);
+        setMatrixElemFP8(AAddr, 1, 4, 1.0f);
+        setMatrixElemFP8(BAddr, 1, 4, 1.0f);
+        setMatrixElemFP8(AAddr, 1, 0, 1.0f);
+        setMatrixElemFP8(BAddr, 1, 0, 1.0f);
     }
 }
 
@@ -154,19 +154,10 @@ static inline void checkMatrix()
     } else {
         printf("Get Finish Pulse:%d\n", finishCount);
         printf("Calculation Latency: %d Cycles\n", finishTime - startTime);
-        printf("A[0, 0] = %f\n", getMatrixElemFP8 (0xA000, 0, 0));
-        printf("A[0, 1] = %f\n", getMatrixElemFP8 (0xA000, 0, 1));
-        printf("A[0, 2] = %f\n", getMatrixElemFP8 (0xA000, 0, 2));
-        printf("A[5, 0] = %f\n", getMatrixElemFP8 (0xA000, 5, 0));
-        printf("A[5, 1] = %f\n", getMatrixElemFP8 (0xA000, 5, 1));
-        printf("A[5, 2] = %f\n", getMatrixElemFP8 (0xA000, 5, 2));
-        printf("B[3, 0] = %f\n", getMatrixElemFP8 (0xB000, 3, 0));
-        printf("B[3, 1] = %f\n", getMatrixElemFP8 (0xB000, 3, 1));
-        printf("B[3, 2] = %f\n", getMatrixElemFP8 (0xB000, 3, 2));
-        printf("C[0, 0] = %f\n", getMatrixElemFP32(0xC000, 0, 0));
-        printf("C[5, 0] = %f\n", getMatrixElemFP32(0xC000, 5, 0));
-        printf("C[0, 3] = %f\n", getMatrixElemFP32(0xC000, 0, 3));
-        printf("C[5, 3] = %f\n", getMatrixElemFP32(0xC000, 5, 3));
+        printf("C[0, 0] = %f\n", getMatrixElemFP32(CAddr, 0, 0));
+        printf("C[0, 1] = %f\n", getMatrixElemFP32(CAddr, 0, 1));
+        printf("C[1, 0] = %f\n", getMatrixElemFP32(CAddr, 1, 0));
+        printf("C[1, 1] = %f\n", getMatrixElemFP32(CAddr, 1, 1));
     }
 }
 
