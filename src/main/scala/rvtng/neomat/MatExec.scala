@@ -107,8 +107,29 @@ class MatExec(params: MatParams) extends Module {
   io.busBReq <> bTile.io.busReq
   bTile.io.busResp := io.busBResp
 
+  // 时序模块，硬流水处理 r0 及 cout 的输出问题
+  val delayedVld = genPipe(io.calc.fire, dpa.r0Latency + 3)
+  val delayedCmd = genPipe(io.calc.bits, dpa.r0Latency + 3)
+
   // Calc Handshake
-  io.calc.ready := 1.B
+  val cRegPipe = Reg(Vec(4, new Bundle {
+    val valid = Bool()
+    val regId = UInt(params.log2CountCTile.W)
+  }))
+  cRegPipe.foldLeft({
+    val initV = Wire(cRegPipe(0).cloneType)
+    initV.valid := io.calc.fire
+    initV.regId := io.calc.bits.regC
+    initV
+  })((l, r) => {
+    r := l
+    r
+  })
+
+  // Note: prevent C data raw hazard.
+  io.calc.ready := !VecInit(cRegPipe.map(iter => {
+    iter.valid & (iter.regId === io.calc.bits.regC)
+  })).reduceTree(_ | _)
 
   // Early Release of Tile
   io.ldARelease := io.calc.fire & io.calc.bits.releaseA
@@ -128,10 +149,6 @@ class MatExec(params: MatParams) extends Module {
 
   // 内建的小型 cBuffer
   val cTile = Reg(Vec(params.sM * params.sN, Vec(params.cM * params.cN, MatInnerSingedFP(params))))
-
-  // 时序模块，硬流水处理 r0 及 cout 的输出问题
-  val delayedVld = genPipe(io.calc.valid, dpa.r0Latency + 3)
-  val delayedCmd = genPipe(io.calc.bits, dpa.r0Latency + 3)
   dpa.r0_cin_exp_in := RegNext(Mux(!delayedVld(dpa.r0Latency) | delayedCmd(dpa.r0Latency).clear,
     VecInit.tabulate(params.cM)(m => VecInit.tabulate(params.cN)(n => (BigInt(1) << (params.wE-1)).S(params.wE.W))),
     VecInit(cTile(delayedCmd(dpa.r0Latency).regC).map(_.exp)).asTypeOf(dpa.r0_cin_exp_in)))
