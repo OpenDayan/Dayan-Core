@@ -6,11 +6,11 @@ VERILATOR_FLAGS = --top-module $(TOP) \
 
 all: UnitTest.mk
 
-include UnitTest.mk
-
 .PHONY: UnitTest.mk CodeStatistics
 UnitTest.mk: GenerateMakefile.py UnitTestConfig.json generated/testbenchTemplate
 	python3 GenerateMakefile.py
+
+include UnitTest.mk
 
 CodeStatistics:
 	git ls-files | xargs wc -l

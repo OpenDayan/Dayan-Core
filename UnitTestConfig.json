@@ -85,5 +85,8 @@
     },
     "MatTileRegisters": {
         "Package": "rvtng.neomat"
+    },
+    "RVTNGNoVecTop": {
+        "Package": "rvtng.top"
     }
 }
