@@ -71,7 +71,7 @@ class MatMemLoadTaskIssue(params: MatParams, srcCount: Int, regIdWidth: Int, pos
     val pld = io.uramResp(i).bits
     val last = pld(0).id(log2SrcCount + posWidth + regIdWidth)
     val regId = pld(0).id(log2SrcCount + posWidth + regIdWidth - 1, log2SrcCount + posWidth)
-    val pos = pld(0).id(log2SrcCount + posWidth - 1, log2SrcCount)
+    val pos = if(posWidth == 0) 0.U else pld(0).id(log2SrcCount + posWidth - 1, log2SrcCount)
     val src = pld(0).id(log2SrcCount - 1, 0)
     for(s <- 0 until srcCount) {
       io.busRResp(s)(i).valid := (src === s.U) & io.uramResp(i).valid & uramCompleteQ(i).enq.ready

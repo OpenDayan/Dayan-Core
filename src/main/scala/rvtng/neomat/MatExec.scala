@@ -112,7 +112,7 @@ class MatExec(params: MatParams) extends Module {
   val delayedCmd = genPipe(io.calc.bits, dpa.r0Latency + 3)
 
   // Calc Handshake
-  val cRegPipe = Reg(Vec(4, new Bundle {
+  val cRegPipe = Reg(Vec(3, new Bundle {
     val valid = Bool()
     val regId = UInt(params.log2CountCTile.W)
   }))

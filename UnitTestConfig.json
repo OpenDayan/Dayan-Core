@@ -49,7 +49,7 @@
             "csrc/DRAMsim3/libdramsim3.a": {}
         },
         "NeedEMU": true,
-        "Threads": 6
+        "Threads": 4
     },
     "RISCVCoreTestTop": {
         "Package": "rvcore",
