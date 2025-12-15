@@ -16,6 +16,8 @@ class RVTNGInstDispatch extends Module {
   val dmaResp = IO(Flipped(Decoupled(new TensorResp)))
   val sbReq = IO(Decoupled(new TensorInst))
   val sbResp = IO(Flipped(Decoupled(new TensorResp)))
+  val vpuReq = IO(Decoupled(new TensorInst))
+  val vpuResp = IO(Flipped(Decoupled(new TensorResp)))
 
   private val instQ = Queue(instReq, 2)
 
@@ -27,27 +29,32 @@ class RVTNGInstDispatch extends Module {
   private val decodeIsMat = (decodeIsTCSRorScoreboard & inst(26, 25) === 0.U) | (inst(31, 28) === 1.U)
   private val decodeIsDma = (decodeIsTCSRorScoreboard & inst(26, 25) === 2.U) | (inst(31, 29) === 1.U)
   private val decodeIsVec = (decodeIsTCSRorScoreboard & inst(26, 25) === 1.U) | (inst(31, 30) > 0.U)
-  private val illegal = !(decodeIsScoreboard | decodeIsMat | decodeIsDma | decodeIsVec)
+  private val decodeIsVpu = inst(6,0) === "h3f".U
+  private val illegal = !(decodeIsScoreboard | decodeIsMat | decodeIsDma | decodeIsVec | decodeIsVpu)
   chisel3.assert(!(illegal & instQ.valid))
 
   sbReq.bits  := instQ.bits
   matReq.bits := instQ.bits
   dmaReq.bits := instQ.bits
   vecReq.bits := instQ.bits
+  vpuReq.bits := instQ.bits
   sbReq.valid  := instQ.valid & decodeIsScoreboard
   matReq.valid := instQ.valid & decodeIsMat
   dmaReq.valid := instQ.valid & decodeIsDma
   vecReq.valid := instQ.valid & decodeIsVec
+  vpuReq.valid := instQ.valid & decodeIsVpu
 
   instQ.ready := (sbReq.ready  & decodeIsScoreboard) | (matReq.ready & decodeIsMat) |
-                 (dmaReq.ready & decodeIsDma)        | (vecReq.ready & decodeIsVec) | illegal
+                 (dmaReq.ready & decodeIsDma)        | (vecReq.ready & decodeIsVec) | 
+                 (vpuReq.ready & decodeIsVpu) | illegal
 
   // RR-Arbiter of write-back
-  private val arb = Module(new RRArbiter(instResp.bits.cloneType, 4)).io
+  private val arb = Module(new RRArbiter(instResp.bits.cloneType, 5)).io
   arb.in(0) <> sbResp
   arb.in(1) <> matResp
   arb.in(2) <> dmaResp
   arb.in(3) <> vecResp
+  arb.in(4) <> vpuResp
   instResp <> arb.out
 
 }

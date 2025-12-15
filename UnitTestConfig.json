@@ -96,5 +96,8 @@
         },
         "NeedEMU": true,
         "Threads": 4
+    },
+    "VPUTestTop":{
+        "Package": "rvtng.vpu"
     }
 }
