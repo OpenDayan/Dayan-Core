@@ -168,13 +168,13 @@ object VPUTestTop extends App {
   ChiselStage.emitSystemVerilog(
     new VPUTestTop[Float](VpuParams(
     ),
-    "VpuTestTop"),
+    "VPUTestTop"),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",
-      "-preserve-aggregate=vpu",
+      "-preserve-aggregate=vec",
       "--split-verilog",
-      "-o=generated/VecTinyTestTop"
+      "-o=generated/VPUTestTop"
     )
   )
 }
