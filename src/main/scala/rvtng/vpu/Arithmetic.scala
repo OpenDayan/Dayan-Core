@@ -7,6 +7,8 @@ import chisel3._
 import chisel3.util._
 import hardfloat._
 
+import scala.language.implicitConversions
+
 // Bundles that represent the raw bits of custom datatypes
 case class Float(expWidth: Int, sigWidth: Int, isRecoded: Boolean = false) extends Bundle {
   val bits = UInt((expWidth + sigWidth + (if (isRecoded) 1 else 0)).W)
@@ -52,7 +54,7 @@ abstract class ArithmeticOps[T <: Data](self: T) {
 
 object Arithmetic {
   implicit object UIntArithmetic extends Arithmetic[UInt] {
-    override implicit def cast(self: UInt) = new ArithmeticOps(self) {
+    override implicit def cast(self: UInt): ArithmeticOps[UInt] = new ArithmeticOps(self) {
       override def *(t: UInt) = self * t
       override def mac(m1: UInt, m2: UInt) = m1 * m2 + self
       override def macmix(m1: UInt, m2: UInt) = m1 * m2 + self
@@ -90,7 +92,7 @@ object Arithmetic {
   }
 
   implicit object SIntArithmetic extends Arithmetic[SInt] {
-    override implicit def cast(self: SInt) = new ArithmeticOps(self) {
+    override implicit def cast(self: SInt): ArithmeticOps[SInt] = new ArithmeticOps(self) {
       override def *(t: SInt) = self * t
       override def mac(m1: SInt, m2: SInt) = m1 * m2 + self
       override def macmix(m1: SInt, m2: SInt) = m1 * m2 + self
@@ -572,7 +574,7 @@ object Arithmetic {
   }
 
   implicit object DummySIntArithmetic extends Arithmetic[DummySInt] {
-    override implicit def cast(self: DummySInt) = new ArithmeticOps(self) {
+    override implicit def cast(self: DummySInt): ArithmeticOps[DummySInt] = new ArithmeticOps(self) {
       override def *(t: DummySInt) = self.dontCare
       override def mac(m1: DummySInt, m2: DummySInt) = self.dontCare
       override def macmix(m1: DummySInt, m2: DummySInt) = self.dontCare
