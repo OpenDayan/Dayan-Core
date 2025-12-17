@@ -87,6 +87,11 @@
         "Package": "rvtng.neomat"
     },
     "RVTNGNoVecTop": {
-        "Package": "rvtng.top"
+        "Package": "rvtng.top",
+        "AdditionDeps": {
+            "csrc/DRAMsim3/libdramsim3.a": {}
+        },
+        "NeedEMU": true,
+        "Threads": 4
     }
 }

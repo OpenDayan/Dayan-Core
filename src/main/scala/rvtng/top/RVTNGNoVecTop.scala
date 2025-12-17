@@ -8,7 +8,7 @@ import rvtng.vec.{VecParams, VecTop}
 import rvtng.neomat.{MatParams, MatTop}
 import rvtng.dma.{DMAParams, DMATop}
 import _root_.circt.stage.ChiselStage
-import rvtng.bus.{AXI4Bundle, AXI4BundleParameters, DPIAXI4}
+import rvtng.bus._
 
 // Full 8-TFlops/GHz/Core Implementation
 class RVTNGNoVecTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams, name: String = "RVTNGTop") extends Module {
@@ -27,15 +27,24 @@ class RVTNGNoVecTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAPa
   private val uramPortPerChannel = vecParams.uramPortPerChannel
   private val uramChannel = uramPort / uramPortPerChannel
 
+  // Tilelink UH To URAM
+  private val tlParms = TLBundleParameters(
+    addressBits = dmaParams.addressBits, dataBits = 256, sourceBits = dmaParams.sourceBits, sinkBits = 1,
+    sizeBits = log2Ceil(256 / 8) , hasBCE = false
+  )
+  val tl2u = Module(new TilelinkUHToURAM(tlParms, 24, uramPortPerChannel))
+  val tl = IO(Flipped(new TLBundle(tlParms)))
+  tl <> tl2u.tl
+
   // Scoreboard
   private val sb = Module(new RVTNGScoreBoard(8, 3))
 
   // URAM Instance
-  // URAM RP0: MAT.B,  VEC.L
+  // URAM RP0: MAT.B,  TLK.L
   // URAM RP1: MAT.AC, LSU.L
-  // URAM WP0: MAT.C,  VEC.S, LSU.S
+  // URAM WP0: MAT.C,  LSU.S, TLK.S [LSU, LSU, TLK, NIL, NIL, NIL, MAT, MAT]
   private val uram = Module(new Adv2R1WURAM(
-    R0Port = 1, R1Port = 2, W0Port = 2, GroupCount = vecParams.uramPortPerChannel,
+    R0Port = 2, R1Port = 2, W0Port = 3, GroupCount = uramPortPerChannel,
     fifoSize = 16, N = uramPort, addrWidth = 24, idWidth = dmaParams.sourceBits, dataWidth = 64
   ))
 
@@ -48,6 +57,41 @@ class RVTNGNoVecTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAPa
   private val disp = Module(new RVTNGInstDispatch)
   disp.instReq  <> instReq
   disp.instResp <> instResp
+
+  // TL Slave Connection
+  for(i <- 0 until uramChannel * uramPortPerChannel) {
+    if(i < 2 * uramPortPerChannel) {
+      // Empty
+      uram.wreq_i(2)(i).valid := 0.B
+      uram.wreq_i(2)(i).bits := DontCare
+      uram.wdata_i(2)(i) := DontCare
+      uram.r0req_i(1)(i).valid := 0.B
+      uram.r0req_i(1)(i).bits := DontCare
+    } else if(i < 3 * uramPortPerChannel) {
+      uram.wreq_i(2)(i) <> tl2u.uramWReq(i - 2 * uramPortPerChannel)
+      uram.wdata_i(2)(i) := tl2u.uramWData(i - 2 * uramPortPerChannel)
+      uram.r0req_i(1)(i) <> tl2u.uramRReq(i - 2 * uramPortPerChannel)
+    } else {
+      // Empty
+      uram.wreq_i(2)(i).valid := 0.B
+      uram.wreq_i(2)(i).bits := DontCare
+      uram.wdata_i(2)(i) := DontCare
+      uram.r0req_i(1)(i).valid := 0.B
+      uram.r0req_i(1)(i).bits := DontCare
+    }
+  }
+  for(i <- 0 until uramChannel) {
+    if(i < 2) {
+      uram.wresp_o(2)(i).ready := 1.B
+      uram.r0resp_o(1)(i).ready := 1.B
+    } else if(i < 3) {
+      tl2u.uramWResp(i - 2) <> uram.wresp_o(2)(i)
+      tl2u.uramRResp(i - 2) <> uram.r0resp_o(1)(i)
+    } else {
+      uram.wresp_o(2)(i).ready := 1.B
+      uram.r0resp_o(1)(i).ready := 1.B
+    }
+  }
 
   // Mat Connection
   mat.instReq <> disp.matReq
