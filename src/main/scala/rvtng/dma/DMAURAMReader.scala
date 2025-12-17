@@ -37,6 +37,7 @@ class DMAURAMReader(params: DMAParams) extends Module {
     uramReq(i).bits.address := SwizzleAddr(addr,
       readReq.bits.UramSwizzleS, readReq.bits.UramSwizzleB, readReq.bits.UramSwizzleM) >> 3
     uramReq(i).bits.id := readReq.bits.id
+    uramReq(i).bits.byteEnable := 255.U
   }
 
   val respVec = Wire(Vec(uramChannel, Bool()))

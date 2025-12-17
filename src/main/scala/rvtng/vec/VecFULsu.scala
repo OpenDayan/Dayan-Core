@@ -56,6 +56,7 @@ class VecFULsu(params: VecParams) extends Module {
       Mux(issueHighMask, (i + uramPort).U, i.U)
     )
     uramRReq(i).bits.id := 0.U
+    uramRReq(i).bits.byteEnable := 255.U
   }
 
   // read resp handling
@@ -123,6 +124,7 @@ class VecFULsu(params: VecParams) extends Module {
     )
     uramWData := instQ.bits.vsrc2Data.asTypeOf(Vec(2, UInt((params.laneWidth * 32 / 2).W)))(issueHighMask).asTypeOf(uramWData)
     uramWReq(i).bits.id := 0.U
+    uramWReq(i).bits.byteEnable := 255.U
   }
   instQ.ready := readIssuedAll | writeIssuedAll
 

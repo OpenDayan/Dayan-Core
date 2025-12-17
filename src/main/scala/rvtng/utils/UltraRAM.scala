@@ -33,6 +33,7 @@ class DPIUltraRAM2R1WBase(DWIDTH: Int = 64, AWIDTH: Int = 12) extends
     val core_clk = Input(Clock())
     val reset = Input(Reset())
     val write_enable = Input(Bool ())
+    val byte_enable = Input(UInt((DWIDTH/8).W))
     val addra = Input(UInt(AWIDTH.W))
     val dina = Input(UInt(DWIDTH.W))
 
@@ -65,6 +66,7 @@ class UltraRAM2R1W(depth: Int, dataWidth: Int, ID: Int) extends Module {
   val rdata1: UInt = IO(Output(UInt(dataWidth.W)))
 
   val we: Bool = IO(Input(Bool()))
+  val be: UInt = IO(Input(UInt((dataWidth/8).W)))
   val waddr: UInt = IO(Input(UInt(log2Depth.W)))
   val wdata: UInt = IO(Input(UInt(dataWidth.W)))
 
@@ -72,6 +74,7 @@ class UltraRAM2R1W(depth: Int, dataWidth: Int, ID: Int) extends Module {
   uBase.io.core_clk := clock
   uBase.io.reset := reset
   uBase.io.write_enable := we
+  uBase.io.byte_enable := be
   uBase.io.addra := waddr
   uBase.io.dina := wdata
 

@@ -40,6 +40,8 @@ class DMAURAMWriter(params: DMAParams) extends Module {
     uramReq(i).bits.address := SwizzleAddr(addr,
       writeReq.bits.UramSwizzleS, writeReq.bits.UramSwizzleB, writeReq.bits.UramSwizzleM) >> 3
     uramReq(i).bits.id := writeReq.bits.id
+    // TODO: Support Smaller(<64B) URAM Transaction Size
+    uramReq(i).bits.byteEnable := 255.U
   }
 
   val respVec = Wire(Vec(uramChannel, Bool()))

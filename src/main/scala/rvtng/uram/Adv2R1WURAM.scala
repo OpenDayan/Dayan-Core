@@ -242,6 +242,7 @@ class Adv2R1WURAM(R0Port:Int, R1Port: Int, W0Port:Int, GroupCount: Int = 4, fifo
     r1UramDout(b) := uram.rdata1
     uram.we       := wBankedValidReq(b)
     uram.waddr    := wBankedReq(b).ctrl.address(addrWidth - 1, log2N)
+    uram.be       := wBankedReq(b).ctrl.byteEnable
     uram.wdata    := wBankedReq(b).data
   }
 }

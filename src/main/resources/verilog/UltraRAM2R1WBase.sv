@@ -9,6 +9,7 @@ module DPIUltraRAM2R1WBase #(
     input wire core_clk,               // Clock
     input wire reset,                  // Reset
     input wire write_enable,           // Write Enable
+    input wire [DWIDTH/8-1:0] byte_enable,
     input wire [AWIDTH-1:0] addra,     // Write Address
     input wire [DWIDTH-1:0] dina,      // Data <wire_or_reg>
 
@@ -30,6 +31,7 @@ module DPIUltraRAM2R1WBase #(
 
     import "DPI-C" function longint UltraRamWrite(
         input  int id,
+        input  int byte_enable,
         input  int waddr,
         input  longint wdata
     );
@@ -40,7 +42,7 @@ module DPIUltraRAM2R1WBase #(
     always @(posedge core_clk) begin
         if(read_enable1) readreg1 <= UltraRamRead(id, addrb1);
         if(read_enable0) readreg0 <= UltraRamRead(id, addrb0);
-        if(write_enable) wret <= UltraRamWrite(id, addra, dina);
+        if(write_enable) wret <= UltraRamWrite(id, byte_enable, addra, dina);
     end
 
     reg read_enable0_q, read_enable1_q;
@@ -58,6 +60,7 @@ module DPIUltraRAM2R1WBase #(
     ) base0 (
         .core_clk(core_clk),
         .reset(reset),
+        .byte_enable(byte_enable),
         .write_enable(write_enable),
         .addra(addra),
         .dina(dina),
@@ -71,6 +74,7 @@ module DPIUltraRAM2R1WBase #(
     ) base1 (
         .core_clk(core_clk),
         .reset(reset),
+        .byte_enable(byte_enable),
         .write_enable(write_enable),
         .addra(addra),
         .dina(dina),

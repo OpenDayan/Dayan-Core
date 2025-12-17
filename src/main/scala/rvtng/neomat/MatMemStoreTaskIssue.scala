@@ -28,6 +28,7 @@ class MatMemStoreTaskIssue(params: MatParams) extends Module {
       io.uramWReq(i * portsPerChannel + p).bits.address :=
         SwizzleAddr(io.busWReq(i).bits.addr + (p * 8).U, io.busWReq(i).bits.swizzle) >> 3
       io.uramWReq(i * portsPerChannel + p).bits.id := io.busWReq(i).bits.last.asUInt
+      io.uramWReq(i * portsPerChannel + p).bits.byteEnable := 255.U
       io.uramWdata(i * portsPerChannel + p) := wdata(p)
     }
     io.busWReq(i).ready := io.uramWReq(i * portsPerChannel).ready

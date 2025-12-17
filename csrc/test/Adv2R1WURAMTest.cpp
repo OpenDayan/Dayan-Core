@@ -16,7 +16,7 @@ extern "C" long long UltraRamRead(int id, int raddr)
     return id | (raddr << 2);
 }
 
-extern "C" long long UltraRamWrite(int id, int waddr, long long wdata)
+extern "C" long long UltraRamWrite(int id, int byte_enable, int waddr, long long wdata)
 {
     return 0;
 }

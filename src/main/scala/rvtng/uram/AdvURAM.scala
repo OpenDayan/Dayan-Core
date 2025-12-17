@@ -10,9 +10,10 @@ import chisel3._
 
 // Interface Define of AdvURAM
 // Use ID To track Coming Port or other out-standing information.
-class AdvURAMReq(addrWidth: Int, idWidth: Int, dataWidth: Int) extends Bundle {
+class AdvURAMReq(val addrWidth: Int, val idWidth: Int, val dataWidth: Int) extends Bundle {
   val address = UInt(addrWidth.W)
   val id = UInt(idWidth.W)
+  val byteEnable = UInt((dataWidth/8).W)
 }
 
 class AdvURAMResp(addrWidth: Int, idWidth: Int, dataWidth: Int) extends Bundle {

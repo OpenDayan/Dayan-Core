@@ -9,6 +9,7 @@ module UltraRAMBase #(
 ) (
     input wire core_clk,               // Clock
     input wire reset,                  // Reset
+    input wire [DWIDTH/8-1:0] byte_enable,
     input wire write_enable,           // Write Enable
     input wire read_enable,            // Read Enable
     input wire [DWIDTH-1:0] dina,      // Data <wire_or_reg>
@@ -24,7 +25,11 @@ reg [DWIDTH-1:0] readreg;
 
 always @(posedge core_clk) begin
     if(read_enable) readreg <= mem[addrb];
-    if(write_enable) mem[addra] <= dina;
+    if(write_enable) begin
+        for(integer i = 0; i < (DWIDTH/8); i = i + 1) begin
+            if(byte_enable[i]) mem[addra][i * 8 +: 8] <= dina[i * 8 +: 8];
+        end
+    end
 end
 
 reg read_enable_q;

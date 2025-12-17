@@ -61,6 +61,7 @@ class MatMemLoadTaskIssue(params: MatParams, srcCount: Int, regIdWidth: Int, pos
     io.uramReq(i).valid := reqQ(channel).deq.valid
     io.uramReq(i).bits.address := SwizzleAddr(pld.addr + (subPortId * 8).U, pld.swizzle) >> 3
     io.uramReq(i).bits.id := pld.last ## pld.regId ## pld.position ## pld.src
+    io.uramReq(i).bits.byteEnable := 255.U
   }
   // 完成队列
   val uramCompleteQ = VecInit.tabulate(params.busChannel)(i => Module(new Queue(UInt(log2SrcCount.W), 16)).io)
