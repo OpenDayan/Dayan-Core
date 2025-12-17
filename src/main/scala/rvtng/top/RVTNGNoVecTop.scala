@@ -11,7 +11,7 @@ import _root_.circt.stage.ChiselStage
 import rvtng.bus._
 
 // Full 8-TFlops/GHz/Core Implementation
-class RVTNGNoVecTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams, name: String = "RVTNGTop") extends Module {
+class RVTNGNoVecTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams, name: String = "RVTNGNoVecTop") extends Module {
   // 实例化 MAT、Vec、DMA、URAM，并完成顶层指令分发、Scoreboard 实现。
 
   private val axi4Parms = AXI4BundleParameters(
