@@ -173,3 +173,37 @@ object RVTNGNoVecTop extends App {
     )
   )
 }
+
+class RVTNGNoVecTestTop() extends Module {
+  private val matParams = MatParams(cM = 8, cN = 8, cK = 32)
+  private val vecParams = VecParams()
+  private val dmaParams = DMAParams()
+  private val core = Module(new RVTNGNoVecTop(matParams, vecParams, dmaParams))
+  private val axi4Parms = AXI4BundleParameters(
+    addressBits = dmaParams.addressBits, dataBits = dmaParams.dataBits, idBits = dmaParams.sourceBits
+  )
+
+  val instReq = IO(Flipped(Decoupled(new TensorInst)))
+  val instResp = IO(Decoupled(new TensorResp))
+  val tl = IO(Flipped(core.tl.cloneType))
+  tl <> core.tl
+  // DPI Instance
+  private val axi4 = Module(new DPIAXI4(axi4Parms, 0)).axi
+  core.instReq <> instReq
+  core.instResp <> instResp
+  core.axi4 <> axi4
+}
+
+object RVTNGNoVecTestTop extends App {
+  ChiselStage.emitSystemVerilog(
+    new RVTNGNoVecTestTop(),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/RVTNGNoVecTestTop"
+    )
+  )
+}
+

@@ -51,6 +51,6 @@ class MatScoreboard(params: MatParams) extends Module {
   io.sbComp.valid := compQ.valid & !compQ.bits.isBar & hasCommit
   io.sbComp.bits.entryId := compQ.bits.rdData
 
-  compQ.ready := hasCommit & Mux(compQ.bits.isBar, io.sbComp.ready, io.instResp.ready)
+  compQ.ready := hasCommit & Mux(compQ.bits.isBar, io.instResp.ready, io.sbComp.ready)
 
 }

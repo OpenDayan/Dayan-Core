@@ -34,3 +34,4 @@ clean:
 	rm -rf generated
 	rm -rf wave
 	rm -rf UnitTest.mk
+	touch UnitTest.mk

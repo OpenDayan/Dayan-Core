@@ -351,3 +351,6 @@ mill.*
 # Emulator Log
 .emu_log
 dramsim3epoch.json
+
+.metals
+.bloop

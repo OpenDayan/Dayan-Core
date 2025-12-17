@@ -9,9 +9,10 @@ import rvtng.neomat.{MatParams, MatTop}
 import rvtng.dma.{DMAParams, DMATop}
 import _root_.circt.stage.ChiselStage
 import rvtng.bus.{AXI4Bundle, AXI4BundleParameters, DPIAXI4}
+import rvtng.vpu._
 
 // Full 8-TFlops/GHz/Core Implementation
-class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams, name: String = "RVTNGTop") extends Module {
+class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams, vpuParams: VpuParams, name: String = "RVTNGTop") extends Module {
   // 实例化 MAT、Vec、DMA、URAM，并完成顶层指令分发、Scoreboard 实现。
 
   private val axi4Parms = AXI4BundleParameters(
@@ -40,7 +41,8 @@ class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams,
   ))
 
   // SubModule Instance
-  private val vec = Module(new VecTop(vecParams))
+  // private val vec = Module(new VecTop(vecParams))
+  private val vpu = Module(new VPUTop[Float](vpuParams))
   private val mat = Module(new MatTop(matParams)).io
   private val dma = Module(new DMATop(dmaParams, true))
 
@@ -81,14 +83,25 @@ class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams,
   }
 
   // Vec Connection
-  vec.instReq <> disp.vecReq
-  vec.instResp <> disp.vecResp
-  vec.sbComp <> sb.sbComp(1)
-  vec.uramRReq <> uram.r0req_i(1)
-  vec.uramRResp <> uram.r0resp_o(1)
-  vec.uramWReq <> uram.wreq_i(1)
-  vec.uramWResp <> uram.wresp_o(1)
-  uram.wdata_i(1) := vec.uramWData
+  // vec.instReq <> disp.vecReq
+  // vec.instResp <> disp.vecResp
+  // vec.sbComp <> sb.sbComp(1)
+  // vec.uramRReq <> uram.r0req_i(1)
+  // vec.uramRResp <> uram.r0resp_o(1)
+  // vec.uramWReq <> uram.wreq_i(1)
+  // vec.uramWResp <> uram.wresp_o(1)
+  disp.vecReq.ready := 1.B
+  // vec.instReq <> disp.vecReq
+  disp.vecResp.valid := 0.B
+  disp.vecResp.bits := DontCare
+  vpu.instReq <> disp.vpuReq
+  vpu.instResp <> disp.vpuResp
+  vpu.sbComp <> sb.sbComp(1)
+  vpu.uramRReq <> uram.r0req_i(1)
+  vpu.uramRResp <> uram.r0resp_o(1)
+  vpu.uramWReq <> uram.wreq_i(1)
+  vpu.uramWResp <> uram.wresp_o(1)
+  uram.wdata_i(1) := vpu.uramWData
 
   // DMA Connection
   dma.instReq <> disp.dmaReq
@@ -110,7 +123,8 @@ class RVTNGTestTop() extends Module {
   private val matParams = MatParams(cM = 8, cN = 8, cK = 32)
   private val vecParams = VecParams()
   private val dmaParams = DMAParams()
-  private val core = Module(new RVTNGTop(matParams, vecParams, dmaParams))
+  private val vpuParams = VpuParams()
+  private val core = Module(new RVTNGTop(matParams, vecParams, dmaParams, vpuParams))
   private val axi4Parms = AXI4BundleParameters(
     addressBits = dmaParams.addressBits, dataBits = dmaParams.dataBits, idBits = dmaParams.sourceBits
   )

@@ -1,0 +1,38 @@
+package convertutils
+
+import chisel3._
+
+object ConvertType {
+  val CONVERT_U8   = "b1000000".U
+  val CONVERT_S8   = "b1000001".U
+  val CONVERT_U16  = "b1000010".U
+  val CONVERT_S16  = "b1000011".U
+  val CONVERT_U32  = "b1000100".U
+  val CONVERT_S32  = "b1000101".U
+  val CONVERT_U64  = "b1000110".U
+  val CONVERT_S64  = "b1000111".U
+  val CONVERT_FP16 = "b1001010".U
+  val CONVERT_BF16 = "b1001011".U
+  val CONVERT_FP32 = "b1001100".U
+  val CONVERT_TF32 = "b1001101".U
+  val CONVERT_FP64 = "b1001110".U
+  val CONVERT_E4M3 = "b0011100".U
+}
+
+// NEMU C code:
+// typedef enum {
+//   CONVERT_U8 = 0b1000000,
+//   CONVERT_S8 = 0b1000001,
+//   CONVERT_U16 = 0b1000010,
+//   CONVERT_S16 = 0b1000011,
+//   CONVERT_U32 = 0b1000100,
+//   CONVERT_S32 = 0b1000101,
+//   CONVERT_U64 = 0b1000110,
+//   CONVERT_S64 = 0b1000111,
+//   CONVERT_FP16 = 0b1001010,
+//   CONVERT_BF16 = 0b1001011,
+//   CONVERT_FP32 = 0b1001100,
+//   CONVERT_TF32 = 0b1001101,
+//   CONVERT_FP64 = 0b1001110,
+//   CONVERT_E4M3 = 0b0011100
+// } ConvertType;

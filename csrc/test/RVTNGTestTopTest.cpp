@@ -61,7 +61,7 @@ static inline void mainLoop()
 
     if(instCount != 0) {
         dut->instReq_valid = 1;
-        dut->instReq_bits_instWord = (int)inst.inst;
+        dut->instReq_bits_instWord = inst.inst;
         dut->instReq_bits_rdData   = inst.rd;
         dut->instReq_bits_rs1Data  = inst.rs1;
         dut->instReq_bits_rs2Data  = inst.rs2;
