@@ -7,7 +7,7 @@ import Util._
 import ujson.True
 
 case class VpuParams(
-                    sp_bank_entries: Int = 1024,
+                    sp_bank_entries: Int = 1024*1024,
                     total_banks: Int = 1, // 最多同时 32 个并行线程
                     acc_width: Int = 32,
                     square_len: Int = 16,
@@ -541,7 +541,7 @@ class ElewiseUnit[T <: Data : Arithmetic](params: VpuParams) extends Module {
   val is_writing_last = Mux(is_reduce, reduce_out_offset === 0.U, out_row === 0.U && out_offset === 0.U)
   val w_mask = (0 until computeunit_len).map(_.U + offset < Mux(is_reduce, 1.U, out_op_max_dim))
   io.uram_write.valid := arbResult.io.out.valid && start
-  arbResult.io.out.ready := io.uram_write.ready
+  arbResult.io.out.ready := true.B
   // io.uram_write.addr := Mux(is_reduce, currentAddrReduceOut.asUInt, currentAddrOut.asUInt)
   io.uram_write.addr := MuxCase(
     currentAddrOut,

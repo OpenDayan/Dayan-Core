@@ -1,0 +1,223 @@
+{
+    "version": "1.4.0",
+    "project": {
+        "name": "mill-build-",
+        "directory": "/workspace/RVTNG/mill-build",
+        "workspaceDir": "/workspace/RVTNG",
+        "sources": [
+            "/workspace/RVTNG/build.sc",
+            "/workspace/RVTNG/dependencies/berkeley-hardfloat/common.sc",
+            "/workspace/RVTNG/common.sc",
+            "/workspace/RVTNG/out/generateScriptSources.dest"
+        ],
+        "dependencies": [
+            
+        ],
+        "classpath": [
+            "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/mill-moduledefs_2.13/0.10.9/mill-moduledefs_2.13-0.10.9.jar",
+            "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.14/scala-library-2.13.14.jar",
+            "/workspace/RVTNG/mill-build/compile-resources",
+            "/workspace/RVTNG/out/mill-launcher/0.11.8.jar",
+            "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/mill-runner-linenumbers_2.13/0.11.8/mill-runner-linenumbers_2.13-0.11.8.jar",
+            "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-compiler/2.13.14/scala-compiler-2.13.14.jar",
+            "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-reflect/2.13.14/scala-reflect-2.13.14.jar",
+            "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/io/github/java-diff-utils/java-diff-utils/4.12/java-diff-utils-4.12.jar",
+            "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/jline/jline/3.25.1/jline-3.25.1.jar",
+            "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/net/java/dev/jna/jna/5.14.0/jna-5.14.0.jar",
+            "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/sourcecode_2.13/0.3.0/sourcecode_2.13-0.3.0.jar"
+        ],
+        "out": "/workspace/RVTNG/.bloop/out/mill-build-",
+        "classesDir": "/workspace/RVTNG/.bloop/out/mill-build-/classes",
+        "resources": [
+            "/workspace/RVTNG/mill-build/compile-resources"
+        ],
+        "scala": {
+            "organization": "org.scala-lang",
+            "name": "scala-compiler",
+            "version": "2.13.14",
+            "options": [
+                "-Xplugin:/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/scalac-mill-moduledefs-plugin_2.13.14/0.10.9/scalac-mill-moduledefs-plugin_2.13.14-0.10.9.jar",
+                "-Xplugin:/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/mill-runner-linenumbers_2.13/0.11.8/mill-runner-linenumbers_2.13-0.11.8.jar,/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-compiler/2.13.14/scala-compiler-2.13.14.jar,/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.14/scala-library-2.13.14.jar,/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/mill-moduledefs_2.13/0.10.9/mill-moduledefs_2.13-0.10.9.jar,/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-reflect/2.13.14/scala-reflect-2.13.14.jar,/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/io/github/java-diff-utils/java-diff-utils/4.12/java-diff-utils-4.12.jar,/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/jline/jline/3.25.1/jline-3.25.1.jar,/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/net/java/dev/jna/jna/5.14.0/jna-5.14.0.jar,/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/sourcecode_2.13/0.3.0/sourcecode_2.13-0.3.0.jar",
+                "-deprecation",
+                "-Xplugin-require:mill-linenumber-plugin"
+            ],
+            "jars": [
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-compiler/2.13.14/scala-compiler-2.13.14.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-reflect/2.13.14/scala-reflect-2.13.14.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.14/scala-library-2.13.14.jar"
+            ]
+        },
+        "java": {
+            "options": [
+                
+            ]
+        },
+        "platform": {
+            "name": "jvm",
+            "config": {
+                "home": "/usr/lib/jvm/java-17-openjdk-amd64",
+                "options": [
+                    "-Duser.dir=/workspace/RVTNG"
+                ]
+            },
+            "mainClass": [
+                
+            ],
+            "classpath": [
+                "/workspace/RVTNG/.bloop/out/mill-build-/classes",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/mill-contrib-bloop_2.13/0.11.8/mill-contrib-bloop_2.13-0.11.8.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/mill-moduledefs_2.13/0.10.9/mill-moduledefs_2.13-0.10.9.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.14/scala-library-2.13.14.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/ch/epfl/scala/bloop-config_2.13/1.5.5/bloop-config_2.13-1.5.5.jar",
+                "/workspace/RVTNG/out/mill-launcher/0.11.8.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/mill-runner-linenumbers_2.13/0.11.8/mill-runner-linenumbers_2.13-0.11.8.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-compiler/2.13.14/scala-compiler-2.13.14.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.14/scala-library-2.13.14.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/mill-moduledefs_2.13/0.10.9/mill-moduledefs_2.13-0.10.9.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-reflect/2.13.14/scala-reflect-2.13.14.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/io/github/java-diff-utils/java-diff-utils/4.12/java-diff-utils-4.12.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/jline/jline/3.25.1/jline-3.25.1.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/net/java/dev/jna/jna/5.14.0/jna-5.14.0.jar",
+                "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/sourcecode_2.13/0.3.0/sourcecode_2.13-0.3.0.jar"
+            ],
+            "resources": [
+                "/workspace/RVTNG/mill-build/compile-resources"
+            ]
+        },
+        "resolution": {
+            "modules": [
+                {
+                    "organization": "io.github.java-diff-utils",
+                    "name": "java-diff-utils",
+                    "version": "4.12",
+                    "artifacts": [
+                        {
+                            "name": "java-diff-utils",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/io/github/java-diff-utils/java-diff-utils/4.12/java-diff-utils-4.12.jar"
+                        },
+                        {
+                            "name": "java-diff-utils",
+                            "classifier": "sources",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/io/github/java-diff-utils/java-diff-utils/4.12/java-diff-utils-4.12-sources.jar"
+                        }
+                    ]
+                },
+                {
+                    "organization": "org.scala-lang",
+                    "name": "scala-compiler",
+                    "version": "2.13.10",
+                    "artifacts": [
+                        {
+                            "name": "scala-compiler",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-compiler/2.13.10/scala-compiler-2.13.10.jar"
+                        },
+                        {
+                            "name": "scala-compiler",
+                            "classifier": "sources",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-compiler/2.13.10/scala-compiler-2.13.10-sources.jar"
+                        }
+                    ]
+                },
+                {
+                    "organization": "org.scala-lang",
+                    "name": "scala-library",
+                    "version": "2.13.14",
+                    "artifacts": [
+                        {
+                            "name": "scala-library",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.14/scala-library-2.13.14.jar"
+                        },
+                        {
+                            "name": "scala-library",
+                            "classifier": "sources",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.14/scala-library-2.13.14-sources.jar"
+                        }
+                    ]
+                },
+                {
+                    "organization": "com.lihaoyi",
+                    "name": "mill-moduledefs_2.13",
+                    "version": "0.10.9",
+                    "artifacts": [
+                        {
+                            "name": "mill-moduledefs_2.13",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/mill-moduledefs_2.13/0.10.9/mill-moduledefs_2.13-0.10.9.jar"
+                        },
+                        {
+                            "name": "mill-moduledefs_2.13",
+                            "classifier": "sources",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/mill-moduledefs_2.13/0.10.9/mill-moduledefs_2.13-0.10.9-sources.jar"
+                        }
+                    ]
+                },
+                {
+                    "organization": "org.jline",
+                    "name": "jline",
+                    "version": "3.21.0",
+                    "artifacts": [
+                        {
+                            "name": "jline",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/jline/jline/3.21.0/jline-3.21.0.jar"
+                        },
+                        {
+                            "name": "jline",
+                            "classifier": "sources",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/jline/jline/3.21.0/jline-3.21.0-sources.jar"
+                        }
+                    ]
+                },
+                {
+                    "organization": "com.lihaoyi",
+                    "name": "sourcecode_2.13",
+                    "version": "0.3.0",
+                    "artifacts": [
+                        {
+                            "name": "sourcecode_2.13",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/sourcecode_2.13/0.3.0/sourcecode_2.13-0.3.0.jar"
+                        },
+                        {
+                            "name": "sourcecode_2.13",
+                            "classifier": "sources",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/com/lihaoyi/sourcecode_2.13/0.3.0/sourcecode_2.13-0.3.0-sources.jar"
+                        }
+                    ]
+                },
+                {
+                    "organization": "net.java.dev.jna",
+                    "name": "jna",
+                    "version": "5.9.0",
+                    "artifacts": [
+                        {
+                            "name": "jna",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/net/java/dev/jna/jna/5.9.0/jna-5.9.0.jar"
+                        },
+                        {
+                            "name": "jna",
+                            "classifier": "sources",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/net/java/dev/jna/jna/5.9.0/jna-5.9.0-sources.jar"
+                        }
+                    ]
+                },
+                {
+                    "organization": "org.scala-lang",
+                    "name": "scala-reflect",
+                    "version": "2.13.10",
+                    "artifacts": [
+                        {
+                            "name": "scala-reflect",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-reflect/2.13.10/scala-reflect-2.13.10.jar"
+                        },
+                        {
+                            "name": "scala-reflect",
+                            "classifier": "sources",
+                            "path": "/home/dev/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-reflect/2.13.10/scala-reflect-2.13.10-sources.jar"
+                        }
+                    ]
+                }
+            ]
+        },
+        "tags": [
+            "library"
+        ]
+    }
+}

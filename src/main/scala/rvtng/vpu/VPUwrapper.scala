@@ -44,7 +44,7 @@ class VPUwrapper[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) exten
 
   io.srams.read <> ElementwiseUnit.io.uram_read_1
 
-  io.srams.read <> ElementwiseUnit.io.uram_read_2
+  ElementwiseUnit.io.uram_read_2 <> DontCare
 
   io.srams.write <> ElementwiseUnit.io.uram_write
   

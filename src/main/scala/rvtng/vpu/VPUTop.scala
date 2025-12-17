@@ -31,16 +31,16 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
 
     // URAM 读口
     val uramRReq  = IO(Vec(uramPort, Decoupled(
-      new AdvURAMReq(params.uramAddrBits, 0, 64))))
+      new AdvURAMReq(params.uramAddrBits, params.sourceBits - 1, 64))))
     val uramRResp = IO(Flipped(Vec(uramChannel, Decoupled(Vec(uramPortPerChannel,
-      new AdvURAMResp(params.uramAddrBits,  0, 64))))))
+      new AdvURAMResp(params.uramAddrBits,  params.sourceBits - 1, 64))))))
 
     // URAM 写口
     val uramWReq = IO(Vec(uramPort, Decoupled(
-      new AdvURAMReq(params.uramAddrBits, 0, 64))))
+      new AdvURAMReq(params.uramAddrBits, params.sourceBits - 1, 64))))
     val uramWData = IO(Output(Vec(uramPort, UInt(64.W))))
     val uramWResp = IO(Flipped(Vec(uramChannel, Decoupled(Vec(uramPortPerChannel,
-        new AdvURAMWResp(params.uramAddrBits,  0, 64))))))
+        new AdvURAMWResp(params.uramAddrBits,  params.sourceBits - 1, 64))))))
 
     private val VPU = Module(new VPUwrapper(params))
 
@@ -48,10 +48,22 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
 
     private val instQueue = Module(new Queue(new GemminiCmd(reservation_station_entries), 32))
 
+    class WriteReq extends Bundle{
+      val writeio = Vec(uramPort, (new AdvURAMReq(params.uramAddrBits, params.sourceBits - 1, 64)))
+      val mask = Vec((row_width / (aligned_to * 8)) max 1, Bool())
+      val last = Bool()
+      val Wdata = UInt(row_width.W)
+    }
+
+    val WriteReqQueue = Module(new Queue(new WriteReq, 16))
+    val ReqCount = RegInit(VecInit(Seq.fill(2)(0.U(16.W))))
+    val current_ReqIndex = RegInit(0.U(1.W))
+    val current_RespIndex = RegInit(0.U(1.W))
+
     instQueue.io.enq <> TU.io.cmdout
 
     val raw_cmd = Wire(Decoupled(new GemminiCmd(reservation_station_entries)))
-    raw_cmd.valid := instReq.valid
+    raw_cmd.valid := instReq.valid && instReq.bits.instWord(6,0) === "h3f".U
     raw_cmd.bits.cmd.inst := instReq.bits.instWord.asTypeOf(new RoCCInstruction)
     raw_cmd.bits.cmd.rs1 := instReq.bits.rs1Data
     raw_cmd.bits.cmd.rs2 := instReq.bits.rs2Data
@@ -76,7 +88,7 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     sb.instReq.bits := instReq.bits
     sb.instReq.valid := instReq.valid & decodeCompReq
     sb.instIssue := instQueue.io.enq.fire
-    sb.instCommit := VPU.io.done
+    sb.instCommit := ReqCount(current_RespIndex) === 0.U && current_RespIndex =/= current_ReqIndex
     sb.sbComp <> sbComp
 
     instResp <> respArb.out
@@ -84,6 +96,29 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     VPU.io.start := instQueue.io.deq.valid
     VPU.io.cmd := instQueue.io.deq.bits
     instQueue.io.deq.ready := VPU.io.done
+
+    when(current_ReqIndex === current_RespIndex){
+      when(uramWReq(0).fire && !uramWResp(0).fire){
+        ReqCount(current_ReqIndex) := ReqCount(current_ReqIndex) + 1.U
+      }.elsewhen(!uramWReq(0).fire && uramWResp(0).fire){
+        ReqCount(current_RespIndex) := ReqCount(current_RespIndex) - 1.U
+      }
+    }.otherwise{
+      when(uramWReq(0).fire){
+        ReqCount(current_ReqIndex) := ReqCount(current_ReqIndex) + 1.U
+      }
+      when(uramWResp(0).fire){
+        ReqCount(current_RespIndex) := ReqCount(current_RespIndex) - 1.U
+      }
+    }
+
+    when(WriteReqQueue.io.deq.bits.last){
+      current_ReqIndex := !current_ReqIndex
+    }
+    when(ReqCount(current_RespIndex) === 0.U && current_RespIndex =/= current_ReqIndex){
+      current_RespIndex := !current_RespIndex
+    }
+
 
     //TODO: 不同resp端口返回带有的decouple用处
     //TODO: sb没用到
@@ -93,7 +128,9 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     VPU.io.srams.read.resp.bits.fromDMA := false.B
     uramRResp(0).ready := VPU.io.srams.read.resp.ready
 
-    VPU.io.srams.write.ready := uramWResp(0).valid
+    VPU.io.srams.write.ready := WriteReqQueue.io.enq.ready
+    //写数据队列不能被阻塞
+    chisel3.assert(!VPU.io.srams.write.valid || (VPU.io.srams.write.valid && WriteReqQueue.io.enq.ready))
 
     for( i <- 1 until uramChannel){
       uramRResp(i).ready := true.B
@@ -103,25 +140,37 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
       uramWResp(i).ready := true.B
     }
 
+    WriteReqQueue.io.enq.bits.mask := VPU.io.srams.write.mask
+    WriteReqQueue.io.enq.bits.last := VPU.io.done
+    WriteReqQueue.io.enq.valid := VPU.io.srams.write.valid
+    WriteReqQueue.io.enq.bits.Wdata := VPU.io.srams.write.data
+
+    WriteReqQueue.io.deq.ready := uramWReq(0).ready
+    
 
     for( i <- 0 until uramPort){
-      if(i < computeunit_len*acc_width/(8*8)){
+      if(i < computeunit_len*acc_width/(uramChannel*8)){
         uramRReq(i).valid := VPU.io.srams.read.req.valid
         uramRReq(i).bits.address := VPU.io.srams.read.req.bits.addr + (i * 8).U
         uramRReq(i).bits.id := 0.U
         VPU.io.srams.read.req.ready := uramRReq(i).ready
 
-        uramWReq(i).valid := Mux(VPU.io.srams.write.mask(i * 8), VPU.io.srams.write.valid, false.B)
-        uramWReq(i).bits.address := VPU.io.srams.write.addr + (i * 8).U
+        WriteReqQueue.io.enq.bits.writeio(i).address := VPU.io.srams.write.addr + (i * 8).U
+        WriteReqQueue.io.enq.bits.writeio(i).id := 0.U
+
+        uramWReq(i).valid := Mux(WriteReqQueue.io.deq.bits.mask(i * 8), WriteReqQueue.io.deq.valid, false.B)
+        uramWReq(i).bits.address := WriteReqQueue.io.deq.bits.writeio(i).address
         uramWReq(i).bits.id := 0.U
 
-        uramWData(i) := VPU.io.srams.write.data(i*64 + 63, i*64)
+        uramWData(i) := WriteReqQueue.io.deq.bits.Wdata(i*64 + 63, i*64)
       }else{
         uramRReq(i) <> DontCare
         uramWReq(i) <> DontCare
         uramWData(i) <> DontCare
         uramRReq(i).valid := false.B 
         uramWReq(i).valid := false.B
+        WriteReqQueue.io.enq.bits.writeio(i).address := DontCare
+        WriteReqQueue.io.enq.bits.writeio(i).id := DontCare
       }
       
     }

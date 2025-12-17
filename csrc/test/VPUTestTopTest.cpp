@@ -3,13 +3,11 @@
 #include <verilated.h>
 #include "verilated_fst_c.h"
 #include "VVPUTestTop.h"
-
 #include "cliUtils.h"
 #include "rvtng-intf.h"
 #include "bar.h"
 #include <vector>
 #include <queue>
-#define MAX_SIM_TIME 1000
 VerilatedContext *contextp;
 VerilatedFstC *m_trace;
 VVPUTestTop *dut;
@@ -66,7 +64,7 @@ static inline void mainLoop()
 
     if(instCount != 0) {
         dut->instReq_valid = 1;
-        dut->instReq_bits_instWord = (int)inst.inst;
+        dut->instReq_bits_instWord = inst.inst;
         dut->instReq_bits_rdData   = inst.rd;
         dut->instReq_bits_rs1Data  = inst.rs1;
         dut->instReq_bits_rs2Data  = inst.rs2;
@@ -98,9 +96,9 @@ void run_next_cycle(uint64_t n) {
     print_progress_with_speed_multithread(realN, realN, 0);
     wait_for_render_completion();
     if(!stopFlag) {
-        printf("\033[42;32mVerilator: RVTNGTestTop Run Next Cycle Success!\033[0m\n");
+        printf("\033[42;32mVerilator: VPUTestTop Run Next Cycle Success!\033[0m\n");
     } else {
-        printf("\033[41;32mVerilator: RVTNGTestTop Run Next Cycle FAILED!\033[0m\n");
+        printf("\033[41;32mVerilator: VPUTestTop Run Next Cycle FAILED!\033[0m\n");
     }
 }
 
@@ -111,13 +109,13 @@ void run_until_empty(void) {
 void dump_waveform(void) {
     if(contextp->time() != dump_offset) {
         m_trace->close();
-        start_surfer_process((char*) "wave/RVTNGTestTop.fst");
+        start_surfer_process((char*) "wave/VPUTestTop.fst");
         delete m_trace;
         m_trace = new VerilatedFstC;
         dut->trace(m_trace, 99);
         sleep(2);
         dump_offset = contextp->time();
-        m_trace->open("wave/RVTNGTestTop.fst");
+        m_trace->open("wave/VPUTestTop.fst");
     }
 }
 
