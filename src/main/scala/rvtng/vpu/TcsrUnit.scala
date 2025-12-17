@@ -34,8 +34,8 @@ class TcsrUnit(TcsrNum: Int = 64, TcsrWidth: Int = 32, params: VpuParams) extend
     val tcsr_rd = io.cmdin.bits.cmd.inst.rd
 
     when(io.cmdin.fire && tcsr_cmd){
-      val data = (io.cmdin.bits.cmd.rs1 & ~io.cmdin.bits.cmd.rs3) | (TCSR(tcsr_w_id).asUInt & io.cmdin.bits.cmd.rs3)
-      TCSR(tcsr_w_id) := (io.cmdin.bits.cmd.rs1 & ~io.cmdin.bits.cmd.rs3) | (TCSR(tcsr_w_id).asUInt & io.cmdin.bits.cmd.rs3)
+      val data = (io.cmdin.bits.cmd.rs1 & ~io.cmdin.bits.cmd.rs3) | (TCSR(tcsr_w_id(5, 0)).asUInt & io.cmdin.bits.cmd.rs3)
+      TCSR(tcsr_w_id(5, 0)) := (io.cmdin.bits.cmd.rs1 & ~io.cmdin.bits.cmd.rs3) | (TCSR(tcsr_w_id(5, 0)).asUInt & io.cmdin.bits.cmd.rs3)
     }
 
     //inst with tcsr info
@@ -55,13 +55,13 @@ class TcsrUnit(TcsrNum: Int = 64, TcsrWidth: Int = 32, params: VpuParams) extend
     tcsr_r_id(2) := io.cmdin.bits.cmd.inst.tcfgrs3 * 8.U
 
     for (i <- 0 until 3){
-      tcsr_reads(i) := VecInit((0 until 8).map(j =>TCSR(tcsr_r_id(i) + j.U))).asTypeOf(new tcsrcontent(32))// Cat(TCSR(tcsr_r_id(i)), TCSR(tcsr_r_id(i) + 1.U), TCSR(tcsr_r_id(i) + 2.U), TCSR(tcsr_r_id(i) + 3.U),TCSR(tcsr_r_id(i) + 4.U), TCSR(tcsr_r_id(i) + 5.U), TCSR(tcsr_r_id(i) + 6.U), TCSR(tcsr_r_id(i) + 7.U)).asTypeOf(new tcsrcontent(32))
+      tcsr_reads(i) := VecInit((0 until 8).map(j =>TCSR(tcsr_r_id(i)(5, 0) + j.U))).asTypeOf(new tcsrcontent(32))// Cat(TCSR(tcsr_r_id(i)), TCSR(tcsr_r_id(i) + 1.U), TCSR(tcsr_r_id(i) + 2.U), TCSR(tcsr_r_id(i) + 3.U),TCSR(tcsr_r_id(i) + 4.U), TCSR(tcsr_r_id(i) + 5.U), TCSR(tcsr_r_id(i) + 6.U), TCSR(tcsr_r_id(i) + 7.U)).asTypeOf(new tcsrcontent(32))
     }
     tcsr_filter_cmd.bits.tcfgrs := tcsr_reads
 
     io.cmdout <> tcsr_filter_cmd
 
     io.instResp.valid := tcsr_cmd
-    io.instResp.bits.data := TCSR(tcsr_w_id)
+    io.instResp.bits.data := TCSR(tcsr_w_id)(5, 0)
     io.instResp.bits.rd := tcsr_rd
 }

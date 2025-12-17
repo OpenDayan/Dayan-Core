@@ -151,15 +151,15 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     for( i <- 0 until uramPort){
       if(i < computeunit_len*acc_width/(uramChannel*8)){
         uramRReq(i).valid := VPU.io.srams.read.req.valid
-        uramRReq(i).bits.address := VPU.io.srams.read.req.bits.addr + (i * 8).U
+        uramRReq(i).bits.address := (VPU.io.srams.read.req.bits.addr + (i * 8).U) >> 3
         uramRReq(i).bits.id := 0.U
         VPU.io.srams.read.req.ready := uramRReq(i).ready
 
-        WriteReqQueue.io.enq.bits.writeio(i).address := VPU.io.srams.write.addr + (i * 8).U
+        WriteReqQueue.io.enq.bits.writeio(i).address := (VPU.io.srams.write.addr + (i * 8).U) >> 3
         WriteReqQueue.io.enq.bits.writeio(i).id := 0.U
 
         uramWReq(i).valid := Mux(WriteReqQueue.io.deq.bits.mask(i * 8), WriteReqQueue.io.deq.valid, false.B)
-        uramWReq(i).bits.address := WriteReqQueue.io.deq.bits.writeio(i).address
+        uramWReq(i).bits.address := WriteReqQueue.io.deq.bits.writeio(i).address >> 3
         uramWReq(i).bits.id := 0.U
 
         uramWData(i) := WriteReqQueue.io.deq.bits.Wdata(i*64 + 63, i*64)
