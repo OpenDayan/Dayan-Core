@@ -282,6 +282,7 @@ static inline int backend_instruction_fetch(int fdInst, int coreIdx, rvt_pack_t*
     return 1;
 }
 static inline int backend_instruction_commit(int fdMsg, int coreIdx, rvt_commit_t* pkg) {
+    if(pkg->rd == 0) return 0;
     rvt_socket_push(fdMsg, 0x0);
     rvt_socket_push(fdMsg, coreIdx);
     rvt_socket_push(fdMsg, pkg->rd);
