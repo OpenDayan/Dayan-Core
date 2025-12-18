@@ -59,6 +59,8 @@ object GemminiISA {
   val SFU_OP = "b10010000".U
   val CONVERT_OP = "b10001110".U
   val REDUCE_OP = "b10001101".U
-
+  val FENCE = "b11111111".U
+  val PRODUCE = "b0000".U
+  val BAR = "b0001".U
 }
 

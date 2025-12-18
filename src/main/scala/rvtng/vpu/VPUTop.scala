@@ -62,8 +62,10 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
 
     instQueue.io.enq <> TU.io.cmdout
 
+    private val decodeCompReq   = instReq.bits.instWord(63, 56) === "hff".U
+
     val raw_cmd = Wire(Decoupled(new GemminiCmd(reservation_station_entries)))
-    raw_cmd.valid := instReq.valid && instReq.bits.instWord(6,0) === "h3f".U
+    raw_cmd.valid := instReq.valid && !decodeCompReq
     raw_cmd.bits.cmd.inst := instReq.bits.instWord.asTypeOf(new RoCCInstruction)
     raw_cmd.bits.cmd.rs1 := instReq.bits.rs1Data
     raw_cmd.bits.cmd.rs2 := instReq.bits.rs2Data
@@ -78,8 +80,6 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
 
     //inst resp source: tcsr, sb
     private val sb = Module(new VpuScoreboard(params))
-
-    private val decodeCompReq   = instReq.bits.instWord(31, 27) === 0b00001.U
 
     val respArb = Module(new Arbiter(instResp.bits.cloneType, 2)).io
     respArb.in(0) <> TU.io.instResp
@@ -124,7 +124,7 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     //TODO: sb没用到
 
     VPU.io.srams.read.resp.valid := uramRResp(0).valid
-    VPU.io.srams.read.resp.bits.data := uramRResp(0).bits(0).data
+    VPU.io.srams.read.resp.bits.data := VecInit((0 until uramPortPerChannel).map(i => uramRResp(0).bits(i).data)).asUInt
     VPU.io.srams.read.resp.bits.fromDMA := false.B
     uramRResp(0).ready := VPU.io.srams.read.resp.ready
 

@@ -34,7 +34,7 @@ class VpuScoreboard(params: VpuParams) extends Module {
   sbInst.valid := instReq.valid
   instReq.ready := sbInst.ready
   sbInst.bits.isCount := isCounter
-  sbInst.bits.isBar   := instReq.bits.instWord(14)
+  sbInst.bits.isBar   := instReq.bits.instWord(52)
   sbInst.bits.rd      := instReq.bits.instWord(11, 7)
   sbInst.bits.rdData  := instReq.bits.rdData
 

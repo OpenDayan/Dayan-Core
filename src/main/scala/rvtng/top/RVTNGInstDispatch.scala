@@ -28,8 +28,8 @@ class RVTNGInstDispatch extends Module {
   private val decodeIsScoreboard = decodeIsTCSRorScoreboard & inst(26, 25) === 3.U
   private val decodeIsMat = (decodeIsTCSRorScoreboard & inst(26, 25) === 0.U) | (inst(31, 28) === 1.U)
   private val decodeIsDma = (decodeIsTCSRorScoreboard & inst(26, 25) === 2.U) | (inst(31, 29) === 1.U)
-  private val decodeIsVec = (inst(31, 30) > 0.U)
-  private val decodeIsVpu = inst(6,0) === "h3f".U | (decodeIsTCSRorScoreboard & inst(26, 25) === 1.U)
+  private val decodeIsVec = (decodeIsTCSRorScoreboard & inst(26, 25) === 1.U) | (inst(31, 30) > 0.U)
+  private val decodeIsVpu = inst(6,0) === "h3f".U
   private val illegal = !(decodeIsScoreboard | decodeIsMat | decodeIsDma | decodeIsVec | decodeIsVpu)
   chisel3.assert(!(illegal & instQ.valid))
 
