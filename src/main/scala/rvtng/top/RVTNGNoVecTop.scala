@@ -49,7 +49,6 @@ class RVTNGNoVecTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAPa
   ))
 
   // SubModule Instance
-  // private val vec = Module(new VecTop(vecParams))
   private val mat = Module(new MatTop(matParams)).io
   private val dma = Module(new DMATop(dmaParams, true))
 
@@ -101,9 +100,6 @@ class RVTNGNoVecTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAPa
   mat.uramRResp0 <> uram.r0resp_o(0)
   mat.uramRReq1 <> uram.r1req_i(0)
   mat.uramRResp1 <> uram.r1resp_o(0)
-//  mat.uramWReq <> uram.wreq_i(0)
-//  mat.uramWResp <> uram.wresp_o(0)
-//  uram.wdata_i(0) := mat.uramWData
 
   for(i <- 0 until matParams.busChannel * uramPortPerChannel) {
     if(i < matParams.busWriteChannel * uramPortPerChannel) {
@@ -126,18 +122,13 @@ class RVTNGNoVecTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAPa
 
   // Vec Connection
   disp.vecReq.ready := 1.B
-  // vec.instReq <> disp.vecReq
   disp.vecResp.valid := 0.B
   disp.vecResp.bits := DontCare
+  disp.vpuReq.ready := 1.B
+  disp.vpuResp.valid := 0.B
+  disp.vpuResp.bits := DontCare
   sb.sbComp(1).valid := 0.B
   sb.sbComp(1).bits := DontCare
-  // vec.instResp <> disp.vecResp
-  // vec.sbComp <> sb.sbComp(1)
-  // vec.uramRReq <> uram.r0req_i(1)
-  // vec.uramRResp <> uram.r0resp_o(1)
-  // vec.uramWReq <> uram.wreq_i(1)
-  // vec.uramWResp <> uram.wresp_o(1)
-  // uram.wdata_i(1) := vec.uramWData
 
   // DMA Connection
   dma.instReq <> disp.dmaReq
@@ -145,9 +136,6 @@ class RVTNGNoVecTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAPa
   dma.sbComp <> sb.sbComp(2)
   dma.uramRReq <> uram.r1req_i(1)
   dma.uramRResp <> uram.r1resp_o(1)
-  // dma.uramWReq <> uram.wreq_i(2)
-  // dma.uramWResp <> uram.wresp_o(2)
-  // uram.wdata_i(2) := dma.uramWData
   dma.uramWReq <> uram.wreq_i(1)
   dma.uramWResp <> uram.wresp_o(1)
   uram.wdata_i(1) := dma.uramWData

@@ -100,5 +100,8 @@
     "VPUTestTop":{
         "Package": "rvtng.vpu",
         "NeedEMU": true
+    },
+    "BasicXBar":{
+        "Package": "rvtng.utils"
     }
 }
