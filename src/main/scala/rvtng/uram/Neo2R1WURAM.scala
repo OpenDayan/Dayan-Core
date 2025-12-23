@@ -81,6 +81,8 @@ class Neo2R1WURAM(r0Port:Int, r1Port: Int, w0Port:Int, portsPerChannel: Int = 4,
     ctrl.ready := resp.ready
     resp.bits.valid := ctrl.valid
     resp.bits.id := ctrl.bits.flit.id
+    resp.ready := 1.B
+    chisel3.assert(!(resp.valid & !resp.ready))
   })
   rawR1Resp.zip(r1Ctrl).foreach(iter => {
     val (resp, ctrl) = iter
@@ -88,6 +90,8 @@ class Neo2R1WURAM(r0Port:Int, r1Port: Int, w0Port:Int, portsPerChannel: Int = 4,
     ctrl.ready := resp.ready
     resp.bits.valid := ctrl.valid
     resp.bits.id := ctrl.bits.flit.id
+    resp.ready := 1.B
+    chisel3.assert(!(resp.valid & !resp.ready))
   })
   rawW0Resp.zip(w0Ctrl).foreach(iter => {
     val (resp, ctrl) = iter
@@ -95,6 +99,7 @@ class Neo2R1WURAM(r0Port:Int, r1Port: Int, w0Port:Int, portsPerChannel: Int = 4,
     ctrl.ready := resp.ready
     resp.bits.valid := ctrl.valid
     resp.bits.id := ctrl.bits.flit.id
+    resp.ready := 1.B
   })
 
   // RSel Info Flow
@@ -116,6 +121,29 @@ class Neo2R1WURAM(r0Port:Int, r1Port: Int, w0Port:Int, portsPerChannel: Int = 4,
     uram.be       := w0XBar.outFlit(b).bits.flit.ctrl.byteEnable
     uram.wdata    := w0XBar.outFlit(b).bits.flit.data
   }
+
+  // Reverse Mux Generation
+  val r0Resp = r0RSel.map(respSel => {
+    val resp = Wire(DecoupledIO(new AdvURAMResp(addrWidth, idWidth, dataWidth)))
+    resp.bits := RegNext(rawR0Resp(respSel).bits)
+    resp.valid := RegNext(rawR0Resp(respSel).valid)
+    chisel3.assert(resp.ready)
+    resp
+  })
+  val r1Resp = r1RSel.map(respSel => {
+    val resp = Wire(DecoupledIO(new AdvURAMResp(addrWidth, idWidth, dataWidth)))
+    resp.bits := RegNext(rawR1Resp(respSel).bits)
+    resp.valid := RegNext(rawR1Resp(respSel).valid)
+    chisel3.assert(resp.ready)
+    resp
+  })
+  val w0Resp = w0RSel.map(respSel => {
+    val resp = Wire(DecoupledIO(new AdvURAMWResp(addrWidth, idWidth, dataWidth)))
+    resp.bits := RegNext(rawW0Resp(respSel).bits)
+    resp.valid := RegNext(rawW0Resp(respSel).valid)
+    chisel3.assert(resp.ready)
+    resp
+  })
 
   // Connection of Source-Sink Sync
 
