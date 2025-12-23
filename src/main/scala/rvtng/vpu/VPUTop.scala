@@ -60,6 +60,8 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     val current_ReqIndex = RegInit(0.U(1.W))
     val current_RespIndex = RegInit(0.U(1.W))
 
+    val ReadReqQueue = Module(new Queue(UInt(3.W), 16))
+
     instQueue.io.enq <> TU.io.cmdout
 
     private val decodeCompReq   = instReq.bits.instWord(63, 56) === "hff".U
@@ -112,7 +114,7 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
       }
     }
 
-    when(WriteReqQueue.io.deq.bits.last){
+    when(WriteReqQueue.io.deq.bits.last && WriteReqQueue.io.deq.fire){
       current_ReqIndex := !current_ReqIndex
     }
     when(ReqCount(current_RespIndex) === 0.U && current_RespIndex =/= current_ReqIndex){
@@ -124,9 +126,11 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     //TODO: sb没用到
 
     VPU.io.srams.read.resp.valid := uramRResp(0).valid
-    VPU.io.srams.read.resp.bits.data := VecInit((0 until uramPortPerChannel).map(i => uramRResp(0).bits(i).data)).asUInt
+    val RespData = VecInit((0 until uramPortPerChannel).map(i => uramRResp(0).bits(i).data)).asUInt
+    VPU.io.srams.read.resp.bits.data := Mux(ReadReqQueue.io.deq.bits === 4.U, RespData >> 32.U, RespData)
     VPU.io.srams.read.resp.bits.fromDMA := false.B
     uramRResp(0).ready := VPU.io.srams.read.resp.ready
+    ReadReqQueue.io.deq.ready := VPU.io.srams.read.resp.fire
 
     VPU.io.srams.write.ready := WriteReqQueue.io.enq.ready
     //写数据队列不能被阻塞
@@ -146,26 +150,30 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     WriteReqQueue.io.enq.bits.Wdata := VPU.io.srams.write.data
 
     WriteReqQueue.io.deq.ready := uramWReq(0).ready
+
+    val ReadreqValid = VPU.io.srams.read.req.valid && uramRReq(0).ready && ReadReqQueue.io.enq.ready
+    VPU.io.srams.read.req.ready := ReadreqValid
+    ReadReqQueue.io.enq.valid := VPU.io.srams.read.req.valid && uramRReq(0).ready
+    ReadReqQueue.io.enq.bits := VPU.io.srams.read.req.bits.addr(2,0)
     
 
     for( i <- 0 until uramPort){
       if(i < computeunit_len*acc_width/(uramChannel*8)){
-        uramRReq(i).valid := VPU.io.srams.read.req.valid
+        uramRReq(i).valid := VPU.io.srams.read.req.valid && ReadReqQueue.io.enq.ready
         uramRReq(i).bits.address := (VPU.io.srams.read.req.bits.addr + (i * 8).U) >> 3
         uramRReq(i).bits.id := 0.U
         uramRReq(i).bits.byteEnable := 255.U
-        VPU.io.srams.read.req.ready := uramRReq(i).ready
 
-        WriteReqQueue.io.enq.bits.writeio(i).address := (VPU.io.srams.write.addr + (i * 8).U) >> 3
+        WriteReqQueue.io.enq.bits.writeio(i).address := VPU.io.srams.write.addr
         WriteReqQueue.io.enq.bits.writeio(i).id := 0.U
         WriteReqQueue.io.enq.bits.writeio(i).byteEnable := 255.U
 
         uramWReq(i).valid := Mux(WriteReqQueue.io.deq.bits.mask(i * 8), WriteReqQueue.io.deq.valid, false.B)
-        uramWReq(i).bits.address := WriteReqQueue.io.deq.bits.writeio(i).address
+        uramWReq(i).bits.address := (WriteReqQueue.io.deq.bits.writeio(i).address + (i * 8).U) >> 3
         uramWReq(i).bits.id := 0.U
-        uramWReq(i).bits.byteEnable := 255.U
+        uramWReq(i).bits.byteEnable := Mux(WriteReqQueue.io.deq.bits.writeio(i).address(2,0) === 4.U, "b11110000".U, WriteReqQueue.io.deq.bits.mask.asUInt(7,0)) //255.U
 
-        uramWData(i) := WriteReqQueue.io.deq.bits.Wdata(i*64 + 63, i*64)
+        uramWData(i) := Mux(WriteReqQueue.io.deq.bits.writeio(i).address(2,0) === 4.U, Cat(WriteReqQueue.io.deq.bits.Wdata(i*64 + 31, i*64), Fill(32, 0.U)), WriteReqQueue.io.deq.bits.Wdata(i*64 + 63, i*64))
       }else{
         uramRReq(i) <> DontCare
         uramWReq(i) <> DontCare
