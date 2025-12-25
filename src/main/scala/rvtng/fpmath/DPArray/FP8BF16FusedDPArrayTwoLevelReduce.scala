@@ -228,7 +228,7 @@ debugFP32Output: Boolean = false
     for(n <- 0 until N) {
       // For Debugger: Temporarly Align To FP32 for better Debug View
       if(debugFP32Output) {
-        val fp32_view_module = Module(new FPRoundingModule(wE, wF, 0))
+        val fp32_view_module = Module(new SignedFPToFPModule(wE, wF, 0))
         fp32_view_module.exp := cout_exp(m)(n)
         fp32_view_module.frac := cout_frac(m)(n).asUInt
         fp32Dbg(m)(n) := fp32_view_module.fp

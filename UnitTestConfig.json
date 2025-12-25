@@ -103,5 +103,8 @@
     },
     "BasicXBar":{
         "Package": "rvtng.utils"
+    },
+    "SignedFPToFPModule": {
+        "Package": "rvtng.fpmath"
     }
 }

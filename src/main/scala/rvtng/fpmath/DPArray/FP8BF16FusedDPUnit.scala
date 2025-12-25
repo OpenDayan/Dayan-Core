@@ -4,7 +4,7 @@ import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
 import rvtng.fpmath.DPArray.U8m2n2k1U4m2n2k2Mul
-import rvtng.fpmath.{FPRoundingModule, U8U4FusedMxNyKzMul, converter}
+import rvtng.fpmath.{SignedFPToFPModule, U8U4FusedMxNyKzMul, converter}
 
 // Generic Module, Support tM tN Configuration.
 // In Xilinx FPGA: tM==tN==2, for better Utilization of DSP48E2
@@ -163,7 +163,7 @@ class FP8BF16FusedDPUnit[S <: Module with U8U4FusedMxNyKzMul]
 
       // For Debugger: Temporarly Align To FP32 for better Debug View
       if(debugFP32Output) {
-        val fp32_view_module = Module(new FPRoundingModule(wE, wF, 0))
+        val fp32_view_module = Module(new SignedFPToFPModule(wE, wF, 0))
         fp32_view_module.exp := raw.exp
         fp32_view_module.frac := raw.frac.asUInt
         fp32Dbg(m)(n) := fp32_view_module.fp

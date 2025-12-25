@@ -215,6 +215,7 @@ class MatPostProcess(params: MatParams) extends Module {
   resultQ.zip(busReadQ).zip(busWriteAddrQ).zip(io.busWReq).foreach(iter => {
     val (((lQ, rQ), aQ), tQ) = iter
     tQ.valid := lQ.deq.valid & aQ.deq.valid & (aQ.deq.bits.clear | rQ.deq.valid)
+    // TODO: 打多拍流水，换用更好的浮点加法器
     tQ.bits.data := VecInit(lQ.deq.bits.zip(rQ.deq.bits).map(adders => {
       val fpAdder = Module(new KulischAccumulator(KulischAccConfig(
         numInputs = 2,
@@ -228,7 +229,7 @@ class MatPostProcess(params: MatParams) extends Module {
       zeroFp.frac := 0.S
       fpAdder.io.in(0) := adders._1
       fpAdder.io.in(1) := Mux(aQ.deq.bits.clear, zeroFp, adders._2)
-      FNFromSignedFP(SignedFPNorm(fpAdder.io.out))
+      FNFromSignedFP(fpAdder.io.out)
     })).asTypeOf(tQ.bits.data)
     tQ.bits.last := aQ.deq.bits.last
     tQ.bits.addr := aQ.deq.bits.addr

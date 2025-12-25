@@ -1,6 +1,6 @@
 package rvtng.mat
 
-import rvtng.fpmath.{FPRoundingModule, FPUnpackModule}
+import rvtng.fpmath.{SignedFPToFPModule, FPUnpackModule}
 import rvtng.utils.RF1R1WRam
 import _root_.circt.stage.ChiselStage
 import chisel3._
@@ -72,7 +72,7 @@ class DPArrayBufferC(busWidth: Int, entries: Int, m: Int, n: Int, wE: Int, wF: I
   val realExtRData = Wire(Vec(m, UInt((n * (wE + wF)).W)))
   val realExtRDataIFP = realExtRData.asTypeOf(Vec(m * n, UInt((wE + wF).W)))
   val realExtRDataFP32 = VecInit.tabulate(m * n)(i => {
-    val cvt = Module(new FPRoundingModule(wE, wF, 0))
+    val cvt = Module(new SignedFPToFPModule(wE, wF, 0))
     cvt.exp  := realExtRDataIFP(i)(wE + wF - 1, wF).asSInt
     cvt.frac := realExtRDataIFP(i)(     wF - 1,  0)
     cvt.fp

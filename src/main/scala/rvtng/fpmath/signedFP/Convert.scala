@@ -18,9 +18,9 @@ object SignedFPFrom {
 
 object FNFromSignedFP {
   def apply(in: SignedFP): UInt = {
-    val m = Module(new FPRoundingModule(in.wE, in.wF, 0))
+    val m = Module(new SignedFPToFPModule(in.wE, in.wF, 0))
     m.frac := in.frac.asUInt
-    m.exp := Mux(in.frac === 0.S, (BigInt(1) << (in.wE - 1)).S(in.wE.W), in.exp)
+    m.exp := in.exp
     m.fp
   }
 }

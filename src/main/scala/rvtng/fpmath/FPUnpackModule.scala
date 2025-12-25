@@ -30,7 +30,7 @@ class TestFPUnpackPack extends Module {
   val fpIn = IO(Input(UInt(32.W)))
   val fpOut = IO(Output(UInt(32.W)))
   val unpack = Module(new FPUnpackModule(9, 25, 0))
-  val pack = Module(new FPRoundingModule(9, 25, 0))
+  val pack = Module(new SignedFPToFPModule(9, 25, 0))
   unpack.fp := fpIn
   pack.exp := unpack.exp
   pack.frac := unpack.frac
