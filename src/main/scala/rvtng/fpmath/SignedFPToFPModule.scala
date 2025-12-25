@@ -4,7 +4,6 @@ import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
 
-// TODO: Known limitation, this module cannot generate Sub-Normal Numbers
 class SignedFPToFPModule(wE: Int, wF: Int, bias: Int) extends Module {
   val exp = IO(Input(SInt(wE.W)))
   val frac = IO(Input(UInt(wF.W)))
@@ -17,6 +16,7 @@ class SignedFPToFPModule(wE: Int, wF: Int, bias: Int) extends Module {
   private val trueFrac = fracAbs << clzFrac
   private val addedExp = converter.clipSub(exp, bias.S +& clzFrac.zext -& 127.S, 255.S, 0.S)
   private val addedExpRaw = exp -& (bias.S +& clzFrac.zext -& 127.S)
+  // TODO: Simplified Logic here.
   when(addedExpRaw === 0.S) {
     // SubNorm Situation 0
     fp := Cat(sign, 0.U(8.W), 0x7fffff.U(23.W))

@@ -212,10 +212,16 @@ class MatPostProcess(params: MatParams) extends Module {
 
   // 计算流水线
   // 获取 resultQ, busWriteAddrQ 压入 busWriteQ
-  resultQ.zip(busReadQ).zip(busWriteAddrQ).zip(io.busWReq).foreach(iter => {
+  // 打两级流水
+  val busWReqPipe = Wire(Vec(params.busWriteChannel,
+    DecoupledIO(new MatInnerTileWriteReq(params))
+  ))
+  io.busWReq <> VecInit(busWReqPipe.map(it => Queue(Queue(it, 1, true, false), 1, true, false)))
+
+  resultQ.zip(busReadQ).zip(busWriteAddrQ).zip(busWReqPipe).foreach(iter => {
     val (((lQ, rQ), aQ), tQ) = iter
     tQ.valid := lQ.deq.valid & aQ.deq.valid & (aQ.deq.bits.clear | rQ.deq.valid)
-    // TODO: 打多拍流水，换用更好的浮点加法器
+    // TODO: 换用更好的浮点加法器
     tQ.bits.data := VecInit(lQ.deq.bits.zip(rQ.deq.bits).map(adders => {
       val fpAdder = Module(new KulischAccumulator(KulischAccConfig(
         numInputs = 2,
