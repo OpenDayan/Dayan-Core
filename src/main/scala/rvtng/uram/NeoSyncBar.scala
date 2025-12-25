@@ -71,19 +71,25 @@ class NeoSyncBarChannel[TS <: Data, TD <: Data](channelWidth: Int, fifoSize: Int
   // 输出处理，每个 Stream 都各自有一个队列接收输入
   private val dstQ = VecInit(io.dstStreamI.map(Queue(_, fifoSize, false, false)))
 
+  // TODO[Fixme]: now dstStreamO.ready must be set simultaneously.
+  val dstGlbRdy = io.dstStreamO(0).ready
+  for(p <- 0 until channelWidth) {
+    chisel3.assert(io.dstStreamO(p).ready === dstGlbRdy)
+  }
+  val dstGlbVld = VecInit(srcVldQ.bits.zip(dstQ).map(iter => {
+    val (vld, dQ) = iter
+    dQ.valid | !vld
+  })).reduceTree(_ & _)
   // 根据 srcVldQ 中的情况，置位 dstStreamO
   io.dstStreamO.zip(srcVldQ.bits).zip(dstQ).foreach(iter => {
-    val ((l, vld), r) = iter
-    l.valid := vld & r.valid & srcVldQ.ready
-    r.ready := vld & l.ready & srcVldQ.ready
-    l.bits := r.bits
+    val ((dOut, vld), dQ) = iter
+    dOut.valid := vld & dQ.valid & dstGlbVld
+    dQ.ready := vld & dstGlbVld & dstGlbRdy
+    dOut.bits := dQ.bits
   })
-  srcVldQ.ready := VecInit(srcVldQ.bits.zip(dstQ).map(iter => {
-    val (vld, r) = iter
-    r.valid | !vld
-  })).reduceTree(_ & _)
+  srcVldQ.ready := dstGlbVld & dstGlbRdy
   creditAdd := srcVldQ.fire
-  io.dstStreamOVld := srcVldQ.fire
+  io.dstStreamOVld := dstGlbVld
 }
 
 class NeoSyncBar[TS <: Data, TD <: Data](channelWidth: Int, channelCount: Int, fifoSize: Int, genS: TS, genD: TD) extends Module {
