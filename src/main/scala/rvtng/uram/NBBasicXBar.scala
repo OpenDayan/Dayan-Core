@@ -4,6 +4,14 @@ import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
 
+private object ArbiterCtrl {
+  def apply(request: Seq[Bool]): Seq[Bool] = request.length match {
+    case 0 => Seq()
+    case 1 => Seq(true.B)
+    case _ => true.B +: request.tail.init.scanLeft(request.head)(_ || _).map(!_)
+  }
+}
+
 class XBarUnionArbiter[T <: Data](gen: T, n: Int)
 extends LockingArbiterLike[T](gen, n, 1, None) {
   // this register is not initialized on purpose, see #267

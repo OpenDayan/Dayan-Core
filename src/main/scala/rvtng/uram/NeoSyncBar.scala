@@ -28,7 +28,7 @@ class NeoSyncBarChannel[TS <: Data, TD <: Data](channelWidth: Int, fifoSize: Int
   // 源数据打包为单个 DecoupledIO
   class PackedChannel extends Bundle {
     val vld = Bool()
-    val pld = genS
+    val pld = Input(genS)
   }
   private val srcChannelStream = Wire(DecoupledIO(Vec(channelWidth, new PackedChannel)))
   srcChannelStream.bits.zip(io.srcStreamI).foreach(iter => {
@@ -37,6 +37,7 @@ class NeoSyncBarChannel[TS <: Data, TD <: Data](channelWidth: Int, fifoSize: Int
     l.vld := r.valid
     r.ready := srcChannelStream.ready
   })
+  srcChannelStream.valid := VecInit(io.srcStreamI.map(_.valid)).reduceTree(_ | _)
   private val srcQ = Queue(srcChannelStream, 2, false, false)
   private val srcIssuedVec = RegInit(VecInit.tabulate(channelWidth)(i => 0.B))
   io.srcStreamO.zip(srcIssuedVec).zip(srcQ.bits).foreach(iter => {
@@ -52,7 +53,7 @@ class NeoSyncBarChannel[TS <: Data, TD <: Data](channelWidth: Int, fifoSize: Int
   }))
   when(srcQ.fire) {
     srcIssuedVec := VecInit.tabulate(channelWidth)(i => 0.B)
-  }.elsewhen(!creditEmpty) {
+  }.elsewhen(srcQ.valid && !creditEmpty) {
     srcIssuedVec := nxtSrcIssuedVec
   }
   srcQ.ready := nxtSrcIssuedVec.reduceTree(_ & _) & !creditEmpty

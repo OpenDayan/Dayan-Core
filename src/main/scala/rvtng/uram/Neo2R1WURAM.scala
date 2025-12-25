@@ -98,7 +98,7 @@ class Neo2R1WURAM(r0Port:Int, r1Port: Int, w0Port:Int, portsPerChannel: Int = 4,
     resp.valid := ctrl.valid
     ctrl.ready := resp.ready
     resp.bits.valid := ctrl.valid
-    resp.bits.id := ctrl.bits.flit.id
+    resp.bits.id := ctrl.bits.flit.ctrl.id
     resp.ready := 1.B
   })
 
@@ -149,7 +149,7 @@ class Neo2R1WURAM(r0Port:Int, r1Port: Int, w0Port:Int, portsPerChannel: Int = 4,
 
 }
 
-object Adv2R1WURAM extends App {
+object Neo2R1WURAM extends App {
   ChiselStage.emitSystemVerilog(
     new Neo2R1WURAM(32, 4, 4, 4),
     firtoolOpts = Array(

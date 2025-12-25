@@ -106,5 +106,8 @@
     },
     "SignedFPToFPModule": {
         "Package": "rvtng.fpmath"
+    },
+    "NeoSyncBarChannel": {
+        "Package": "rvtng.uram"
     }
 }
