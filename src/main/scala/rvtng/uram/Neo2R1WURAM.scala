@@ -16,18 +16,18 @@ class Neo2R1WURAM(r0Port:Int, r1Port: Int, w0Port:Int, portsPerChannel: Int = 4,
   val wChannel = w0Port / portsPerChannel
 
   val io = IO(new Bundle {
-    val r0Req = IO(Flipped(Vec(r0Port, Decoupled(new AdvURAMReq(addrWidth, idWidth, dataWidth)))))
-    val r1Req = IO(Flipped(Vec(r1Port, Decoupled(new AdvURAMReq(addrWidth, idWidth, dataWidth)))))
+    val r0Req = Flipped(Vec(r0Port, Decoupled(new AdvURAMReq(addrWidth, idWidth, dataWidth))))
+    val r1Req = Flipped(Vec(r1Port, Decoupled(new AdvURAMReq(addrWidth, idWidth, dataWidth))))
 
-    val r0Resp = IO(Vec(r0Channel,
-      Decoupled(Vec(portsPerChannel, new AdvURAMResp(addrWidth, idWidth, dataWidth)))))
-    val r1Resp = IO(Vec(r1Channel,
-      Decoupled(Vec(portsPerChannel, new AdvURAMResp(addrWidth, idWidth, dataWidth)))))
+    val r0Resp = Vec(r0Channel,
+      Decoupled(Vec(portsPerChannel, new AdvURAMResp(addrWidth, idWidth, dataWidth))))
+    val r1Resp = Vec(r1Channel,
+      Decoupled(Vec(portsPerChannel, new AdvURAMResp(addrWidth, idWidth, dataWidth))))
 
-    val w0Req = IO(Flipped(Vec(w0Port, Decoupled(new AdvURAMReq(addrWidth, idWidth, dataWidth)))))
-    val w0Data = IO(Input(Vec(w0Port, UInt(dataWidth.W))))
-    val w0Resp = IO(Vec(wChannel,
-      Decoupled(Vec(portsPerChannel, new AdvURAMWResp(addrWidth, idWidth, dataWidth)))))
+    val w0Req = Flipped(Vec(w0Port, Decoupled(new AdvURAMReq(addrWidth, idWidth, dataWidth))))
+    val w0Data = Input(Vec(w0Port, UInt(dataWidth.W)))
+    val w0Resp = Vec(wChannel,
+      Decoupled(Vec(portsPerChannel, new AdvURAMWResp(addrWidth, idWidth, dataWidth))))
   })
 
   class WReq extends Bundle {
@@ -44,15 +44,15 @@ class Neo2R1WURAM(r0Port:Int, r1Port: Int, w0Port:Int, portsPerChannel: Int = 4,
   val r0XBar = Module(new NBBasicXBar(
     r0Port, bank,
     (i: AdvURAMReq) => i.address(log2N - 1, 0),
-    new AdvURAMReq(addrWidth, idWidth, dataWidth))).io
+    new AdvURAMReq(addrWidth, idWidth, dataWidth), portsPerChannel)).io
   val r1XBar = Module(new NBBasicXBar(
     r1Port, bank,
     (i: AdvURAMReq) => i.address(log2N - 1, 0),
-    new AdvURAMReq(addrWidth, idWidth, dataWidth))).io
+    new AdvURAMReq(addrWidth, idWidth, dataWidth), portsPerChannel)).io
   val w0XBar = Module(new NBBasicXBar(
     w0Port, bank,
     (i: WReq) => i.ctrl.address(log2N - 1, 0),
-    new WReq())).io
+    new WReq(), portsPerChannel)).io
 
   r0XBar.inFlit <> r0SyncReq
   r1XBar.inFlit <> r1SyncReq
@@ -123,35 +123,88 @@ class Neo2R1WURAM(r0Port:Int, r1Port: Int, w0Port:Int, portsPerChannel: Int = 4,
   }
 
   // Reverse Mux Generation
-  val r0Resp = r0RSel.map(respSel => {
+  val r0Resp = r0RSel.zipWithIndex.map(iter => {
+    val (respSel, idx) = iter
     val resp = Wire(DecoupledIO(new AdvURAMResp(addrWidth, idWidth, dataWidth)))
     resp.bits := RegNext(rawR0Resp(respSel).bits)
-    resp.valid := RegNext(rawR0Resp(respSel).valid)
-    chisel3.assert(resp.ready)
+    resp.valid := RegNext(rawR0Resp(respSel).valid && r0Ctrl(respSel).bits.src === idx.U)
+    chisel3.assert(!(resp.valid & !resp.ready))
     resp
   })
-  val r1Resp = r1RSel.map(respSel => {
+  val r1Resp = r1RSel.zipWithIndex.map(iter => {
+    val (respSel, idx) = iter
     val resp = Wire(DecoupledIO(new AdvURAMResp(addrWidth, idWidth, dataWidth)))
     resp.bits := RegNext(rawR1Resp(respSel).bits)
-    resp.valid := RegNext(rawR1Resp(respSel).valid)
-    chisel3.assert(resp.ready)
+    resp.valid := RegNext(rawR1Resp(respSel).valid && r1Ctrl(respSel).bits.src === idx.U)
+    chisel3.assert(!(resp.valid & !resp.ready))
     resp
   })
-  val w0Resp = w0RSel.map(respSel => {
+  val w0Resp = w0RSel.zipWithIndex.map(iter => {
+    val (respSel, idx) = iter
     val resp = Wire(DecoupledIO(new AdvURAMWResp(addrWidth, idWidth, dataWidth)))
     resp.bits := RegNext(rawW0Resp(respSel).bits)
-    resp.valid := RegNext(rawW0Resp(respSel).valid)
-    chisel3.assert(resp.ready)
+    resp.valid := RegNext(rawW0Resp(respSel).valid && w0Ctrl(respSel).bits.src === idx.U)
+    chisel3.assert(!(resp.valid & !resp.ready))
     resp
   })
 
   // Connection of Source-Sink Sync
+  val r0SyncBar = Module(new NeoSyncBar(portsPerChannel, r0Port/portsPerChannel, fifoSize,
+    new AdvURAMReq(addrWidth, idWidth, dataWidth), new AdvURAMResp(addrWidth, idWidth, dataWidth))).io
+  val r1SyncBar = Module(new NeoSyncBar(portsPerChannel, r1Port/portsPerChannel, fifoSize,
+    new AdvURAMReq(addrWidth, idWidth, dataWidth), new AdvURAMResp(addrWidth, idWidth, dataWidth))).io
+  val w0SyncBar = Module(new NeoSyncBar(portsPerChannel, w0Port/portsPerChannel, fifoSize,
+    new WReq(), new AdvURAMWResp(addrWidth, idWidth, dataWidth))).io
 
+  r0SyncBar.srcStreamI <> io.r0Req
+  r0SyncBar.srcStreamO <> r0SyncReq
+  r1SyncBar.srcStreamI <> io.r1Req
+  r1SyncBar.srcStreamO <> r1SyncReq
+  w0SyncBar.srcStreamI <> VecInit(io.w0Req.zip(io.w0Data).map(iter => {
+    val (req, wdata) = iter
+    val wreq = Wire(DecoupledIO(new WReq()))
+    wreq.bits.ctrl := req.bits
+    wreq.bits.data := wdata
+    wreq.valid := req.valid
+    req.ready := wreq.ready
+    wreq
+  }))
+  w0SyncBar.srcStreamO <> w0SyncReq
+
+  r0SyncBar.dstStreamI <> r0Resp
+  r1SyncBar.dstStreamI <> r1Resp
+  w0SyncBar.dstStreamI <> w0Resp
+  for(c <- 0 until (r0Port / portsPerChannel)) {
+    io.r0Resp(c).valid := r0SyncBar.dstStreamOVld(c)
+    for(p <- 0 until portsPerChannel) {
+      io.r0Resp(c).bits(p).valid := r0SyncBar.dstStreamO(c * portsPerChannel + p).valid
+      io.r0Resp(c).bits(p).id := r0SyncBar.dstStreamO(c * portsPerChannel + p).bits.id
+      io.r0Resp(c).bits(p).data := r0SyncBar.dstStreamO(c * portsPerChannel + p).bits.data
+      r0SyncBar.dstStreamO(c * portsPerChannel + p).ready := io.r0Resp(c).ready
+    }
+  }
+  for(c <- 0 until (r1Port / portsPerChannel)) {
+    io.r1Resp(c).valid := r1SyncBar.dstStreamOVld(c)
+    for(p <- 0 until portsPerChannel) {
+      io.r1Resp(c).bits(p).valid := r1SyncBar.dstStreamO(c * portsPerChannel + p).valid
+      io.r1Resp(c).bits(p).id := r1SyncBar.dstStreamO(c * portsPerChannel + p).bits.id
+      io.r1Resp(c).bits(p).data := r1SyncBar.dstStreamO(c * portsPerChannel + p).bits.data
+      r1SyncBar.dstStreamO(c * portsPerChannel + p).ready := io.r1Resp(c).ready
+    }
+  }
+  for(c <- 0 until (w0Port / portsPerChannel)) {
+    io.w0Resp(c).valid := w0SyncBar.dstStreamOVld(c)
+    for(p <- 0 until portsPerChannel) {
+      io.w0Resp(c).bits(p).valid := w0SyncBar.dstStreamO(c * portsPerChannel + p).valid
+      io.w0Resp(c).bits(p).id := w0SyncBar.dstStreamO(c * portsPerChannel + p).bits.id
+      w0SyncBar.dstStreamO(c * portsPerChannel + p).ready := io.w0Resp(c).ready
+    }
+  }
 }
 
 object Neo2R1WURAM extends App {
   ChiselStage.emitSystemVerilog(
-    new Neo2R1WURAM(32, 4, 4, 4),
+    new Neo2R1WURAM(8, 8, 2, 2, 16, 2),
     firtoolOpts = Array(
       "-disable-all-randomization",
       "-strip-debug-info",

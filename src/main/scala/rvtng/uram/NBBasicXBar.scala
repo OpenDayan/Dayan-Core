@@ -36,7 +36,7 @@ extends LockingArbiterLike[T](gen, n, 1, None) {
 //   Note: outFlit Should Always be ready
 class NBBasicXBar[T <: Data](
   inCount: Int, outCount: Int,
-  routerPolicy: (T) => UInt, gen: T) extends Module {
+  routerPolicy: (T) => UInt, gen: T, channelHint: Int = 1) extends Module {
   val io = IO(new Bundle {
     val inFlit = Vec(inCount, Flipped(Decoupled(gen)))
     val outFlit = Vec(outCount, Decoupled(new Bundle {
@@ -68,6 +68,9 @@ class NBBasicXBar[T <: Data](
   val outRSel = RegNext(RegNext(
     VecInit(inFlit.map(iter => routerPolicy(iter.bits.flit)))
   ))
+  // 循环更新 grantMask
+  val arbGrantId = RegInit(0.U(log2Ceil(inCount).W))
+  arbGrantId := arbGrantId + channelHint.U
   val outFlit = VecInit.tabulate(outCount)(idx => {
     // 标记所有目标匹配的源
     val filteredIn = VecInit(inFlit.zipWithIndex.map(iter => {
@@ -85,7 +88,10 @@ class NBBasicXBar[T <: Data](
     chisel3.assert(!(!io.outFlit(idx).ready && io.outFlit(idx).valid))
     // 仲裁器
     // TODO: 换用 XBar 联合仲裁器 XBarUnionArbiter，同一个 Channel 的 Request 尽可能同时响应
-    val arb = Module(new RRArbiter(filteredIn(0).bits.cloneType, inCount)).io
+//    val arb = Module(new RRArbiter(filteredIn(0).bits.cloneType, inCount)).io
+    val arbM = Module(new XBarUnionArbiter(filteredIn(0).bits.cloneType, inCount))
+    arbM.grantMask := (0 until inCount).map(_.asUInt > arbGrantId)
+    val arb = arbM.io
     arb.in <> filteredIn
     Queue(Queue(arb.out, 1, true, false), 1, true, false) // HARD PIPE
   })

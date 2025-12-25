@@ -11,6 +11,7 @@ class NeoSyncBarChannel[TS <: Data, TD <: Data](channelWidth: Int, fifoSize: Int
     val srcStreamO = Vec(channelWidth, Decoupled(genS))
     val dstStreamI = Flipped(Vec(channelWidth, Decoupled(genD)))
     val dstStreamO = Vec(channelWidth, Decoupled(genD))
+    val dstStreamOVld = Output(Bool())
   })
 
   // Credit
@@ -82,6 +83,7 @@ class NeoSyncBarChannel[TS <: Data, TD <: Data](channelWidth: Int, fifoSize: Int
     r.valid | !vld
   })).reduceTree(_ & _)
   creditAdd := srcVldQ.fire
+  io.dstStreamOVld := srcVldQ.fire
 }
 
 class NeoSyncBar[TS <: Data, TD <: Data](channelWidth: Int, channelCount: Int, fifoSize: Int, genS: TS, genD: TD) extends Module {
@@ -90,6 +92,7 @@ class NeoSyncBar[TS <: Data, TD <: Data](channelWidth: Int, channelCount: Int, f
     val srcStreamO = Vec(channelWidth * channelCount, Decoupled(genS))
     val dstStreamI = Flipped(Vec(channelWidth * channelCount, Decoupled(genD)))
     val dstStreamO = Vec(channelWidth * channelCount, Decoupled(genD))
+    val dstStreamOVld = Output(Vec(channelCount, Bool()))
   })
   for(channel <- 0 until channelCount) {
     val channelSyncBar = Module(new NeoSyncBarChannel(channelWidth, fifoSize, genS, genD)).io
@@ -99,6 +102,7 @@ class NeoSyncBar[TS <: Data, TD <: Data](channelWidth: Int, channelCount: Int, f
       channelSyncBar.dstStreamI(p) <> io.dstStreamI(channel * channelWidth + p)
       channelSyncBar.dstStreamO(p) <> io.dstStreamO(channel * channelWidth + p)
     }
+    io.dstStreamOVld(channel) := channelSyncBar.dstStreamOVld
   }
 }
 
