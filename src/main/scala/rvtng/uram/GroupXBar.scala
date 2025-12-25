@@ -1,4 +1,4 @@
-package rvtng.utils
+package rvtng.uram
 
 import _root_.circt.stage.ChiselStage
 import chisel3._

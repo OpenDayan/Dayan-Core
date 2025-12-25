@@ -1,4 +1,4 @@
-package rvtng.utils
+package rvtng.uram
 
 import chisel3._
 import chisel3.util._

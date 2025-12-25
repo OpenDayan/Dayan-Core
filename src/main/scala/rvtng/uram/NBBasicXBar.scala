@@ -1,8 +1,8 @@
-package rvtng.utils
+package rvtng.uram
 
 import _root_.circt.stage.ChiselStage
 import chisel3._
-import chisel3.util.{LockingArbiterLike, _}
+import chisel3.util._
 
 class XBarUnionArbiter[T <: Data](gen: T, n: Int)
 extends LockingArbiterLike[T](gen, n, 1, None) {
