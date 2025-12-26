@@ -37,7 +37,6 @@ always @(posedge core_clk) begin
     if(reset) read_enable_q <= '0;
     else read_enable_q <= read_enable;
     if(read_enable_q) doutb <= readreg;
-    else doutb <= '0;
 end
 
 endmodule
