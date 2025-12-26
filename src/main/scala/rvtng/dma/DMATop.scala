@@ -17,7 +17,6 @@ case class DMAParams(
                       byteType: UInt = UInt(8.W),
                       uramAddrBits: Int = 20,
                       uramPortPerChannel: Int = 4,
-                      uramPortAlign: Int = 32,
                       dmaIQSize: Int = 32) {
   val log2MaxOutStanding: Int = sourceBits - 1
   val log2N: Int = log2Ceil(dataBits / byteType.getWidth)
@@ -47,7 +46,7 @@ class DMATop(params: DMAParams, useAxi: Boolean) extends Module {
   val sbComp  = IO(Decoupled(new ScoreboardComp()))
 
   private val uramPort = params.dataBits / 64
-  private val uramPortAlign = params.uramPortAlign
+  private val uramPortAlign = uramPort
   private val uramPortPerChannel = params.uramPortPerChannel
   private val uramChannel = uramPort / uramPortPerChannel
   private val uramChannelAlign = uramPortAlign / uramPortPerChannel
@@ -233,7 +232,7 @@ object DMATestTop extends App {
     new DMATestTop(DMAParams(
       addressBits = 48, dataBits = 512, sourceBits = 9,
       sinkBits = 4, tcsrBanks = 8, transposeLog2CNSize = 3,
-      byteType = UInt(8.W), uramAddrBits = 20, uramPortPerChannel = 4, uramPortAlign = 8, dmaIQSize = 32
+      byteType = UInt(8.W), uramAddrBits = 20, uramPortPerChannel = 4, dmaIQSize = 32
     )),
     firtoolOpts = Array(
       "-disable-all-randomization",

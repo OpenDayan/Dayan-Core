@@ -1,4 +1,4 @@
-package rvtng.utils
+package rvtng.uram
 
 import chisel3._
 import chisel3.util._
@@ -10,7 +10,7 @@ class SyncBarSource(fifoSize: Int, streamCount: Int, sourceCount: Int) extends M
   val inValid = IO(Input(Vec(sourceCount, Vec(streamCount, Bool()))))
   val inReady = IO(Output(Vec(sourceCount, Bool()))) // Sync Ready
 
-  val outFire = IO(Output(Bool()))
+  val outFire  = IO(Output(Bool()))
   val outValid = IO(Output(Vec(streamCount, Bool())))
   val outSel   = IO(Output(UInt(log2Ceil(sourceCount).W)))
   val outReady = IO(Input(Vec(streamCount, Bool())))

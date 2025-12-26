@@ -3,7 +3,7 @@ package rvtng.top
 import chisel3._
 import chisel3.util._
 import rvtng.bus.{TLBundle, TLBundleParameters, TilelinkUHToURAM}
-import rvtng.uram.Adv2R1WURAM
+import rvtng.uram.{Adv2R1WURAM, Neo2R1WURAM}
 import rvtng.vec.{VecParams, VecTop}
 //import rvtng.mat.{MatParams, MatTop}
 import rvtng.neomat.{MatParams, MatTop}
@@ -25,9 +25,7 @@ class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams,
   val axi4 = IO(new AXI4Bundle(axi4Parms))
 
   override def desiredName: String = name
-  private val uramPort = (vecParams.laneWidth * 32 / 2) / 64
   private val uramPortPerChannel = vecParams.uramPortPerChannel
-  private val uramChannel = uramPort / uramPortPerChannel
 
   // Tilelink UH To URAM
   private val tlParms = TLBundleParameters(
@@ -43,12 +41,34 @@ class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams,
 
   // URAM Instance
   // URAM RP0: MAT.B,  VEC.L  TL.L
+  private val MATRP0PORT = matParams.busChannel * uramPortPerChannel
+  private val VECRP0PORT = (vpuParams.laneWidth * 32 / 2) / 64
+  private val TLLRP0PORT = tlParms.dataBits / 64
   // URAM RP1: MAT.AC, LSU.L
+  private val MATRP1PORT = matParams.busChannel * uramPortPerChannel
+  private val LSURP1PORT = dmaParams.dataBits / 64
   // URAM WP0: MAT.C,  VEC.S, LSU.S  TL.S
-  private val uram = Module(new Adv2R1WURAM(
-    R0Port = 3, R1Port = 2, W0Port = 4, GroupCount = vecParams.uramPortPerChannel,
-    fifoSize = 16, N = uramPort, addrWidth = 24, idWidth = dmaParams.sourceBits, dataWidth = 64
-  ))
+  private val MATWP0PORT = matParams.busWriteChannel * uramPortPerChannel
+  private val VECWP0PORT = (vpuParams.laneWidth * 32 / 2) / 64
+  private val LSUWP0PORT = dmaParams.dataBits / 64
+  private val TLSWP0PORT  = tlParms.dataBits / 64
+
+  private val MATRP0CHAN = MATRP0PORT / uramPortPerChannel
+  private val VECRP0CHAN = VECRP0PORT / uramPortPerChannel
+  private val TLLRP0CHAN = TLLRP0PORT / uramPortPerChannel
+  private val MATRP1CHAN = MATRP1PORT / uramPortPerChannel
+  private val LSURP1CHAN = LSURP1PORT / uramPortPerChannel
+  private val MATWP0CHAN = MATWP0PORT / uramPortPerChannel
+  private val VECWP0CHAN = VECWP0PORT / uramPortPerChannel
+  private val LSUWP0CHAN = LSUWP0PORT / uramPortPerChannel
+  private val TLSWP0CHAN = TLSWP0PORT / uramPortPerChannel
+
+  private val uram = Module(new Neo2R1WURAM(
+    r0Port = MATRP0PORT + VECRP0PORT + TLLRP0PORT,
+    r1Port = MATRP1PORT + LSURP1PORT,
+    w0Port = MATWP0PORT + VECWP0PORT + LSUWP0PORT + TLSWP0PORT,
+    portsPerChannel = uramPortPerChannel,
+    fifoSize = 16, bank = 32, addrWidth = 24, idWidth = dmaParams.sourceBits, dataWidth = 64)).io
 
   // SubModule Instance
   // private val vec = Module(new VecTop(vecParams))
@@ -65,99 +85,44 @@ class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams,
   mat.instReq <> disp.matReq
   mat.instResp <> disp.matResp
   mat.sbComp <> sb.sbComp(0)
-  mat.uramRReq0 <> uram.r0req_i(0)
-  mat.uramRResp0 <> uram.r0resp_o(0)
-  mat.uramRReq1 <> uram.r1req_i(0)
-  mat.uramRResp1 <> uram.r1resp_o(0)
-//  mat.uramWReq <> uram.wreq_i(0)
-//  mat.uramWResp <> uram.wresp_o(0)
-//  uram.wdata_i(0) := mat.uramWData
-
-  for(i <- 0 until matParams.busChannel * uramPortPerChannel) {
-    if(i < matParams.busWriteChannel * uramPortPerChannel) {
-      // Avoid DMA Write Port
-      uram.wreq_i(0)( (matParams.busChannel - matParams.busWriteChannel) * uramPortPerChannel + i) <> mat.uramWReq(i)
-      uram.wdata_i(0)((matParams.busChannel - matParams.busWriteChannel) * uramPortPerChannel + i) := mat.uramWData(i)
-    } else {
-      uram.wreq_i(0)(i - matParams.busWriteChannel * uramPortPerChannel).valid := 0.B
-      uram.wreq_i(0)(i - matParams.busWriteChannel * uramPortPerChannel).bits := DontCare
-      uram.wdata_i(0)(i - matParams.busWriteChannel * uramPortPerChannel) := DontCare
-    }
-  }
-  for(i <- 0 until matParams.busChannel) {
-    if(i < matParams.busWriteChannel) {
-      mat.uramWResp(i) <> uram.wresp_o(0)(matParams.busChannel - matParams.busWriteChannel + i)
-    } else {
-      uram.wresp_o(0)(i - matParams.busWriteChannel).ready := 1.B
-    }
-  }
-
-  // TL Slave Connection
-  for(i <- 0 until uramChannel * uramPortPerChannel) {
-    if(i < 2 * uramPortPerChannel) {
-      // Empty
-      uram.wreq_i(3)(i).valid := 0.B
-      uram.wreq_i(3)(i).bits := DontCare
-      uram.wdata_i(3)(i) := DontCare
-      uram.r0req_i(2)(i).valid := 0.B
-      uram.r0req_i(2)(i).bits := DontCare
-    } else if(i < 3 * uramPortPerChannel) {
-      uram.wreq_i(3)(i) <> tl2u.uramWReq(i - 2 * uramPortPerChannel)
-      uram.wdata_i(3)(i) := tl2u.uramWData(i - 2 * uramPortPerChannel)
-      uram.r0req_i(2)(i) <> tl2u.uramRReq(i - 2 * uramPortPerChannel)
-    } else {
-      // Empty
-      uram.wreq_i(3)(i).valid := 0.B
-      uram.wreq_i(3)(i).bits := DontCare
-      uram.wdata_i(3)(i) := DontCare
-      uram.r0req_i(2)(i).valid := 0.B
-      uram.r0req_i(2)(i).bits := DontCare
-    }
-  }
-  for(i <- 0 until uramChannel) {
-    if(i < 2) {
-      uram.wresp_o(3)(i).ready := 1.B
-      uram.r0resp_o(2)(i).ready := 1.B
-    } else if(i < 3) {
-      tl2u.uramWResp(i - 2) <> uram.wresp_o(3)(i)
-      tl2u.uramRResp(i - 2) <> uram.r0resp_o(2)(i)
-    } else {
-      uram.wresp_o(3)(i).ready := 1.B
-      uram.r0resp_o(2)(i).ready := 1.B
-    }
-  }
+  mat.uramRReq0  <> uram.r0Req.slice(0, MATRP0PORT)
+  mat.uramRResp0 <> uram.r0Resp.slice(0, MATRP0CHAN)
+  mat.uramRReq1  <> uram.r1Req.slice(0, MATRP1PORT)
+  mat.uramRResp1 <> uram.r1Resp.slice(0, MATRP1CHAN)
+  mat.uramWReq  <> uram.w0Req.slice(0, MATWP0PORT)
+  mat.uramWResp <> uram.w0Resp.slice(0, MATWP0CHAN)
+  mat.uramWData <> uram.w0Data.slice(0, MATWP0PORT)
 
   // Vec Connection
-  // vec.instReq <> disp.vecReq
-  // vec.instResp <> disp.vecResp
-  // vec.sbComp <> sb.sbComp(1)
-  // vec.uramRReq <> uram.r0req_i(1)
-  // vec.uramRResp <> uram.r0resp_o(1)
-  // vec.uramWReq <> uram.wreq_i(1)
-  // vec.uramWResp <> uram.wresp_o(1)
   disp.vecReq.ready := 1.B
-  // vec.instReq <> disp.vecReq
   disp.vecResp.valid := 0.B
   disp.vecResp.bits := DontCare
   vpu.instReq <> disp.vpuReq
   vpu.instResp <> disp.vpuResp
   vpu.sbComp <> sb.sbComp(1)
-  vpu.uramRReq <> uram.r0req_i(1)
-  vpu.uramRResp <> uram.r0resp_o(1)
-  vpu.uramWReq <> uram.wreq_i(1)
-  vpu.uramWResp <> uram.wresp_o(1)
-  uram.wdata_i(1) := vpu.uramWData
+  vpu.uramRReq  <> uram.r0Req.slice(MATRP0PORT, MATRP0PORT + VECRP0PORT)
+  vpu.uramRResp <> uram.r0Resp.slice(MATRP0CHAN, MATRP0CHAN + VECRP0CHAN)
+  vpu.uramWReq  <> uram.w0Req.slice(MATWP0PORT, MATWP0PORT + VECWP0PORT)
+  vpu.uramWResp <> uram.w0Resp.slice(MATWP0CHAN, MATWP0CHAN + VECWP0CHAN)
+  vpu.uramWData <> uram.w0Data.slice(MATWP0PORT, MATWP0PORT + VECWP0PORT)
 
   // DMA Connection
   dma.instReq <> disp.dmaReq
   dma.instResp <> disp.dmaResp
   dma.sbComp <> sb.sbComp(2)
-  dma.uramRReq <> uram.r1req_i(1)
-  dma.uramRResp <> uram.r1resp_o(1)
-  dma.uramWReq <> uram.wreq_i(2)
-  dma.uramWResp <> uram.wresp_o(2)
+  dma.uramRReq  <> uram.r1Req.slice(MATRP1PORT, MATRP1PORT + LSURP1PORT)
+  dma.uramRResp <> uram.r1Resp.slice(MATRP1CHAN, MATRP1CHAN + LSURP1CHAN)
+  dma.uramWReq  <> uram.w0Req.slice(MATWP0PORT + VECWP0PORT, MATWP0PORT + VECWP0PORT + LSUWP0PORT)
+  dma.uramWResp <> uram.w0Resp.slice(MATWP0CHAN + VECWP0CHAN, MATWP0CHAN + VECWP0CHAN + LSUWP0CHAN)
+  dma.uramWData <> uram.w0Data.slice(MATWP0PORT + VECWP0PORT, MATWP0PORT + VECWP0PORT + LSUWP0PORT)
   dma.axi4 <> axi4
-  uram.wdata_i(2) := dma.uramWData
+
+  // TL Slave Connection
+  tl2u.uramRReq  <> uram.r0Req.slice(MATRP0PORT + VECRP0PORT, MATRP0PORT + VECRP0PORT + TLLRP0PORT)
+  tl2u.uramRResp <> uram.r0Resp.slice(MATRP0CHAN + VECRP0CHAN, MATRP0CHAN + VECRP0CHAN + TLLRP0CHAN)
+  tl2u.uramWReq <> uram.w0Req.slice(MATWP0PORT + VECWP0PORT + LSUWP0PORT, MATWP0PORT + VECWP0PORT + LSUWP0PORT + TLSWP0PORT)
+  tl2u.uramWResp <> uram.w0Resp.slice(MATWP0CHAN + VECWP0CHAN + LSUWP0CHAN, MATWP0CHAN + VECWP0CHAN + LSUWP0CHAN + TLSWP0CHAN)
+  tl2u.uramWData <> uram.w0Data.slice(MATWP0PORT + VECWP0PORT + LSUWP0PORT, MATWP0PORT + VECWP0PORT + LSUWP0PORT + TLSWP0PORT)
 
   // Scoreboard Connection
   sb.instReq <> disp.sbReq
