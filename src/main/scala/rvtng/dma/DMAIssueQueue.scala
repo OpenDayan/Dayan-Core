@@ -86,7 +86,7 @@ class DMAIssueQueue(params: DMAParams) extends Module {
   // May Fail?
   private val compQ = Module(new Queue(new scoreboardInfo, 8, false, false)).io
   compQ.enq.bits.isBar  := compReq.bits.instWord(14)
-  compQ.enq.bits.rd     := compReq.bits.instWord(19, 15)
+  compQ.enq.bits.rd     := compReq.bits.instWord(11, 7)
   compQ.enq.bits.rdData := compReq.bits.rdData
   compQ.enq.bits.id     := isCounter
   compQ.enq.valid := compReq.valid
@@ -108,5 +108,5 @@ class DMAIssueQueue(params: DMAParams) extends Module {
   compResp.bits.data := compQ.deq.bits.rdData
   compResp.bits.rd := compQ.deq.bits.rd
   compResp.valid := hasCommit & compQ.deq.valid & compQ.deq.bits.isBar
-  compQ.deq.ready := (hasCommit & sbComp.ready & !compQ.deq.bits.isBar) | (hasCommit & compResp.ready & compQ.deq.bits.isBar)
+  compQ.deq.ready := hasCommit & Mux(compQ.deq.bits.isBar, compResp.ready, sbComp.ready)
 }

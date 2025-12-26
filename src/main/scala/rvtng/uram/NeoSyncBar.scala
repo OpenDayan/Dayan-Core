@@ -78,12 +78,12 @@ class NeoSyncBarChannel[TS <: Data, TD <: Data](channelWidth: Int, fifoSize: Int
   }
   val dstGlbVld = VecInit(srcVldQ.bits.zip(dstQ).map(iter => {
     val (vld, dQ) = iter
-    dQ.valid | !vld
-  })).reduceTree(_ & _)
+    (!vld) | dQ.valid
+  })).reduceTree(_ & _) & srcVldQ.valid
   // 根据 srcVldQ 中的情况，置位 dstStreamO
   io.dstStreamO.zip(srcVldQ.bits).zip(dstQ).foreach(iter => {
     val ((dOut, vld), dQ) = iter
-    dOut.valid := vld & dQ.valid & dstGlbVld
+    dOut.valid := vld & dstGlbVld
     dQ.ready := vld & dstGlbVld & dstGlbRdy
     dOut.bits := dQ.bits
   })
