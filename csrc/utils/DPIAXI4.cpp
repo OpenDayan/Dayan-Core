@@ -66,7 +66,7 @@ extern "C" void DPIAXI4Tick(
 
         unsigned char w_valid,
         unsigned char *w_ready,
-        int w_strb,
+        long long int  w_strb,
         const svOpenArrayHandle w_data,
         unsigned char w_last,
 

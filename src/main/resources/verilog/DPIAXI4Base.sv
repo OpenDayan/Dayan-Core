@@ -28,7 +28,7 @@ import "DPI-C" function void DPIAXI4Tick
 
   input bit      w_valid,
   output bit     w_ready,
-  input int      w_strb,
+  input longint  w_strb,
   input byte     w_data[],
   input bit      w_last,
 
@@ -97,7 +97,7 @@ module DPIAXI4Base #(
   wire [31:0] __aw_len;
 
   wire __w_valid;
-  wire [31:0] __w_strb;
+  wire [63:0] __w_strb;
   byte        __w_data[(DATA_BITS / 8)-1:0];
   wire        __w_last;
 
