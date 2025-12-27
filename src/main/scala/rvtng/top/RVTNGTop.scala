@@ -13,7 +13,7 @@ import rvtng.bus.{AXI4Bundle, AXI4BundleParameters, DPIAXI4}
 import rvtng.vpu._
 
 // Full 8-TFlops/GHz/Core Implementation
-class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams, vpuParams: VpuParams, name: String = "RVTNGTop") extends Module {
+class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams, vpuParams: VpuParams, tlParms: TLBundleParameters, name: String = "RVTNGTop") extends Module {
   // 实例化 MAT、Vec、DMA、URAM，并完成顶层指令分发、Scoreboard 实现。
 
   private val axi4Parms = AXI4BundleParameters(
@@ -28,10 +28,10 @@ class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams,
   private val uramPortPerChannel = vecParams.uramPortPerChannel
 
   // Tilelink UH To URAM
-  private val tlParms = TLBundleParameters(
-    addressBits = dmaParams.addressBits, dataBits = 256, sourceBits = dmaParams.sourceBits, sinkBits = 1,
-    sizeBits = log2Ceil(256 / 8) , hasBCE = false
-  )
+  // private val tlParms = TLBundleParameters(
+  //   addressBits = dmaParams.addressBits, dataBits = 256, sourceBits = dmaParams.sourceBits, sinkBits = 1,
+  //   sizeBits = log2Ceil(256 / 8) , hasBCE = false
+  // )
   val tl2u = Module(new TilelinkUHToURAM(tlParms, 24, uramPortPerChannel))
   val tl = IO(Flipped(new TLBundle(tlParms)))
   tl <> tl2u.tl
@@ -134,13 +134,13 @@ class RVTNGTestTop() extends Module {
   private val vecParams = VecParams()
   private val dmaParams = DMAParams()
   private val vpuParams = VpuParams()
-  private val core = Module(new RVTNGTop(matParams, vecParams, dmaParams, vpuParams))
-  private val axi4Parms = AXI4BundleParameters(
-    addressBits = dmaParams.addressBits, dataBits = dmaParams.dataBits, idBits = dmaParams.sourceBits
-  )
   private val tlParms = TLBundleParameters(
     addressBits = dmaParams.addressBits, dataBits = 256, sourceBits = dmaParams.sourceBits, sinkBits = 1,
     sizeBits = log2Ceil(256 / 8) , hasBCE = false
+  )
+  private val core = Module(new RVTNGTop(matParams, vecParams, dmaParams, vpuParams, tlParms))
+  private val axi4Parms = AXI4BundleParameters(
+    addressBits = dmaParams.addressBits, dataBits = dmaParams.dataBits, idBits = dmaParams.sourceBits
   )
 
   val instReq = IO(Flipped(Decoupled(new TensorInst)))

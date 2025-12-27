@@ -33,26 +33,46 @@ class TilelinkUHToURAM(val tlParms: TLBundleParameters, val uramAddrBits: Int, v
   val tlGetVld = tl.a.valid && (tl.a.bits.opcode === Get)
   val tlPutFullVld = tl.a.valid && (tl.a.bits.opcode === PutFullData)
   val tlPutPartVld = tl.a.valid && (tl.a.bits.opcode === PutPartialData)
+  val tlPutVld = tl.a.valid && (tl.a.bits.opcode =/= Get)
+
+  // R Meta FIFO
+  val rreqMetaFIFO = Module(new Queue(new Bundle {
+    val source = UInt(tlParms.sourceBits.W)
+    val size   = UInt(tlParms.sizeBits.W)
+  }, 32, false, false)).io
+  rreqMetaFIFO.enq.valid := tlGetVld & uramRReq(0).ready
+  rreqMetaFIFO.enq.bits.source := tl.a.bits.source
+  rreqMetaFIFO.enq.bits.size   := tl.a.bits.size
 
   // A Channel To RReq
   for(i <- 0 until uramPorts) {
-    uramRReq(i).valid := tlGetVld
+    uramRReq(i).valid := tlGetVld & rreqMetaFIFO.enq.ready
     uramRReq(i).bits.address := alignedAddr + i.U
-    uramRReq(i).bits.id := tl.a.bits.source
+    uramRReq(i).bits.id := DontCare
     uramRReq(i).bits.byteEnable := 255.U
   }
 
+  // W Meta FIFO
+  val wreqMetaFIFO = Module(new Queue(new Bundle {
+    val source = UInt(tlParms.sourceBits.W)
+    val size   = UInt(tlParms.sizeBits.W)
+  }, 32, false, false)).io
+  wreqMetaFIFO.enq.valid := tlPutVld & uramWReq(0).ready
+  wreqMetaFIFO.enq.bits.source := tl.a.bits.source
+  wreqMetaFIFO.enq.bits.size   := tl.a.bits.size
   // A Channel To WReq
   for(i <- 0 until uramPorts) {
-    uramWReq(i).valid := tlPutFullVld | tlPutPartVld
+    uramWReq(i).valid := tlPutVld & wreqMetaFIFO.enq.ready
     uramWReq(i).bits.address := alignedAddr + i.U
-    uramWReq(i).bits.id := tl.a.bits.source
+    uramWReq(i).bits.id := DontCare
     uramWReq(i).bits.byteEnable := tl.a.bits.mask.asTypeOf(Vec(uramPorts, UInt(8.W)))(i)
   }
   uramWData := tl.a.bits.data.asTypeOf(uramWData)
 
   // A Channel Ready
-  tl.a.ready := (tlGetVld & uramRReq(0).ready) | ((!tlGetVld) & uramWReq(0).ready)
+  tl.a.ready :=
+  ((tl.a.bits.opcode === Get) & uramRReq(0).ready & rreqMetaFIFO.enq.ready) |
+  ((tl.a.bits.opcode =/= Get) & uramWReq(0).ready & wreqMetaFIFO.enq.ready)
 
   // Resp To D Channel
   val accessAckData = Wire(DecoupledIO(new TLBundleD(tlParms)))
@@ -60,24 +80,26 @@ class TilelinkUHToURAM(val tlParms: TLBundleParameters, val uramAddrBits: Int, v
   uramRResp(0).ready := accessAckData.ready
   accessAckData.bits.opcode := AccessAckData
   accessAckData.bits.param := 0.U
-  accessAckData.bits.size := (log2Ceil(uramPorts) + 3).U
-  accessAckData.bits.source := uramRResp(0).bits(0).id
+  accessAckData.bits.size := rreqMetaFIFO.deq.bits.size
+  accessAckData.bits.source := rreqMetaFIFO.deq.bits.source
   accessAckData.bits.sink := 0.U
   accessAckData.bits.denied := 0.B
   accessAckData.bits.corrupt := 0.B
   accessAckData.bits.data := VecInit(uramRResp(0).bits.map(_.data)).asTypeOf(accessAckData.bits.data)
+  rreqMetaFIFO.deq.ready := accessAckData.fire
 
   val accessAck = Wire(DecoupledIO(new TLBundleD(tlParms)))
   accessAck.valid := uramWResp(0).valid
   uramWResp(0).ready := accessAck.ready
   accessAck.bits.opcode := AccessAck
   accessAck.bits.param := 0.U
-  accessAck.bits.size := (log2Ceil(uramPorts) + 3).U
-  accessAck.bits.source := uramWResp(0).bits(0).id
+  accessAck.bits.size := wreqMetaFIFO.deq.bits.size
+  accessAck.bits.source := wreqMetaFIFO.deq.bits.source
   accessAck.bits.sink := 0.U
   accessAck.bits.denied := 0.B
   accessAck.bits.corrupt := 0.B
   accessAck.bits.data := DontCare
+  wreqMetaFIFO.deq.ready := accessAck.fire
 
   // Arb
   val dArb = Module(new RRArbiter(new TLBundleD(tlParms), 2)).io
