@@ -25,11 +25,14 @@ class RVTNGInstDispatch extends Module {
   private val inst = instQ.bits.instWord
   private val decodeIsTCSRorScoreboard = inst(31, 28) === 0.U
 
-  private val decodeIsScoreboard = decodeIsTCSRorScoreboard & inst(26, 25) === 3.U
-  private val decodeIsMat = (decodeIsTCSRorScoreboard & inst(26, 25) === 0.U) | (inst(31, 28) === 1.U)
-  private val decodeIsDma = (decodeIsTCSRorScoreboard & inst(26, 25) === 2.U) | (inst(31, 29) === 1.U)
-  private val decodeIsVec = (decodeIsTCSRorScoreboard & inst(26, 25) === 1.U) | (inst(31, 30) > 0.U)
-  private val decodeIsVpu = inst(6,0) === "h3f".U
+  private val decodeIs64B = inst(6, 0) === "h3f".U
+  private val decodeIs32B = inst(6, 0) === "h0b".U
+
+  private val decodeIsScoreboard = decodeIsTCSRorScoreboard & inst(26, 25) === 3.U & decodeIs32B
+  private val decodeIsMat = ((decodeIsTCSRorScoreboard & inst(26, 25) === 0.U) | (inst(31, 28) === 1.U)) & decodeIs32B
+  private val decodeIsDma = ((decodeIsTCSRorScoreboard & inst(26, 25) === 2.U) | (inst(31, 29) === 1.U)) & decodeIs32B
+  private val decodeIsVec = ((decodeIsTCSRorScoreboard & inst(26, 25) === 1.U) | (inst(31, 30) > 0.U))   & decodeIs32B
+  private val decodeIsVpu = decodeIs64B
   private val illegal = !(decodeIsScoreboard | decodeIsMat | decodeIsDma | decodeIsVec | decodeIsVpu)
   chisel3.assert(!(illegal & instQ.valid))
 
