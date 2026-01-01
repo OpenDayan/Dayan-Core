@@ -139,7 +139,7 @@ class MatTop(params: MatParams) extends Module {
   csr.sel.addr := io.instReq.bits.instWord(27, 25)
   tgen.cmdIn.valid := io.instReq.valid & decodeTaskSpilt
   tgen.cmdIn.bits.bf16 := curIsBF16
-  tgen.cmdIn.bits.mma  := 1.B // 是否是 MMA 指令
+  tgen.cmdIn.bits.mma  := !io.instReq.bits.instWord(12) // 是否是 MMA 指令
   tgen.cmdIn.bits.aBaseAddr := io.instReq.bits.rs1Data
   tgen.cmdIn.bits.bBaseAddr := io.instReq.bits.rs2Data
   tgen.cmdIn.bits.cBaseAddr := io.instReq.bits.rdData
