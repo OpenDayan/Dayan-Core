@@ -135,7 +135,7 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     for(i <- (rowChannel + 1) until uramChannel){
       uramWResp(i).ready := true.B
     }
-    commit_pulse := VecInit(respLastQueue.map(q => q.deq.valid)).reduceTree(_ || _)
+    commit_pulse := VecInit(respLastQueue.map(q => q.deq.valid)).reduceTree(_ && _)
 
     // when(current_ReqIndex === current_RespIndex){
     //   when(uramWReq(0).fire && !uramWResp(0).fire){
