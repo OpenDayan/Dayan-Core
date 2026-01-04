@@ -22,7 +22,7 @@ case class VpuParams(
                     tcsrBanks: Int = 8,
                     laneWidth: Int = 128,
                     uramAddrBits: Int = 22,
-                    sourceBits: Int = 1,
+                    sourceBits: Int = 2,
                     uramPortPerChannel: Int = 4
                     ) {
   val block_size = computeunit_len
@@ -539,8 +539,19 @@ class ElewiseUnit[T <: Data : Arithmetic](params: VpuParams) extends Module {
   io.uram_read_2.resp.ready := qDataB.io.enq.ready
 
   val is_writing_last = Mux(is_reduce, reduce_out_offset === 0.U, out_row === 0.U && out_offset === 0.U)
-  val w_mask = (0 until computeunit_len).map(_.U + offset < Mux(is_reduce, 1.U, out_op_max_dim))
+  val w_mask = (0 until computeunit_len).map(idx => {
+    val e = Wire(Bool())
+    when(is_16bits) {
+      e := idx.U < (computeunit_len / 2).U
+    }.elsewhen(is_8bits) {
+      e := idx.U < (computeunit_len / 4).U
+    }.otherwise {
+      e := 1.B
+    }
+    e && (idx.U + offset < Mux(is_reduce, 1.U, out_op_max_dim))
+  })
   io.uram_write.valid := arbResult.io.out.valid && start
+  // TODO: ready signal?
   arbResult.io.out.ready := true.B
   // io.uram_write.addr := Mux(is_reduce, currentAddrReduceOut.asUInt, currentAddrOut.asUInt)
   io.uram_write.addr := MuxCase(

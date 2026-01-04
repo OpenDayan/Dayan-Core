@@ -64,9 +64,9 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     val wq = VecInit((0 until (rowChannel + 1)).map(
       i => Module(new Queue(new WriteReq, 16)).io
     ))
-    val ReqCount = RegInit(VecInit(Seq.fill(2)(0.U(16.W))))
-    val current_ReqIndex = RegInit(0.U(1.W))
-    val current_RespIndex = RegInit(0.U(1.W))
+//    val ReqCount = RegInit(VecInit(Seq.fill(2)(0.U(16.W))))
+//    val current_ReqIndex = RegInit(0.U(1.W))
+//    val current_RespIndex = RegInit(0.U(1.W))
 
     val ReadReqQueue = Module(new Queue(UInt(3.W), 16))
 
@@ -120,6 +120,8 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     VPU.io.start := instQueue.io.deq.valid && !vpu_not_yet_commit
     VPU.io.cmd := instQueue.io.deq.bits
     instQueue.io.deq.ready := commit_pulse
+    // TODO: Known Limitation of sft_valid
+    private val sft_valid = Wire(Vec(rowChannel, Bool()))
 
     // 阻塞等待所有 Channel 中标记为 Last 的指令完成，再生成提交脉冲信号。
     // 实现：每个 Channel 实现一个 Queue，等待所有 Channel 的 Last 指令都有效后，才发出提交信号。
@@ -127,15 +129,27 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
       Module(new Queue(Bool(), 16)).io
     ))
     respLastQueue.zipWithIndex.foreach{ case (q, i) =>
-      q.enq.valid := uramWResp(i).valid && uramWResp(i).bits(0).id === 1.U
-      q.enq.bits := 0.B
-      q.deq.ready := commit_pulse
+      q.enq.valid := uramWResp(i).valid && uramWResp(i).bits(0).id(0) === 1.U
+      if(i < rowChannel) sft_valid(i) := q.deq.bits
+      q.enq.bits := uramWResp(i).bits(0).id(1)
+      if(i != 0) {
+        q.deq.ready := commit_pulse && sft_valid(i - 1)
+      } else {
+        q.deq.ready := commit_pulse
+      }
       uramWResp(i).ready := q.enq.ready
     }
     for(i <- (rowChannel + 1) until uramChannel){
       uramWResp(i).ready := true.B
     }
-    commit_pulse := VecInit(respLastQueue.map(q => q.deq.valid)).reduceTree(_ && _)
+    commit_pulse := VecInit(respLastQueue.zipWithIndex.map( iter => {
+      val (q, i) = iter
+      if(i != 0) {
+        q.deq.valid || !sft_valid(i - 1)
+      } else {
+        q.deq.valid
+      }
+    })).reduceTree(_ && _)
 
     // when(current_ReqIndex === current_RespIndex){
     //   when(uramWReq(0).fire && !uramWResp(0).fire){
@@ -179,6 +193,13 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     // WriteReqQueue.io.enq.bits.last := VPU.io.done
     // WriteReqQueue.io.enq.valid := VPU.io.srams.write.valid
     // WriteReqQueue.io.enq.bits.data := VPU.io.srams.write.data
+
+    private val wqRndGateCnt = RegInit(0.U(4.W))
+    wqRndGateCnt := wqRndGateCnt + 1.U
+//    wqRndGate := !wqRndGate
+//    private val wqRndGate = wqRndGateCnt <= 13.U
+    private val wqRndGate = 1.B
+
     wq.zipWithIndex.foreach(iter => {
       val (q, idx) = iter
       q.enq.bits.addr := VPU.io.srams.write.addr
@@ -186,7 +207,7 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
       q.enq.bits.last := VPU.io.done
       q.enq.bits.data := VPU.io.srams.write.data
       q.enq.valid := VPU.io.srams.write.valid && VPU.io.srams.write.ready
-      q.deq.ready := uramWReq(idx * uramPortPerChannel).ready
+      q.deq.ready := uramWReq(idx * uramPortPerChannel).ready && wqRndGate
     })
 
     for( i <- 1 until uramChannel){
@@ -219,9 +240,12 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
         // uramWReq(i).valid := Mux(WriteReqQueue.io.deq.bits.mask(i * 8), WriteReqQueue.io.deq.valid, false.B)
         // 始终有效的写请求，偶尔取消 byteEnable 的置位，用于简化 Resp 追踪的复杂度
         // uramWReq(i).valid := WriteReqQueue.io.deq.valid
-        uramWReq(i).valid := wq(i / uramPortPerChannel).deq.valid
+        uramWReq(i).valid := wqRndGate && wq(i / uramPortPerChannel).deq.valid && ((i == 0).B || uramWReq(i).bits.byteEnable.orR)
         uramWReq(i).bits.address := (wq(i / uramPortPerChannel).deq.bits.addr + (i * 8).U) >> 3
-        uramWReq(i).bits.id := wq(i / uramPortPerChannel).deq.bits.last.asUInt
+        uramWReq(i).bits.id := Cat(
+          uramWReq(i + uramPortPerChannel).bits.byteEnable.orR.asUInt,
+          wq(i / uramPortPerChannel).deq.bits.last.asUInt
+        )
 
         if(i == 0) {
           uramWReq(i).bits.byteEnable := Mux(wq(i / uramPortPerChannel).deq.bits.addr(2,0) === 4.U,
