@@ -20,6 +20,7 @@ long fdInst, fdMsg;
 #define LOG2BANK 5
 #define URAMSIZE ((1 << LOG2BANK) * 32 * 1024ull)
 long int *uram = NULL; // 1024KBytes URAM
+uint8_t *dram = NULL; // 1024KBytes URAM
 
 extern "C" long long UltraRamRead(int id, int raddr)
 {
@@ -129,6 +130,9 @@ int main(int argc, char **argv)
 {
     // 创建 URAM
     uram = (long *)backend_get_shm_ptr("/uram_shm_0", 1024 * 1024);
+    dram = (uint8_t*)backend_get_shm_ptr("/dram_shm_0", 4ul * 1024ul * 1024ul * 1024ul);
+    printf("Note: 如果模拟器启动失败并返回信号：SIGBUS，则说明 Shared Memory 没有正确创建。\n请执行命令： sudo mount -o remount,size=32G /dev/shm\n");
+    dram[0x100000000ul - 1] = 0x0; // Check Shared DRAM Status
     // 创建 QEMU 子进程
     pid_t qemuPid = fork();
     if (qemuPid == -1) {

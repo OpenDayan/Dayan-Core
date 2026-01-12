@@ -26,7 +26,7 @@
         "Package": "rvtng.uram"
     },
     "FP8BF16FusedDPArray": {
-        "Package": "rvtng.fpmath",
+        "Package": "rvtng.fpmath.DPArray",
         "AdditionDeps": {
             "csrc/gen/FP8BF16FusedDPArrayTestBF16Gen.hpp csrc/gen/FP8BF16FusedDPArrayTestCheckGen.hpp": {
                 "deps": "csrc/gen/FP8BF16FusedDPArrayTestMatrixGen.py",
@@ -35,7 +35,7 @@
         }
     },
     "FP8BF16FusedDPUnit": {
-        "Package": "rvtng.fpmath"
+        "Package": "rvtng.fpmath.DPArray"
     },
     "GroupXBar": {
         "Package": "rvtng.utils"

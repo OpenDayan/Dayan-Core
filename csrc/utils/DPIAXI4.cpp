@@ -7,6 +7,7 @@
 #include "rvtng-intf.h"
 
 extern double npu_cycle, dram_cycle, npu_freq, dram_freq;
+extern uint8_t *dram;
 
 #define DRAM_CYCLE (dram_cycle) // 1200MHz -> 0.833ns
 #define NPU_CYCLE  (npu_cycle) // 1000MHz -> 1ns
@@ -119,8 +120,11 @@ extern "C" void DPIAXI4Tick(
             if(sys->WillAcceptTransaction(local_aw_addr, true)) {
                 sys->AddTransaction(local_aw_addr, true, local_aw_id);
                 // 立即完成写请求
-                backend_dram_write(fdMsg, local_w_ready ? ((char*)svGetArrayPtr(w_data)) : local_w_data,
-                    data_bytes_, local_aw_addr);
+                // backend_dram_write(fdMsg, local_w_ready ? ((char*)svGetArrayPtr(w_data)) : local_w_data,
+                //     data_bytes_, local_aw_addr);
+                memcpy(dram + local_aw_addr - 0x80000000,
+                    local_w_ready ? ((char*)svGetArrayPtr(w_data)) : local_w_data,
+                    data_bytes_);
                 local_aw_ready = 1;
                 local_w_ready = 1;
                 aw_back_fire = 1;
@@ -151,7 +155,10 @@ extern "C" void DPIAXI4Tick(
             *r_id = resp.second;
             *r_last = 1;
             *r_resp = 0;
-            backend_dram_read(fdMsg, (char*)svGetArrayPtr(r_data), data_bytes_, resp.first);
+            // backend_dram_read(fdMsg, (char*)svGetArrayPtr(r_data), data_bytes_, resp.first);
+            memcpy((char*)svGetArrayPtr(r_data),
+                dram + resp.first - 0x80000000,
+                data_bytes_);
             read_resp.pop();
         } else {
             local_r_valid = 0;
