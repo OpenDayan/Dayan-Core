@@ -29,7 +29,6 @@ extern "C" {
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include "ipc_channel.h"
-#include "blocking-queue.h"
 
 typedef struct {
 	uint64_t inst;
@@ -45,9 +44,6 @@ typedef struct {
     uint64_t timestamp;
 } rvt_commit_t;
 
-DEFINE_BLOCKING_QUEUE(rvt_pack_t, RVTPackQ)
-DEFINE_BLOCKING_QUEUE(rvt_commit_t, RVTCommitQ)
-
 // Frontend Service API
 int frontend_dram_read_service(char *buf, size_t size, off_t addr);
 int frontend_dram_write_service(char *buf, size_t size, off_t addr);
@@ -56,14 +52,14 @@ int frontend_instruction_commit_service(int coreIdx, rvt_commit_t* pkg);
 
 static inline void backend_init(int* fdMsg, int* fdInst) {
     int retry = 0;
-    while((*fdMsg = rvt_socket_client_init("/tmp/rv_frontend_msg")) == -1) {
+    while((*fdMsg = rvt_socket_client_init("/tmp/card0_rvt_msg")) == -1) {
         if(retry >= 20) {
             exit(-1);
         }
         printf("Backend Init msg client Fail, retrying %d...\n", ++retry);
         usleep(500000);
     }
-    while((*fdInst = rvt_socket_server_init("/tmp/rv_frontend_inst")) == -1) {
+    while((*fdInst = rvt_socket_server_init("/tmp/card0_rvt_inst")) == -1) {
         if(retry >= 20) {
             exit(-1);
         }
@@ -74,14 +70,14 @@ static inline void backend_init(int* fdMsg, int* fdInst) {
 
 static inline void frontend_init(int* fdMsg, int* fdInst) {
     int retry = 0;
-    while((*fdMsg = rvt_socket_server_init("/tmp/rv_frontend_msg")) == -1) {
+    while((*fdMsg = rvt_socket_server_init("/tmp/card0_rvt_msg")) == -1) {
         if(retry >= 20) {
             exit(-1);
         }
         printf("Frontend Init msg server Fail, retrying %d...\n", ++retry);
         usleep(500000);
     }
-    while((*fdInst = rvt_socket_client_init("/tmp/rv_frontend_inst")) == -1) {
+    while((*fdInst = rvt_socket_client_init("/tmp/card0_rvt_inst")) == -1) {
         if(retry >= 20) {
             exit(-1);
         }
