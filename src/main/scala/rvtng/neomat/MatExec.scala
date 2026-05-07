@@ -155,7 +155,7 @@ class MatExec(params: MatParams) extends Module {
   // 内建的小型 cBuffer
   val cTile = Reg(Vec(params.sM * params.sN, Vec(params.cM * params.cN, MatInnerSingedFP(params))))
   dpa.r0_cin_exp_in := RegNext(Mux(!delayedVld(dpa.r0Latency) | delayedCmd(dpa.r0Latency).clear,
-    VecInit.tabulate(params.cM)(m => VecInit.tabulate(params.cN)(n => (BigInt(1) << (params.wE-1)).S(params.wE.W))),
+    VecInit.tabulate(params.cM)(m => VecInit.tabulate(params.cN)(n => (BigInt(-1) << (params.wE-1)).S(params.wE.W))),
     VecInit(cTile(delayedCmd(dpa.r0Latency).regC).map(_.exp)).asTypeOf(dpa.r0_cin_exp_in)))
   dpa.r0_cin_frac_in := RegNext(Mux(!delayedVld(dpa.r0Latency) | delayedCmd(dpa.r0Latency).clear,
     VecInit.tabulate(params.cM)(m => VecInit.tabulate(params.cN)(n => 0.S(params.wF.W))),

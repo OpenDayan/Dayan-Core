@@ -249,7 +249,7 @@ class MatPostProcess(params: MatParams) extends Module {
         outSigWidth = params.wF + 1
       )))
       val zeroFp = Wire(adders._2.cloneType)
-      zeroFp.exp := (BigInt(1) << (params.wE-1)).S(params.wE.W)
+      zeroFp.exp := (BigInt(-1) << (params.wE-1)).S(params.wE.W)
       zeroFp.frac := 0.S
       fpAdder.io.in(0) := adders._1
       fpAdder.io.in(1) := Mux(aQ.deq.bits.clear, zeroFp, adders._2)
