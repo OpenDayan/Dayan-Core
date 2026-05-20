@@ -40,6 +40,24 @@ int CAddr = 0x4000 << 3;
 int sM = 2, sN = 2, sK = 3;
 int persistentMode = 0;
 
+enum MatCSROffset {
+    MAT_CSR_C = 0,
+    MAT_CSR_WO = 3,
+    MAT_CSR_CO = 7,
+    MAT_CSR_WI_STRIDE = 8,
+    MAT_CSR_CO_STRIDE = 12,
+    MAT_CSR_WO_STRIDE = 13,
+    MAT_CSR_I_SWIZZLE_MBS = 15,
+    MAT_CSR_K_SWIZZLE_MBS = 16,
+    MAT_CSR_O_SWIZZLE_MBS = 17,
+    MAT_CSR_DATA_TYPE = 18,
+};
+
+static inline uint32_t matCSRWriteInst(int offset)
+{
+    return (0b0000000 << 25) | (offset << 15) | 0xb;
+}
+
 // Random Range
 int randomRange = 480;
 
@@ -177,49 +195,45 @@ static inline void mainLoop()
     dut->instResp_ready = 1;
     dut->instReq_valid = (startTime == 0) || (finishTime != 0);
     if(sim_time == 0) {
-        // problemM
-        dut->instReq_bits_rdData = M - 1;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (0 << 15) | 0xb;
-    } else if(sim_time == 1) {
-        // problemN
-        dut->instReq_bits_rdData = N - 1;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (1 << 15) | 0xb;
-    } else if(sim_time == 2) {
-        // problemK
+        // GEMM K aliases ISA CSR C
         dut->instReq_bits_rdData = K - 1;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (2 << 15) | 0xb;
+        dut->instReq_bits_instWord = matCSRWriteInst(MAT_CSR_C);
+    } else if(sim_time == 1) {
+        // GEMM M aliases ISA CSR Wo
+        dut->instReq_bits_rdData = M - 1;
+        dut->instReq_bits_instWord = matCSRWriteInst(MAT_CSR_WO);
+    } else if(sim_time == 2) {
+        // GEMM N aliases ISA CSR Co
+        dut->instReq_bits_rdData = N - 1;
+        dut->instReq_bits_instWord = matCSRWriteInst(MAT_CSR_CO);
     } else if(sim_time == 3) {
-        // strideA
+        // GEMM AStride aliases ISA CSR WiStride
         dut->instReq_bits_rdData = K;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (3 << 15) | 0xb;
+        dut->instReq_bits_instWord = matCSRWriteInst(MAT_CSR_WI_STRIDE);
     } else if(sim_time == 4) {
-        // strideB
+        // GEMM BStride aliases ISA CSR CoStride
         dut->instReq_bits_rdData = K;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (4 << 15) | 0xb;
+        dut->instReq_bits_instWord = matCSRWriteInst(MAT_CSR_CO_STRIDE);
     } else if(sim_time == 5) {
-        // strideC
+        // GEMM CStride aliases ISA CSR WoStride
         dut->instReq_bits_rdData = N * 4;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (5 << 15) | 0xb;
+        dut->instReq_bits_instWord = matCSRWriteInst(MAT_CSR_WO_STRIDE);
     } else if(sim_time == 6) {
-        // A Swizzle MBS
+        // GEMM ASwizzleMBS aliases ISA CSR ISwizzleMBS
         dut->instReq_bits_rdData = 0;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (6 << 15) | 0xb;
+        dut->instReq_bits_instWord = matCSRWriteInst(MAT_CSR_I_SWIZZLE_MBS);
     } else if(sim_time == 7) {
-        // B Swizzle MBS
+        // GEMM BSwizzleMBS aliases ISA CSR KSwizzleMBS
         dut->instReq_bits_rdData = 0;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (7 << 15) | 0xb;
+        dut->instReq_bits_instWord = matCSRWriteInst(MAT_CSR_K_SWIZZLE_MBS);
     } else if(sim_time == 8) {
-        // C Swizzle MBS
+        // GEMM CSwizzleMBS aliases ISA CSR OSwizzleMBS
         dut->instReq_bits_rdData = 0;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (8 << 15) | 0xb;
+        dut->instReq_bits_instWord = matCSRWriteInst(MAT_CSR_O_SWIZZLE_MBS);
     } else if(sim_time == 9) {
-        // Persistent Mode
-        dut->instReq_bits_rdData = persistentMode;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (9 << 15) | 0xb;
-    } else if(sim_time == 10) {
         // Data Type
         dut->instReq_bits_rdData = 1;
-        dut->instReq_bits_instWord = (0b0000000 << 25) | (10 << 15) | 0xb;
+        dut->instReq_bits_instWord = matCSRWriteInst(MAT_CSR_DATA_TYPE);
     } else {
         dut->instReq_bits_rs1Data = AAddr;
         dut->instReq_bits_rs2Data = BAddr;

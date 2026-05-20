@@ -5,23 +5,82 @@ import chisel3._
 import chisel3.util._
 import rvtng.top.{TensorInst, TensorResp}
 
-class MatCSRStorage extends Bundle {
-  val M = UInt(20.W)
-  val N = UInt(20.W)
-  val K = UInt(20.W)
-  val AStride  = UInt(20.W)
-  val BStride  = UInt(20.W)
-  val CStride  = UInt(20.W)
-  val ASwizzleMBS  = UInt(24.W)
-  val BSwizzleMBS  = UInt(24.W)
-  val CSwizzleMBS  = UInt(24.W)
-  val PersistentMode = UInt(2.W)
-  val DataType = UInt(8.W)
+class MatCSRStorage(params: MatParams) extends Bundle {
+  // spec Table 4.1 对应的新寄存器实现，用别名保留原有命名
+  val C = UInt(params.MNKWidth.W)                // offset 0
+  val Wi = UInt(params.MNKWidth.W)               // offset 1
+  val Hi = UInt(params.MNKWidth.W)               // offset 2
+  val Wo = UInt(params.MNKWidth.W)               // offset 3
+  val Ho = UInt(params.MNKWidth.W)               // offset 4
+  val Wk = UInt(params.MNKWidth.W)               // offset 5
+  val Hk = UInt(params.MNKWidth.W)               // offset 6
+  val Co = UInt(params.MNKWidth.W)               // offset 7
+  val WiStride = UInt(params.addrWidth.W)        // offset 8
+  val HiStride = UInt(params.addrWidth.W)        // offset 9
+  val WkStride = UInt(params.addrWidth.W)        // offset 10
+  val HkStride = UInt(params.addrWidth.W)        // offset 11
+  val CoStride = UInt(params.addrWidth.W)        // offset 12
+  val WoStride = UInt(params.addrWidth.W)        // offset 13
+  val HoStride = UInt(params.addrWidth.W)        // offset 14
+  val ISwizzleMBS = UInt(24.W)                   // offset 15
+  val KSwizzleMBS = UInt(24.W)                   // offset 16
+  val OSwizzleMBS = UInt(24.W)                   // offset 17
+  val DataType = UInt(8.W)                       // offset 18
+  val ScaleWiStride = UInt(params.addrWidth.W)   // offset 19
+  val ScaleHiStride = UInt(params.addrWidth.W)   // offset 20
+  val ScaleWkStride = UInt(params.addrWidth.W)   // offset 21
+  val ScaleHkStride = UInt(params.addrWidth.W)   // offset 22
+  val ScaleCoStride = UInt(params.addrWidth.W)   // offset 23
+  val PadL = UInt(params.MNKWidth.W)             // offset 24
+  val PadU = UInt(params.MNKWidth.W)             // offset 25
+  val DilationW = UInt(params.MNKWidth.W)        // offset 26
+  val DilationH = UInt(params.MNKWidth.W)        // offset 27
+  val StrideW = UInt(params.MNKWidth.W)          // offset 28
+  val StrideH = UInt(params.MNKWidth.W)          // offset 29
+  val StrideDilationW = UInt(params.addrWidth.W) // offset 30
+  val StrideDilationH = UInt(params.addrWidth.W) // offset 31
+
+  // GEMM aliases
+  def K: UInt = C
+  def M: UInt = Wo
+  def N: UInt = Co
+  def AStride: UInt = WiStride
+  def BStride: UInt = CoStride
+  def CStride: UInt = WoStride
+  def ASwizzleMBS: UInt = ISwizzleMBS
+  def BSwizzleMBS: UInt = KSwizzleMBS
+  def CSwizzleMBS: UInt = OSwizzleMBS
+  def AScaleStride: UInt = ScaleWiStride
+  def BScaleStride: UInt = ScaleCoStride
+  def PersistentMode: UInt = 0.U(2.W)
+
+  // CONV aliases
+  def taskCi: UInt = C
+  def taskWi: UInt = Wi
+  def taskHi: UInt = Hi
+  def taskWo: UInt = Wo
+  def taskHo: UInt = Ho
+  def taskWk: UInt = Wk
+  def taskHk: UInt = Hk
+  def taskCo: UInt = Co
+  def wiStride: UInt = WiStride
+  def hiStride: UInt = HiStride
+  def wkStride: UInt = WkStride
+  def hkStride: UInt = HkStride
+  def coStride: UInt = CoStride
+  def woStride: UInt = WoStride
+  def hoStride: UInt = HoStride
+  def padL: UInt = PadL
+  def padU: UInt = PadU
+  def dilationW: UInt = DilationW
+  def dilationH: UInt = DilationH
+  def strideW: UInt = StrideW
+  def strideH: UInt = StrideH
 }
 
 class MatCSRGroupFetchIF(params: MatParams) extends Bundle {
   val addr = Input(UInt(log2Ceil(params.tcsrBanks).W))
-  val ctrl = Output(new MatCSRStorage)
+  val ctrl = Output(new MatCSRStorage(params))
 }
 
 /*
@@ -61,27 +120,52 @@ class MatControlStatusRegisters(params: MatParams) extends Module {
 
   instRespRaw.valid    := instReq.valid & instDecode.re
 
-  private val cksumArray = VecInit.tabulate(params.tcsrBanks)(i => {
-    val wSum = RegInit(0.U(20.W))
-    when(instDecode.we && i.U === instDecode.bank) {
-      wSum := wSum + 1.U
+  private val csrBankWidth = log2Ceil(params.tcsrBanks)
+  private val csrBank = instDecode.bank(csrBankWidth - 1, 0)
+  private val csrBankValid = instDecode.bank < params.tcsrBanks.U
+
+  private def mapCSR(offset: Int, field: UInt): Unit = {
+    val mem = Module(new RF1R1RWAsyncRamGen(csrBankWidth, 0, chiselTypeOf(field)))
+    mem.raddr := sel.addr
+    field := mem.rdata
+    mem.waddr := csrBank
+    mem.we := instDecode.we & csrBankValid & (instDecode.subAddr === offset.U)
+    mem.wdata := instDecode.wData.asTypeOf(chiselTypeOf(field))
+    when(csrBankValid & (instDecode.subAddr === offset.U)) {
+      instRespRaw.bits.data := mem.rwdata.asUInt
     }
-    wSum
-  })
-  when(instDecode.subAddr === 31.U) {
-    instRespRaw.bits.data := cksumArray(instDecode.bank(log2Ceil(params.tcsrBanks) - 1, 0))
   }
-  private val TCSRPrototype = new MatCSRStorage
-  TCSRPrototype.elements.toSeq.reverse.zipWithIndex.foreach {
-    case ((name, fieldGen), idx) =>
-      val mem = Module(new RF1R1RWAsyncRamGen(log2Ceil(params.tcsrBanks), 0, fieldGen))
-      mem.raddr := sel.addr
-      sel.ctrl.elements(name) := mem.rdata
-      mem.waddr := instDecode.bank
-      mem.we    := instDecode.we & instDecode.subAddr === idx.U
-      mem.wdata := instDecode.wData
-      when(instDecode.subAddr === idx.U) {
-        instRespRaw.bits.data := mem.rwdata
-      }
-  }
+
+  mapCSR(0,  sel.ctrl.C)
+  mapCSR(1,  sel.ctrl.Wi)
+  mapCSR(2,  sel.ctrl.Hi)
+  mapCSR(3,  sel.ctrl.Wo)
+  mapCSR(4,  sel.ctrl.Ho)
+  mapCSR(5,  sel.ctrl.Wk)
+  mapCSR(6,  sel.ctrl.Hk)
+  mapCSR(7,  sel.ctrl.Co)
+  mapCSR(8,  sel.ctrl.WiStride)
+  mapCSR(9,  sel.ctrl.HiStride)
+  mapCSR(10, sel.ctrl.WkStride)
+  mapCSR(11, sel.ctrl.HkStride)
+  mapCSR(12, sel.ctrl.CoStride)
+  mapCSR(13, sel.ctrl.WoStride)
+  mapCSR(14, sel.ctrl.HoStride)
+  mapCSR(15, sel.ctrl.ISwizzleMBS)
+  mapCSR(16, sel.ctrl.KSwizzleMBS)
+  mapCSR(17, sel.ctrl.OSwizzleMBS)
+  mapCSR(18, sel.ctrl.DataType)
+  mapCSR(19, sel.ctrl.ScaleWiStride)
+  mapCSR(20, sel.ctrl.ScaleHiStride)
+  mapCSR(21, sel.ctrl.ScaleWkStride)
+  mapCSR(22, sel.ctrl.ScaleHkStride)
+  mapCSR(23, sel.ctrl.ScaleCoStride)
+  mapCSR(24, sel.ctrl.PadL)
+  mapCSR(25, sel.ctrl.PadU)
+  mapCSR(26, sel.ctrl.DilationW)
+  mapCSR(27, sel.ctrl.DilationH)
+  mapCSR(28, sel.ctrl.StrideW)
+  mapCSR(29, sel.ctrl.StrideH)
+  mapCSR(30, sel.ctrl.StrideDilationW)
+  mapCSR(31, sel.ctrl.StrideDilationH)
 }
