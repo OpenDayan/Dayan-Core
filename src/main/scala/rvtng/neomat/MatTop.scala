@@ -136,10 +136,45 @@ class MatTop(params: MatParams) extends Module {
 
   // mat tgen cmdIn generation
   private val curIsBF16 = csr.sel.ctrl.DataType === 0.U
+  private val taskMode = io.instReq.bits.instWord(14, 12)//mode: mm=000, mma=001, conv2d=010, conv2da=011
+  private val taskIsConv = taskMode(1)
+  private val taskAccumulate = taskMode(0)
   csr.sel.addr := io.instReq.bits.instWord(27, 25)
   tgen.cmdIn.valid := io.instReq.valid & decodeTaskSpilt
   tgen.cmdIn.bits.bf16 := curIsBF16
-  tgen.cmdIn.bits.mma  := !io.instReq.bits.instWord(12) // 是否是 MMA 指令
+  tgen.cmdIn.bits.opMode := taskMode
+  tgen.cmdIn.bits.isConv := taskIsConv
+  tgen.cmdIn.bits.accumulate := taskAccumulate
+  tgen.cmdIn.bits.aBaseAddr := io.instReq.bits.rs1Data
+  tgen.cmdIn.bits.persistentMode := csr.sel.ctrl.PersistentMode
+  tgen.cmdIn.bits.taskCi := csr.sel.ctrl.taskCi
+  tgen.cmdIn.bits.taskWi := csr.sel.ctrl.taskWi
+  tgen.cmdIn.bits.taskHi := csr.sel.ctrl.taskHi
+  tgen.cmdIn.bits.taskWo := csr.sel.ctrl.taskWo
+  tgen.cmdIn.bits.taskHo := csr.sel.ctrl.taskHo
+  tgen.cmdIn.bits.taskWk := csr.sel.ctrl.taskWk
+  tgen.cmdIn.bits.taskHk := csr.sel.ctrl.taskHk
+  tgen.cmdIn.bits.taskCo := csr.sel.ctrl.taskCo
+  tgen.cmdIn.bits.wiStride := csr.sel.ctrl.wiStride
+  tgen.cmdIn.bits.hiStride := csr.sel.ctrl.hiStride
+  tgen.cmdIn.bits.wkStride := csr.sel.ctrl.wkStride
+  tgen.cmdIn.bits.hkStride := csr.sel.ctrl.hkStride
+  tgen.cmdIn.bits.coStride := csr.sel.ctrl.coStride
+  tgen.cmdIn.bits.woStride := csr.sel.ctrl.woStride
+  tgen.cmdIn.bits.hoStride := csr.sel.ctrl.hoStride
+  tgen.cmdIn.bits.scaleWiStride := csr.sel.ctrl.ScaleWiStride
+  tgen.cmdIn.bits.scaleHiStride := csr.sel.ctrl.ScaleHiStride
+  tgen.cmdIn.bits.scaleWkStride := csr.sel.ctrl.ScaleWkStride
+  tgen.cmdIn.bits.scaleHkStride := csr.sel.ctrl.ScaleHkStride
+  tgen.cmdIn.bits.scaleCoStride := csr.sel.ctrl.ScaleCoStride
+  tgen.cmdIn.bits.padL := csr.sel.ctrl.padL
+  tgen.cmdIn.bits.padU := csr.sel.ctrl.padU
+  tgen.cmdIn.bits.dilationW := csr.sel.ctrl.dilationW
+  tgen.cmdIn.bits.dilationH := csr.sel.ctrl.dilationH
+  tgen.cmdIn.bits.strideW := csr.sel.ctrl.strideW
+  tgen.cmdIn.bits.strideH := csr.sel.ctrl.strideH
+  tgen.cmdIn.bits.strideDilationW := csr.sel.ctrl.StrideDilationW
+  tgen.cmdIn.bits.strideDilationH := csr.sel.ctrl.StrideDilationH
   tgen.cmdIn.bits.aBaseAddr := io.instReq.bits.rs1Data
   tgen.cmdIn.bits.bBaseAddr := io.instReq.bits.rs2Data
   tgen.cmdIn.bits.cBaseAddr := io.instReq.bits.rdData

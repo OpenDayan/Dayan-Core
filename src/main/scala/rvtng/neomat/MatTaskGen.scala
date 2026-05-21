@@ -6,7 +6,9 @@ import _root_.circt.stage.ChiselStage
 
 class MatTask(params: MatParams) extends Bundle {
   val bf16 = Bool()
-  val mma = Bool() // 是否是 MMA 指令
+  val opMode = UInt(3.W) // ISA mode: mm=000, mma=001, conv2d=010, conv2da=011；inst[14:12]
+  val isConv = Bool()
+  val accumulate = Bool()
   val aBaseAddr = UInt(params.addrWidth.W)
   val aStride   = UInt(params.addrWidth.W)
   val bBaseAddr = UInt(params.addrWidth.W)
@@ -20,6 +22,35 @@ class MatTask(params: MatParams) extends Bundle {
   val BSwizzleMBS  = UInt(24.W)
   val CSwizzleMBS  = UInt(24.W)
   val persistentMode = UInt(2.W)
+
+  val taskCi = UInt(params.MNKWidth.W)
+  val taskWi = UInt(params.MNKWidth.W)
+  val taskHi = UInt(params.MNKWidth.W)
+  val taskWo = UInt(params.MNKWidth.W)
+  val taskHo = UInt(params.MNKWidth.W)
+  val taskWk = UInt(params.MNKWidth.W)
+  val taskHk = UInt(params.MNKWidth.W)
+  val taskCo = UInt(params.MNKWidth.W)
+  val wiStride = UInt(params.addrWidth.W)
+  val hiStride = UInt(params.addrWidth.W)
+  val wkStride = UInt(params.addrWidth.W)
+  val hkStride = UInt(params.addrWidth.W)
+  val coStride = UInt(params.addrWidth.W)
+  val woStride = UInt(params.addrWidth.W)
+  val hoStride = UInt(params.addrWidth.W)
+  val scaleWiStride = UInt(params.addrWidth.W)
+  val scaleHiStride = UInt(params.addrWidth.W)
+  val scaleWkStride = UInt(params.addrWidth.W)
+  val scaleHkStride = UInt(params.addrWidth.W)
+  val scaleCoStride = UInt(params.addrWidth.W)
+  val padL = UInt(params.MNKWidth.W)
+  val padU = UInt(params.MNKWidth.W)
+  val dilationW = UInt(params.MNKWidth.W)
+  val dilationH = UInt(params.MNKWidth.W)
+  val strideW = UInt(params.MNKWidth.W)
+  val strideH = UInt(params.MNKWidth.W)
+  val strideDilationW = UInt(params.addrWidth.W)
+  val strideDilationH = UInt(params.addrWidth.W)
 }
 
 /*
@@ -105,7 +136,7 @@ class MatTaskGen(params: MatParams) extends Module {
   ppCmd.bits.mTile := tileM
   ppCmd.bits.nTile := tileN
   ppCmd.bits.repeat := tileK >> params.log2SK
-  ppCmd.bits.accumulate := io.cmdIn.bits.mma
+  ppCmd.bits.accumulate := io.cmdIn.bits.accumulate
 
   // 命令连线
   pA.io.cmdIn <> Queue(aCmd, 2)
