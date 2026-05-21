@@ -300,5 +300,21 @@ object MatTestTop extends App {
   )
 }
 
+class MatConvTestTop(params: MatParams) extends MatTestTop(params)
 
-
+object MatConvTestTop extends App {
+  ChiselStage.emitSystemVerilog(
+    new MatConvTestTop(MatParams(
+      addrWidth = 20, MNKWidth = 16, sM = 2, sN = 2, sK = 16, cM = 16, cN = 8, cK = 32,
+      wE = 9, wF = 25, busChannel = 8, channelWidth = 32, idWidth = 9,
+      busWriteChannel = 2, tcsrBanks = 8
+    )),
+    firtoolOpts = Array(
+      "-disable-all-randomization",
+      "-strip-debug-info",
+      "-preserve-aggregate=vec",
+      "--split-verilog",
+      "-o=generated/MatConvTestTop"
+    )
+  )
+}

@@ -58,7 +58,7 @@ class MatTask(params: MatParams) extends Bundle {
 *  - 该模块用于矩阵乘法任务拆分，内部例化两个 Producer Task Gen，一个 Consumer Task Gen 及一个 PostProcessTaskGen
 *  - 该模块对外，暴露三组指令接口(ldA, ldB, calc)，及对应指令的完成接口，及 Post-Processing 单元接口(cmd、allocate(Credit-FIFO))。
 * */
-class MatTaskGen(params: MatParams) extends Module {
+class MatGemmTaskGen(params: MatParams) extends Module {
   val io = IO(new Bundle{
     val cmdIn = Flipped(Decoupled(new MatTask(params)))
     val ldA = Decoupled(new DPALoadCmd(params, params.log2CountATile))
@@ -145,6 +145,99 @@ class MatTaskGen(params: MatParams) extends Module {
   pp.io.cmdIn <> Queue(ppCmd, 2)
 
   io.cmdIn.ready := aCmd.ready & bCmd.ready & cCmd.ready & ppCmd.ready
+}
+
+/*
+* 说明：
+*  - 该模块根据指令模式，将 MAT 任务分发到 GEMM 或 CONV TaskGen。
+*  - 同一时刻只允许一种任务类型占用后端接口；同类型任务仍可连续进入子 TaskGen 队列。
+* */
+class MatTaskGen(params: MatParams) extends Module {
+  val io = IO(new Bundle{
+    val cmdIn = Flipped(Decoupled(new MatTask(params)))
+    val ldA = Decoupled(new DPALoadCmd(params, params.log2CountATile))
+    val ldAAck = Input(Bool())
+    val ldARelease = Input(Bool())
+    val ldB = Decoupled(new DPALoadCmd(params, params.log2CountBTile))
+    val ldBAck = Input(Bool())
+    val ldBRelease = Input(Bool())
+    val calc = Decoupled(new DPACalcCmd(params))
+    val pp = Decoupled(new DPAPostProcessCmd(params))
+    val ppAlloc = Flipped(Decoupled(Bool()))
+  })
+
+  private val gemm = Module(new MatGemmTaskGen(params))
+  private val conv = Module(new MatConvTaskGen(params))
+
+  //表示当前执行的任务类型是 conv 还是 GEMM
+  private val activeConv = RegInit(0.B)
+  private val activeCount = RegInit(0.U(8.W))
+  private val active = activeCount =/= 0.U
+  //同一时间仅一个任务占用
+  private val sameMode = !active | (io.cmdIn.bits.isConv === activeConv)
+
+  gemm.io.cmdIn.bits := io.cmdIn.bits
+  conv.io.cmdIn.bits := io.cmdIn.bits
+  gemm.io.cmdIn.valid := io.cmdIn.valid & sameMode & !io.cmdIn.bits.isConv
+  conv.io.cmdIn.valid := io.cmdIn.valid & sameMode & io.cmdIn.bits.isConv
+  io.cmdIn.ready := sameMode & Mux(io.cmdIn.bits.isConv, conv.io.cmdIn.ready, gemm.io.cmdIn.ready)
+
+  private val taskFinish = io.pp.fire & io.pp.bits.last
+  when(io.cmdIn.fire & !active) {
+    activeConv := io.cmdIn.bits.isConv
+  }
+  when(io.cmdIn.fire & !taskFinish) {
+    activeCount := activeCount + 1.U
+  }.elsewhen(!io.cmdIn.fire & taskFinish) {
+    activeCount := activeCount - 1.U
+  }
+
+  gemm.io.ldAAck := io.ldAAck & !activeConv
+  conv.io.ldAAck := io.ldAAck & activeConv
+  gemm.io.ldARelease := io.ldARelease & !activeConv
+  conv.io.ldARelease := io.ldARelease & activeConv
+  gemm.io.ldBAck := io.ldBAck & !activeConv
+  conv.io.ldBAck := io.ldBAck & activeConv
+  gemm.io.ldBRelease := io.ldBRelease & !activeConv
+  conv.io.ldBRelease := io.ldBRelease & activeConv
+
+  io.ldA.valid := Mux(activeConv, conv.io.ldA.valid, gemm.io.ldA.valid)
+  io.ldA.bits := gemm.io.ldA.bits
+  when(activeConv) {
+    io.ldA.bits := conv.io.ldA.bits
+  }
+  gemm.io.ldA.ready := io.ldA.ready & !activeConv
+  conv.io.ldA.ready := io.ldA.ready & activeConv
+
+  io.ldB.valid := Mux(activeConv, conv.io.ldB.valid, gemm.io.ldB.valid)
+  io.ldB.bits := gemm.io.ldB.bits
+  when(activeConv) {
+    io.ldB.bits := conv.io.ldB.bits
+  }
+  gemm.io.ldB.ready := io.ldB.ready & !activeConv
+  conv.io.ldB.ready := io.ldB.ready & activeConv
+
+  io.calc.valid := Mux(activeConv, conv.io.calc.valid, gemm.io.calc.valid)
+  io.calc.bits := gemm.io.calc.bits
+  when(activeConv) {
+    io.calc.bits := conv.io.calc.bits
+  }
+  gemm.io.calc.ready := io.calc.ready & !activeConv
+  conv.io.calc.ready := io.calc.ready & activeConv
+
+  io.pp.valid := Mux(activeConv, conv.io.pp.valid, gemm.io.pp.valid)
+  io.pp.bits := gemm.io.pp.bits
+  when(activeConv) {
+    io.pp.bits := conv.io.pp.bits
+  }
+  gemm.io.pp.ready := io.pp.ready & !activeConv
+  conv.io.pp.ready := io.pp.ready & activeConv
+
+  gemm.io.ppAlloc.valid := io.ppAlloc.valid & !activeConv
+  conv.io.ppAlloc.valid := io.ppAlloc.valid & activeConv
+  gemm.io.ppAlloc.bits := io.ppAlloc.bits
+  conv.io.ppAlloc.bits := io.ppAlloc.bits
+  io.ppAlloc.ready := Mux(activeConv, conv.io.ppAlloc.ready, gemm.io.ppAlloc.ready)
 }
 
 object MatTaskGen extends App {

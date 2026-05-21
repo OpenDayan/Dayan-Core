@@ -43,6 +43,9 @@
     "MatTestTop": {
         "Package": "rvtng.neomat"
     },
+    "MatConvTestTop": {
+        "Package": "rvtng.neomat"
+    },
     "RVTNGTestTop": {
         "Package": "rvtng.top",
         "AdditionDeps": {
