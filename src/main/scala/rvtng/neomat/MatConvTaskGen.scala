@@ -8,7 +8,7 @@ import _root_.circt.stage.ChiselStage
 * 说明：
 *  - 该模块用于卷积任务拆分，内部例化两个 Conv Producer Task Gen，一个 Consumer Task Gen 及一个 PostProcessTaskGen
 *  - 卷积映射为 M->Wo, N->Co, K->Hk*Wk*CiBytes；Ho 由本模块作为外层子任务循环。
-*  - 当前首版要求 Wo/Co/CiBytes 分别按 cM/cN/cK 对齐，且不支持 padding zero-fill。
+*  - 当前支持 Input padding zero-fill，以及 Wo/Co/CiBytes tail。
 * */
 class MatConvTaskGen(params: MatParams) extends Module {
   val io = IO(new Bundle{
@@ -30,13 +30,14 @@ class MatConvTaskGen(params: MatParams) extends Module {
     Cat(io.cmdIn.bits.taskCi, 1.U(1.W))(params.MNKWidth - 1, 0),
     io.cmdIn.bits.taskCi
   )
-  val convKByteCount = (io.cmdIn.bits.taskHk + 1.U) * (io.cmdIn.bits.taskWk + 1.U) * (ciByteDec1 + 1.U)
-  val convKByteDec1 = convKByteCount(params.MNKWidth - 1, 0) - 1.U
+  val ciTile = ciByteDec1 >> params.log2CK
+  val convKTileCount = (io.cmdIn.bits.taskHk + 1.U) * (io.cmdIn.bits.taskWk + 1.U) * (ciTile + 1.U)
+  val convKTileDec1 = convKTileCount(params.MNKWidth - 1, 0) - 1.U
 
   // 任务拆分逻辑：卷积映射 M->Wo, N->Co, K->Hk*Wk*CiBytes
   val tileM = io.cmdIn.bits.taskWo >> params.log2CM
   val tileN = io.cmdIn.bits.taskCo >> params.log2CN
-  val tileK = convKByteDec1 >> params.log2CK
+  val tileK = convKTileDec1
   val inputWoStride = io.cmdIn.bits.wiStride * io.cmdIn.bits.strideW
   val inputHoStride = io.cmdIn.bits.hiStride * io.cmdIn.bits.strideH
   val strideDilationW = Mux(
@@ -49,6 +50,12 @@ class MatConvTaskGen(params: MatParams) extends Module {
     io.cmdIn.bits.hiStride * io.cmdIn.bits.dilationH,
     io.cmdIn.bits.strideDilationH
   )
+  val mTailMask = VecInit.tabulate(params.cM)(i =>
+    i.U <= io.cmdIn.bits.taskWo(params.log2CM - 1, 0)
+  ).asUInt
+  val nTailMask = VecInit.tabulate(params.cN)(i =>
+    i.U <= io.cmdIn.bits.taskCo(params.log2CN - 1, 0)
+  ).asUInt
 
   // 当前正在处理任务的信号
   val valid = RegInit(0.B)
@@ -64,6 +71,8 @@ class MatConvTaskGen(params: MatParams) extends Module {
   val cmdInputHoStride = RegEnable(inputHoStride, io.cmdIn.fire)
   val cmdStrideDilationW = RegEnable(strideDilationW, io.cmdIn.fire)
   val cmdStrideDilationH = RegEnable(strideDilationH, io.cmdIn.fire)
+  val cmdMMask = RegEnable(mTailMask, io.cmdIn.fire)
+  val cmdNMask = RegEnable(nTailMask, io.cmdIn.fire)
 
   // 卷积外层循环：Ho；Hk/Wk/CiBytes 作为 Consumer 的 K 维完成累加
   val curHo = Reg(UInt(params.MNKWidth.W))
@@ -122,6 +131,10 @@ class MatConvTaskGen(params: MatParams) extends Module {
   aCmd.bits.ho := curHo
   aCmd.bits.ciByteDec1 := cmdCiByteDec1
   aCmd.bits.taskWk := cmd.taskWk
+  aCmd.bits.taskWo := cmd.taskWo
+  aCmd.bits.taskWi := cmd.taskWi
+  aCmd.bits.taskHi := cmd.taskHi
+  aCmd.bits.taskCo := cmd.taskCo
   aCmd.bits.wiStride := cmd.wiStride
   aCmd.bits.hiStride := cmd.hiStride
   aCmd.bits.wkStride := cmd.wkStride
@@ -133,6 +146,10 @@ class MatConvTaskGen(params: MatParams) extends Module {
   aCmd.bits.strideDilationH := cmdStrideDilationH
   aCmd.bits.padL := cmd.padL
   aCmd.bits.padU := cmd.padU
+  aCmd.bits.strideW := cmd.strideW
+  aCmd.bits.strideH := cmd.strideH
+  aCmd.bits.dilationW := cmd.dilationW
+  aCmd.bits.dilationH := cmd.dilationH
 
   val bCmd = Wire(DecoupledIO(new MatConvProducerTaskGenCmd(params)))
   bCmd.bits.addr := cmd.bBaseAddr
@@ -143,6 +160,10 @@ class MatConvTaskGen(params: MatParams) extends Module {
   bCmd.bits.ho := curHo
   bCmd.bits.ciByteDec1 := cmdCiByteDec1
   bCmd.bits.taskWk := cmd.taskWk
+  bCmd.bits.taskWo := cmd.taskWo
+  bCmd.bits.taskWi := cmd.taskWi
+  bCmd.bits.taskHi := cmd.taskHi
+  bCmd.bits.taskCo := cmd.taskCo
   bCmd.bits.wiStride := cmd.wiStride
   bCmd.bits.hiStride := cmd.hiStride
   bCmd.bits.wkStride := cmd.wkStride
@@ -154,6 +175,10 @@ class MatConvTaskGen(params: MatParams) extends Module {
   bCmd.bits.strideDilationH := cmdStrideDilationH
   bCmd.bits.padL := cmd.padL
   bCmd.bits.padU := cmd.padU
+  bCmd.bits.strideW := cmd.strideW
+  bCmd.bits.strideH := cmd.strideH
+  bCmd.bits.dilationW := cmd.dilationW
+  bCmd.bits.dilationH := cmd.dilationH
 
   val cCmd = Wire(DecoupledIO(new MatConsumerTaskGenCmd(params)))
   cCmd.bits.mTile := cmdTileM
@@ -170,6 +195,8 @@ class MatConvTaskGen(params: MatParams) extends Module {
   ppCmd.bits.repeat := cmdTileK >> params.log2SK
   ppCmd.bits.accumulate := cmd.accumulate
   ppCmd.bits.lastTask := lastSubTask
+  ppCmd.bits.mMask := cmdMMask
+  ppCmd.bits.nMask := cmdNMask
 
   // 命令连线
   pA.io.cmdIn <> Queue(aCmd, 2)

@@ -9,6 +9,7 @@
 
 #define MAX_SIM_TIME 200000
 #define MAX_ERROR 0.1
+#define TAIL_SENTINEL (-123.0f)
 
 VerilatedContext *contextp;
 VMatConvTestTop *dut;
@@ -73,36 +74,62 @@ struct ConvCase {
     bool zeroStrideDilation;
     bool accumulate;
     float outputInit;
+    bool bf16;
 };
 
 static const std::vector<ConvCase> convCases = {
     // 基础 1x1：覆盖 Wo/Co 多 tile 和 conv 指令/CSR/地址基础路径。
-    {"conv1x1_multi_tile", 32, 32, 1, 32, 1, 1, 1, 16, 1, 1, 1, 1, 0, 0, false, false, 0.0f},
+    {"conv1x1_multi_tile", 32, 32, 1, 32, 1, 1, 1, 16, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
     // CiBytes=64：覆盖 Consumer/Producer 的 K tile 多于 1 个的情况。
-    {"conv1x1_ci64",       64, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f},
+    {"conv1x1_ci64",       64, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
     // 2x2：覆盖 Hk/Wk/CiBytes 映射到 Consumer K 维后的完整卷积累加。
-    {"conv2x2_accumulate", 32, 17, 2, 16, 1, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f},
+    {"conv2x2_accumulate", 32, 17, 2, 16, 1, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
     // Ho=2：覆盖 Ho 外层循环和 HiStride/HoStride。
-    {"conv2x2_ho2",        32, 17, 3, 16, 2, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f},
+    {"conv2x2_ho2",        32, 17, 3, 16, 2, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
     // Stride=2：覆盖 inputWoStride/inputHoStride。
-    {"conv2x2_stride2",    32, 32, 4, 16, 2, 2, 2,  8, 2, 2, 1, 1, 0, 0, false, false, 0.0f},
+    {"conv2x2_stride2",    32, 32, 4, 16, 2, 2, 2,  8, 2, 2, 1, 1, 0, 0, false, false, 0.0f, false},
     // Dilation=2：覆盖 StrideDilationW/H CSR。
-    {"conv2x2_dilation2",  32, 18, 4, 16, 2, 2, 2,  8, 1, 1, 2, 2, 0, 0, false, false, 0.0f},
+    {"conv2x2_dilation2",  32, 18, 4, 16, 2, 2, 2,  8, 1, 1, 2, 2, 0, 0, false, false, 0.0f, false},
     // StrideDilation CSR 写 0：覆盖硬件按 stride/dilation 回退计算组合步长。
-    {"conv2x2_sd_zero",    32, 18, 4, 16, 2, 2, 2,  8, 1, 1, 2, 2, 0, 0, true,  false, 0.0f},
+    {"conv2x2_sd_zero",    32, 18, 4, 16, 2, 2, 2,  8, 1, 1, 2, 2, 0, 0, true,  false, 0.0f, false},
     // 3x3：覆盖更长的 Hk/Wk reduction 计数。
-    {"conv3x3_kernel",     32, 18, 3, 16, 1, 3, 3,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f},
+    {"conv3x3_kernel",     32, 18, 3, 16, 1, 3, 3,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
     // conv2da：覆盖 O_old + Conv(I, K) 的后处理累加路径。
-    {"conv2da_output_acc", 32, 17, 2, 16, 1, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, true, 1.5f},
+    {"conv2da_output_acc", 32, 17, 2, 16, 1, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, true, 1.5f, false},
+    // BF16：覆盖 DataType=0 下 Ci 逻辑通道数和物理字节数的映射。
+    {"conv1x1_bf16",       32, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, true},
+    // Padding：覆盖 Input Producer 的 zero-fill mask。
+    {"conv2x2_pad_left_up", 32, 16, 2, 16, 2, 2, 2,  8, 1, 1, 1, 1, 1, 1, false, false, 0.0f, false},
+    // BF16 + Padding：覆盖 BF16 下 padding zero-fill。
+    {"conv1x1_bf16_pad_l",  32, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 1, 0, false, false, 0.0f, true},
+    // Wo tail：覆盖输出宽度不按 cM 对齐时的输入 zero-fill 和输出写回 mask。
+    {"conv1x1_wo_tail",     32, 24, 1, 17, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
+    // Wo tail + conv2da：覆盖尾块旧 O 读取和写回都不访问真实输出范围外。
+    {"conv2da_wo_tail",     32, 24, 1, 17, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, true, 1.5f, false},
+    // Co tail：覆盖 Kernel Producer 的 N 维 zero-fill 和输出列 byte-enable。
+    {"conv1x1_co_tail",      32, 16, 1, 16, 1, 1, 1,  9, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
+    // Co tail + conv2da：覆盖尾列旧 O 累加路径不会写回无效 Co。
+    {"conv2da_co_tail",      32, 16, 1, 16, 1, 1, 1,  9, 1, 1, 1, 1, 0, 0, false, true, 1.5f, false},
+    // CiBytes tail：覆盖最后一个 K tile 内部的 byte zero-fill。
+    {"conv1x1_ci_tail",      36, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
+    // BF16 CiBytes tail：覆盖 BF16 逻辑通道数到物理字节数的尾块映射。
+    {"conv1x1_bf16_ci_tail", 36, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, true},
+    // 组合 tail：Wo/Co/CiBytes 同时不对齐。
+    {"conv1x1_all_tail",     36, 24, 1, 17, 1, 1, 1,  9, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
 };
 
-static inline int wiStride(const ConvCase& c) { return c.ciBytes; }
+static inline int elemBytes(const ConvCase& c) { return c.bf16 ? 2 : 1; }
+static inline int ciCount(const ConvCase& c) { return c.ciBytes / elemBytes(c); }
+static inline int paddedCiBytes(const ConvCase& c) { return ((c.ciBytes + 7) / 8) * 8; }
+static inline int paddedWo(const ConvCase& c) { return ((c.wo + 15) / 16) * 16; }
+static inline int paddedCo(const ConvCase& c) { return ((c.co + 7) / 8) * 8; }
+static inline int wiStride(const ConvCase& c) { return paddedCiBytes(c); }
 static inline int hiStride(const ConvCase& c) { return c.wi * wiStride(c); }
-static inline int coStride(const ConvCase& c) { return c.ciBytes; }
+static inline int coStride(const ConvCase& c) { return paddedCiBytes(c); }
 static inline int wkStride(const ConvCase& c) { return c.co * coStride(c); }
 static inline int hkStride(const ConvCase& c) { return c.wk * wkStride(c); }
-static inline int woStride(const ConvCase& c) { return c.co * 4; }
-static inline int hoStride(const ConvCase& c) { return c.wo * woStride(c); }
+static inline int woStride(const ConvCase& c) { return paddedCo(c) * 4; }
+static inline int hoStride(const ConvCase& c) { return paddedWo(c) * woStride(c); }
 
 static inline uint32_t matCSRWriteInst(int offset)
 {
@@ -150,7 +177,7 @@ extern "C" long long UltraRamWrite(int id, int byte_enable, int waddr, long long
 static inline std::vector<CSRWrite> buildCSRWrites(const ConvCase& c)
 {
     return {
-        {MAT_CSR_C, c.ciBytes - 1},
+        {MAT_CSR_C, ciCount(c) - 1},
         {MAT_CSR_WI, c.wi - 1},
         {MAT_CSR_HI, c.hi - 1},
         {MAT_CSR_WO, c.wo - 1},
@@ -168,7 +195,7 @@ static inline std::vector<CSRWrite> buildCSRWrites(const ConvCase& c)
         {MAT_CSR_I_SWIZZLE_MBS, 0},
         {MAT_CSR_K_SWIZZLE_MBS, 0},
         {MAT_CSR_O_SWIZZLE_MBS, 0},
-        {MAT_CSR_DATA_TYPE, 1},
+        {MAT_CSR_DATA_TYPE, c.bf16 ? 0 : 1},
         {MAT_CSR_PAD_L, c.padL},
         {MAT_CSR_PAD_U, c.padU},
         {MAT_CSR_DILATION_W, c.dilationW},
@@ -182,12 +209,12 @@ static inline std::vector<CSRWrite> buildCSRWrites(const ConvCase& c)
 
 static inline int inputAddr(const ConvCase& c, int h, int w, int ci)
 {
-    return IAddr + h * hiStride(c) + w * wiStride(c) + ci;
+    return IAddr + h * hiStride(c) + w * wiStride(c) + ci * elemBytes(c);
 }
 
 static inline int kernelAddr(const ConvCase& c, int kh, int kw, int co, int ci)
 {
-    return KAddr + kh * hkStride(c) + kw * wkStride(c) + co * coStride(c) + ci;
+    return KAddr + kh * hkStride(c) + kw * wkStride(c) + co * coStride(c) + ci * elemBytes(c);
 }
 
 static inline int outputAddr(const ConvCase& c, int h, int w, int co)
@@ -195,28 +222,48 @@ static inline int outputAddr(const ConvCase& c, int h, int w, int co)
     return OAddr + h * hoStride(c) + w * woStride(c) + co * 4;
 }
 
-static inline float getInputElemFP8(const ConvCase& c, int h, int w, int ci)
+static inline float getInputElem(const ConvCase& c, int h, int w, int ci)
 {
-    uint8_t ret = uramBase[inputAddr(c, h, w, ci)];
-    return FP8ToFP32<4>(ret);
+    if(c.bf16) {
+        uint16_t* addr = (uint16_t*)(uramBase + inputAddr(c, h, w, ci));
+        return BF16ToFP32(*addr);
+    } else {
+        uint8_t ret = uramBase[inputAddr(c, h, w, ci)];
+        return FP8ToFP32<4>(ret);
+    }
 }
 
-static inline void setInputElemFP8(const ConvCase& c, int h, int w, int ci, float v)
+static inline void setInputElem(const ConvCase& c, int h, int w, int ci, float v)
 {
-    uint8_t vfp8 = FP32ToFP8<4>(v);
-    uramBase[inputAddr(c, h, w, ci)] = vfp8;
+    if(c.bf16) {
+        uint16_t* addr = (uint16_t*)(uramBase + inputAddr(c, h, w, ci));
+        *addr = FP32ToBF16(v);
+    } else {
+        uint8_t vfp8 = FP32ToFP8<4>(v);
+        uramBase[inputAddr(c, h, w, ci)] = vfp8;
+    }
 }
 
-static inline float getKernelElemFP8(const ConvCase& c, int kh, int kw, int co, int ci)
+static inline float getKernelElem(const ConvCase& c, int kh, int kw, int co, int ci)
 {
-    uint8_t ret = uramBase[kernelAddr(c, kh, kw, co, ci)];
-    return FP8ToFP32<4>(ret);
+    if(c.bf16) {
+        uint16_t* addr = (uint16_t*)(uramBase + kernelAddr(c, kh, kw, co, ci));
+        return BF16ToFP32(*addr);
+    } else {
+        uint8_t ret = uramBase[kernelAddr(c, kh, kw, co, ci)];
+        return FP8ToFP32<4>(ret);
+    }
 }
 
-static inline void setKernelElemFP8(const ConvCase& c, int kh, int kw, int co, int ci, float v)
+static inline void setKernelElem(const ConvCase& c, int kh, int kw, int co, int ci, float v)
 {
-    uint8_t vfp8 = FP32ToFP8<4>(v);
-    uramBase[kernelAddr(c, kh, kw, co, ci)] = vfp8;
+    if(c.bf16) {
+        uint16_t* addr = (uint16_t*)(uramBase + kernelAddr(c, kh, kw, co, ci));
+        *addr = FP32ToBF16(v);
+    } else {
+        uint8_t vfp8 = FP32ToFP8<4>(v);
+        uramBase[kernelAddr(c, kh, kw, co, ci)] = vfp8;
+    }
 }
 
 static inline float getOutputElemFP32(const ConvCase& c, int h, int w, int co)
@@ -236,8 +283,10 @@ static inline float inputPattern(const ConvCase& c, int h, int w, int ci)
     if(ci == 0) return (float)(1 + (h & 1));
     if(ci == 4) return (float)(1 + (w & 3));
     if(ci == 8) return 0.5f;
-    if(c.ciBytes > 32 && ci == 32) return (float)(1 + ((h + w) & 1));
-    if(c.ciBytes > 32 && ci == 36) return 0.5f;
+    if(ciCount(c) > 16 && ci == 16) return (float)(1 + ((h + w) & 1));
+    if(ciCount(c) > 17 && ci == 17) return 0.5f;
+    if(ciCount(c) > 32 && ci == 32) return (float)(1 + ((h + w) & 1));
+    if(ciCount(c) > 35 && ci == 35) return 0.5f;
     return 0.0f;
 }
 
@@ -246,8 +295,10 @@ static inline float kernelPattern(const ConvCase& c, int kh, int kw, int co, int
     if(ci == 0) return (float)(1 + kh + kw);
     if(ci == 4) return (float)(1 + (co % 3));
     if(ci == 8) return 0.5f;
-    if(c.ciBytes > 32 && ci == 32) return (float)(1 + (co & 1));
-    if(c.ciBytes > 32 && ci == 36) return 0.5f;
+    if(ciCount(c) > 16 && ci == 16) return (float)(1 + (co & 1));
+    if(ciCount(c) > 17 && ci == 17) return 0.5f;
+    if(ciCount(c) > 32 && ci == 32) return (float)(1 + (co & 1));
+    if(ciCount(c) > 35 && ci == 35) return 0.5f;
     return 0.0f;
 }
 
@@ -255,24 +306,24 @@ static inline void initConvTensor(const ConvCase& c)
 {
     for(int h = 0; h < c.hi; h++) {
         for(int w = 0; w < c.wi; w++) {
-            for(int ci = 0; ci < c.ciBytes; ci++) {
-                setInputElemFP8(c, h, w, ci, inputPattern(c, h, w, ci));
+            for(int ci = 0; ci < ciCount(c); ci++) {
+                setInputElem(c, h, w, ci, inputPattern(c, h, w, ci));
             }
         }
     }
     for(int kh = 0; kh < c.hk; kh++) {
         for(int kw = 0; kw < c.wk; kw++) {
             for(int co = 0; co < c.co; co++) {
-                for(int ci = 0; ci < c.ciBytes; ci++) {
-                    setKernelElemFP8(c, kh, kw, co, ci, kernelPattern(c, kh, kw, co, ci));
+                for(int ci = 0; ci < ciCount(c); ci++) {
+                    setKernelElem(c, kh, kw, co, ci, kernelPattern(c, kh, kw, co, ci));
                 }
             }
         }
     }
     for(int h = 0; h < c.ho; h++) {
-        for(int w = 0; w < c.wo; w++) {
-            for(int co = 0; co < c.co; co++) {
-                setOutputElemFP32(c, h, w, co, c.outputInit);
+        for(int w = 0; w < paddedWo(c); w++) {
+            for(int co = 0; co < paddedCo(c); co++) {
+                setOutputElemFP32(c, h, w, co, w < c.wo && co < c.co ? c.outputInit : TAIL_SENTINEL);
             }
         }
     }
@@ -286,8 +337,8 @@ static inline float calcConvRef(const ConvCase& c, int ho, int wo, int co)
             int ih = ho * c.strideH + kh * c.dilationH - c.padU;
             int iw = wo * c.strideW + kw * c.dilationW - c.padL;
             if(ih < 0 || ih >= c.hi || iw < 0 || iw >= c.wi) continue;
-            for(int ci = 0; ci < c.ciBytes; ci++) {
-                acc += getInputElemFP8(c, ih, iw, ci) * getKernelElemFP8(c, kh, kw, co, ci);
+            for(int ci = 0; ci < ciCount(c); ci++) {
+                acc += getInputElem(c, ih, iw, ci) * getKernelElem(c, kh, kw, co, ci);
             }
         }
     }
@@ -321,6 +372,21 @@ static int checkConvTensor(const ConvCase& c)
             for(int co = 0; co < c.co; co++) {
                 float ref = calcConvRef(c, h, w, co) + (c.accumulate ? c.outputInit : 0.0f);
                 caseErrorCount += handleOCompare(c, h, w, co, ref);
+            }
+        }
+    }
+    for(int h = 0; h < c.ho; h++) {
+        for(int w = 0; w < c.wo; w++) {
+            for(int co = c.co; co < paddedCo(c); co++) {
+                caseErrorCount += handleOCompare(c, h, w, co, TAIL_SENTINEL);
+            }
+        }
+        for(int w = c.wo; w < paddedWo(c); w++) {
+            for(int co = 0; co < c.co; co++) {
+                caseErrorCount += handleOCompare(c, h, w, co, TAIL_SENTINEL);
+            }
+            for(int co = c.co; co < paddedCo(c); co++) {
+                caseErrorCount += handleOCompare(c, h, w, co, TAIL_SENTINEL);
             }
         }
     }

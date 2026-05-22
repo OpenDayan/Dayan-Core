@@ -20,6 +20,8 @@ class DPALoadCmd(params: MatParams, log2CountXTile: Int) extends Bundle {
   val addr = UInt(params.addrWidth.W)
   val stride = UInt(params.addrWidth.W)
   val swizzle = UInt(24.W)
+  val zeroMask = UInt(math.max(math.max(params.cM, params.cN), params.busChannel).W)
+  val byteZeroMask = UInt(params.channelWidth.W)
 }
 
 // MatProducer Ack
@@ -174,6 +176,8 @@ class MatProducerTaskGen(params: MatParams, log2CountXTile: Int, sMajor: Int, sM
   io.cmdOut.bits.swizzle := cmd.swizzle
   io.cmdOut.bits.stride := cmd.stride
   io.cmdOut.bits.addr := cmd.addr + cmd.stride * curMajor * majorStride.U + minorStride.U * curMinor
+  io.cmdOut.bits.zeroMask := 0.U
+  io.cmdOut.bits.byteZeroMask := 0.U
 }
 
 object MatProducerTaskGen extends App {
@@ -190,4 +194,3 @@ object MatProducerTaskGen extends App {
     )
   )
 }
-

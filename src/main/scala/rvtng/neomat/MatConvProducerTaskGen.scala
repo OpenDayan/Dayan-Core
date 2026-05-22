@@ -19,6 +19,10 @@ class MatConvProducerTaskGenCmd(params: MatParams) extends Bundle {
   val ho = UInt(params.MNKWidth.W)
   val ciByteDec1 = UInt(params.MNKWidth.W)
   val taskWk = UInt(params.MNKWidth.W)
+  val taskWo = UInt(params.MNKWidth.W)
+  val taskWi = UInt(params.MNKWidth.W)
+  val taskHi = UInt(params.MNKWidth.W)
+  val taskCo = UInt(params.MNKWidth.W)
 
   // ISA 中的原始 stride，以及在 MatConvTaskGen 中预先算好的组合 stride。
   val wiStride = UInt(params.addrWidth.W)
@@ -32,6 +36,10 @@ class MatConvProducerTaskGenCmd(params: MatParams) extends Bundle {
   val strideDilationH = UInt(params.addrWidth.W)
   val padL = UInt(params.MNKWidth.W)
   val padU = UInt(params.MNKWidth.W)
+  val strideW = UInt(params.MNKWidth.W)
+  val strideH = UInt(params.MNKWidth.W)
+  val dilationW = UInt(params.MNKWidth.W)
+  val dilationH = UInt(params.MNKWidth.W)
 }
 
 class MatConvProducerTaskGen(
@@ -47,7 +55,7 @@ class MatConvProducerTaskGen(
    *  - 与 GEMM Producer 的主要区别仅在地址生成：
    *      Input  地址对应 I[ho * StrideH + kh * DilationH - PadU, wo * StrideW + kw * DilationW - PadL, ci]
    *      Kernel 地址对应 K[kh, kw, ci, co]
-   *  - 当前首版要求 CiBytes 按 cK 对齐，因为 load path 还没有 tail mask 和 padding zero-fill。
+   *  - 当前支持 Input padding zero-fill，以及 Wo/Co/CiBytes tail。
    */
   val io = IO(new Bundle {
     val cmdIn = Flipped(Decoupled(new MatConvProducerTaskGenCmd(params)))
@@ -115,7 +123,7 @@ class MatConvProducerTaskGen(
   // 结束情况
   finish := lastMajor & lastMinor & lastRepeat & io.cmdOut.fire
 
-  val lastCiByte = cmd.ciByteDec1 + 1.U - params.cK.U
+  val lastCiByte = (cmd.ciByteDec1 >> params.log2CK) << params.log2CK
   def nextKIndex(kh: UInt, kw: UInt, ciByte: UInt): (UInt, UInt, UInt) = {
     val nextKh = Wire(UInt(params.MNKWidth.W))
     val nextKw = Wire(UInt(params.MNKWidth.W))
@@ -214,23 +222,45 @@ class MatConvProducerTaskGen(
   val kernelWOffset = curKw * cmd.wkStride
   val kernelCoOffset = curMajor * params.cN.U * cmd.coStride
   val kernelAddr = cmd.addr + kernelHOffset + kernelWOffset + curCiByte + kernelCoOffset
+  val kernelZeroMask = VecInit.tabulate(params.cN)(i => curMajor * params.cN.U + i.U > cmd.taskCo).asUInt
 
   // Input:
   //   ih = ho * StrideH + kh * DilationH - PadU
   //   iw = wo * StrideW + kw * DilationW - PadL
   //   I_addr = I_base + ih * HiStride + iw * WiStride + ciByte
-  val inputHOffset = cmd.ho * cmd.inputHoStride + curKh * cmd.strideDilationH - cmd.padU * cmd.hiStride
-  val inputWOffset = curMajor * params.cM.U * cmd.inputWoStride + curKw * cmd.strideDilationW - cmd.padL * cmd.wiStride
+  val inputHBase = cmd.ho * cmd.inputHoStride + curKh * cmd.strideDilationH
+  val inputWBase = curMajor * params.cM.U * cmd.inputWoStride + curKw * cmd.strideDilationW
+  val inputHOffset = inputHBase - cmd.padU * cmd.hiStride
+  val inputWOffset = inputWBase - cmd.padL * cmd.wiStride
   val inputAddr = cmd.addr + inputHOffset + inputWOffset + curCiByte
+  val inputSafeAddr = cmd.addr + curCiByte
+
+  val inputHIndex = cmd.ho * cmd.strideH + curKh * cmd.dilationH
+  val inputHBeforePad = inputHIndex < cmd.padU
+  val inputHAfterPad = inputHIndex - cmd.padU
+  val inputHInvalid = inputHBeforePad | (inputHAfterPad > cmd.taskHi)
+
+  val inputWIndex = curMajor * params.cM.U * cmd.strideW + curKw * cmd.dilationW
+  val inputWBeforePad = VecInit.tabulate(params.cM)(i => inputWIndex + i.U * cmd.strideW < cmd.padL)
+  val inputWAfterPad = VecInit.tabulate(params.cM)(i => inputWIndex + i.U * cmd.strideW - cmd.padL)
+  val inputWInvalid = VecInit.tabulate(params.cM)(i => inputWBeforePad(i) | (inputWAfterPad(i) > cmd.taskWi))
+  val outputWInvalid = VecInit.tabulate(params.cM)(i => curMajor * params.cM.U + i.U > cmd.taskWo)
+  val inputZeroMask = VecInit(inputWInvalid.zip(outputWInvalid).map { case (padInvalid, tailInvalid) =>
+    padInvalid | tailInvalid | inputHInvalid
+  }).asUInt
+  val kByteZeroMask = VecInit.tabulate(params.channelWidth)(i => curCiByte + i.U > cmd.ciByteDec1).asUInt
 
   io.cmdOut.bits.swizzle := cmd.swizzle
+  io.cmdOut.bits.byteZeroMask := kByteZeroMask
   if(isKernel) {
     io.cmdOut.bits.stride := cmd.coStride
     io.cmdOut.bits.addr := kernelAddr
+    io.cmdOut.bits.zeroMask := kernelZeroMask
   } else {
     // Input tile 的 M 维对应连续 cM 个 Wo 位置，因此 tile 内行间 stride 是 inputWoStride。
     io.cmdOut.bits.stride := cmd.inputWoStride
-    io.cmdOut.bits.addr := inputAddr
+    io.cmdOut.bits.addr := Mux(inputHInvalid, inputSafeAddr, inputAddr)
+    io.cmdOut.bits.zeroMask := inputZeroMask
   }
 }
 

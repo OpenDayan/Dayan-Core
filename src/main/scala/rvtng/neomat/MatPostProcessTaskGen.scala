@@ -14,6 +14,8 @@ class MatPostProcessTaskGenCmd(params: MatParams) extends Bundle {
   val repeat = UInt(params.MNKWidth.W) // K Tile Count / sK dec 1
   val accumulate = Bool() // mma or mm ?
   val lastTask = Bool()
+  val mMask = UInt(params.cM.W)
+  val nMask = UInt(params.cN.W)
 }
 
 // 后端实际执行的 Post Process 指令
@@ -23,6 +25,8 @@ class DPAPostProcessCmd(params: MatParams) extends Bundle {
   val swizzle = UInt(24.W)
   val clear = Bool() // 是否需要加原始输入，区别 mm / mma
   val last = Bool() // 最后一项请求，结束后返回 Finish 信号
+  val mMask = UInt(params.cM.W)
+  val nMask = UInt(params.cN.W)
 }
 
 /*
@@ -116,5 +120,7 @@ class MatPostProcessTaskGen(params: MatParams) extends Module {
   io.cmdOut.bits.stride := cmd.stride
   io.cmdOut.bits.addr := cmd.addr + cmd.stride * curM * params.cM.U + (4 * params.cN).U * curN
   io.cmdOut.bits.last := cmd.lastTask & lastM & lastN & lastRepeat
+  io.cmdOut.bits.mMask := Mux(lastM, cmd.mMask, Fill(params.cM, 1.B))
+  io.cmdOut.bits.nMask := Mux(lastN, cmd.nMask, Fill(params.cN, 1.B))
 
 }

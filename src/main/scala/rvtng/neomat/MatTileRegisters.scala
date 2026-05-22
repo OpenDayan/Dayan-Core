@@ -60,6 +60,8 @@ class MatTileRegisters(params: MatParams, log2CountXTile: Int, dataWidth: Int) e
   io.busReq.bits.swizzle := cmd.swizzle
   io.busReq.bits.position := curPos
   io.busReq.bits.last := curPos === (transactionCount - 1).U
+  io.busReq.bits.zeroMask := (cmd.zeroMask >> (curPos * params.busChannel.U))(params.busChannel - 1, 0)
+  io.busReq.bits.byteZeroMask := cmd.byteZeroMask
 
   // 内部存储器结构: 1R1W
   val rawData = Wire(Vec(transactionCount, Vec(params.busChannel, Vec(params.channelWidth, UInt(8.W)))))
@@ -72,7 +74,9 @@ class MatTileRegisters(params: MatParams, log2CountXTile: Int, dataWidth: Int) e
 
       storage.we    := io.busResp(c).valid & (io.busResp(c).position === pos.U)
       storage.waddr := io.busResp(c).regId
-      storage.wdata := io.busResp(c).data
+      storage.wdata := VecInit.tabulate(params.channelWidth) { i =>
+        Mux(io.busResp(c).zero | io.busResp(c).byteZeroMask(i), 0.U, io.busResp(c).data(i))
+      }
     }
   }
   io.data := rawData.asTypeOf(io.data.cloneType)

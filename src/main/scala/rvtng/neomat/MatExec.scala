@@ -20,6 +20,8 @@ class MatInnerTileReadReq(params: MatParams, regIdWidth: Int, posWidth: Int) ext
   val stride = UInt(params.addrWidth.W)
   val swizzle = UInt(24.W)
   val last = Bool() // 最后一个请求
+  val zeroMask = UInt(params.busChannel.W)
+  val byteZeroMask = UInt(params.channelWidth.W)
 }
 
 class MatInnerTileChannelReadResp(params: MatParams, regIdWidth: Int, posWidth: Int) extends Bundle {
@@ -27,12 +29,15 @@ class MatInnerTileChannelReadResp(params: MatParams, regIdWidth: Int, posWidth: 
   val regId = UInt(regIdWidth.W)
   val position = UInt(posWidth.W) // 一个 Tile Register Fetch 请求，可能会切分为多个 transaction 去执行，此时用 position 区别。
   val data = Vec(params.channelWidth, UInt(8.W))
+  val zero = Bool()
+  val byteZeroMask = UInt(params.channelWidth.W)
 }
 
 class MatInnerTileWriteReq(params: MatParams) extends Bundle {
   val addr = UInt(params.addrWidth.W)
   val swizzle = UInt(24.W)
   val last = Bool()
+  val byteEnable = UInt(params.channelWidth.W)
   val data = Vec(params.channelWidth, UInt(8.W))
 }
 

@@ -48,7 +48,11 @@ class MatPostProcess(params: MatParams) extends Module {
   for(i <- 0 until params.cM) {
     busReadInQ(i).enq.valid := io.busRResp(i % params.busChannel).valid &&
       io.busRResp(i % params.busChannel).position === (i / params.busChannel).U
-    val extFP32 = io.busRResp(i % params.busChannel).data.asTypeOf(Vec(params.cN, UInt(32.W)))
+    val busReadData = VecInit.tabulate(params.channelWidth) { j =>
+      Mux(io.busRResp(i % params.busChannel).zero | io.busRResp(i % params.busChannel).byteZeroMask(j),
+        0.U, io.busRResp(i % params.busChannel).data(j))
+    }
+    val extFP32 = busReadData.asTypeOf(Vec(params.cN, UInt(32.W)))
     busReadInQ(i).enq.bits := VecInit(extFP32.map(SignedFPFrom(params.wE, params.wF, _)))
     busReadInQ(i).deq.ready := 0.B
   }
@@ -122,6 +126,8 @@ class MatPostProcess(params: MatParams) extends Module {
     val swizzle = UInt(24.W)
     val clear = Bool()
     val last = Bool()
+    val valid = Bool()
+    val nMask = UInt(params.cN.W)
   }
   val busWriteAddrQ = VecInit.tabulate(params.busWriteChannel)(i =>
     Module(new Queue(new busWriteAddrT, 2)).io
@@ -159,11 +165,16 @@ class MatPostProcess(params: MatParams) extends Module {
   writeFinish := writeLast & busWriteAddrQFire
   busWriteAddrQ.zipWithIndex.foreach(iter => {
     val (q, idx) = iter
+    val curM = idx.U + curWritePosition * params.busWriteChannel.U
+    val curMValid = writeCmd.mMask(curM(log2Ceil(params.cM) - 1, 0))
+    val curMAddr = writeCmd.addr + curM * writeCmd.stride
     q.enq.valid := busWriteAddrQFire
-    q.enq.bits.addr := writeCmd.addr + (idx.U + curWritePosition * params.busWriteChannel.U) * writeCmd.stride
+    q.enq.bits.addr := Mux(curMValid, curMAddr, writeCmd.addr)
     q.enq.bits.swizzle := writeCmd.swizzle
     q.enq.bits.clear := writeCmd.clear
     q.enq.bits.last := writeCmd.last && writeLast
+    q.enq.bits.valid := curMValid
+    q.enq.bits.nMask := writeCmd.nMask
   })
 
   // 读取地址生成逻辑
@@ -192,6 +203,13 @@ class MatPostProcess(params: MatParams) extends Module {
   io.busRReq.bits.stride := readCmd.stride
   io.busRReq.bits.swizzle := readCmd.swizzle
   io.busRReq.bits.last := 0.B
+  io.busRReq.bits.zeroMask := VecInit.tabulate(params.busChannel) { i =>
+    val curM = i.U + curReadPosition * params.busChannel.U
+    !readCmd.mMask(curM(log2Ceil(params.cM) - 1, 0))
+  }.asUInt
+  io.busRReq.bits.byteZeroMask := VecInit.tabulate(params.channelWidth) { i =>
+    !readCmd.nMask(i / 4)
+  }.asUInt
 
   // bus 完成请求队列
   val busFinishQ = VecInit.tabulate(params.busWriteChannel)(i => {
@@ -240,6 +258,9 @@ class MatPostProcess(params: MatParams) extends Module {
     tQ.bits.last := aQ.deq.bits.last
     tQ.bits.addr := aQ.deq.bits.addr
     tQ.bits.swizzle := aQ.deq.bits.swizzle
+    tQ.bits.byteEnable := VecInit.tabulate(params.channelWidth) { i =>
+      aQ.deq.bits.valid & aQ.deq.bits.nMask(i / 4)
+    }.asUInt
     lQ.deq.ready := tQ.fire
     rQ.deq.ready := tQ.fire & !aQ.deq.bits.clear
     aQ.deq.ready := tQ.fire

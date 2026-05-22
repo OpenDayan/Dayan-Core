@@ -138,6 +138,8 @@ class MatGemmTaskGen(params: MatParams) extends Module {
   ppCmd.bits.repeat := tileK >> params.log2SK
   ppCmd.bits.accumulate := io.cmdIn.bits.accumulate
   ppCmd.bits.lastTask := true.B
+  ppCmd.bits.mMask := Fill(params.cM, 1.B)
+  ppCmd.bits.nMask := Fill(params.cN, 1.B)
 
   // 命令连线
   pA.io.cmdIn <> Queue(aCmd, 2)
