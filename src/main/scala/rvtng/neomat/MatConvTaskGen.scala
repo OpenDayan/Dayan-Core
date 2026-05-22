@@ -8,7 +8,7 @@ import _root_.circt.stage.ChiselStage
 * 说明：
 *  - 该模块用于卷积任务拆分，内部例化两个 Conv Producer Task Gen，一个 Consumer Task Gen 及一个 Conv PostProcessTaskGen
 *  - 卷积映射为 M->Wo, N->Co, K->Hk*Wk*CiBytes；Ho 由本模块作为外层子任务循环。
-*  - 当前首版不支持 padding zero-fill，因此要求 PadL/PadU 为 0 且窗口不越界。
+*  - 当前首版要求 Wo/Co/CiBytes 分别按 cM/cN/cK 对齐，且不支持 padding zero-fill。
 * */
 class MatConvTaskGen(params: MatParams) extends Module {
   val io = IO(new Bundle{

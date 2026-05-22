@@ -70,21 +70,25 @@ struct ConvCase {
     int dilationH;
     int padL;
     int padU;
+    bool accumulate;
+    float outputInit;
 };
 
 static const std::vector<ConvCase> convCases = {
     // 基础 1x1：覆盖 Wo/Co 多 tile 和 conv 指令/CSR/地址基础路径。
-    {"conv1x1_multi_tile", 32, 32, 1, 32, 1, 1, 1, 16, 1, 1, 1, 1, 0, 0},
+    {"conv1x1_multi_tile", 32, 32, 1, 32, 1, 1, 1, 16, 1, 1, 1, 1, 0, 0, false, 0.0f},
     // CiBytes=64：覆盖 Consumer/Producer 的 K tile 多于 1 个的情况。
-    {"conv1x1_ci64",       64, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0},
-    // 2x2：覆盖 kh/kw 外层子任务和 partial sum 累加。
-    {"conv2x2_accumulate", 32, 17, 2, 16, 1, 2, 2,  8, 1, 1, 1, 1, 0, 0},
+    {"conv1x1_ci64",       64, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, 0.0f},
+    // 2x2：覆盖 Hk/Wk/CiBytes 映射到 Consumer K 维后的完整卷积累加。
+    {"conv2x2_accumulate", 32, 17, 2, 16, 1, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, 0.0f},
     // Ho=2：覆盖 Ho 外层循环和 HiStride/HoStride。
-    {"conv2x2_ho2",        32, 17, 3, 16, 2, 2, 2,  8, 1, 1, 1, 1, 0, 0},
+    {"conv2x2_ho2",        32, 17, 3, 16, 2, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, 0.0f},
     // Stride=2：覆盖 inputWoStride/inputHoStride。
-    {"conv2x2_stride2",    32, 32, 4, 16, 2, 2, 2,  8, 2, 2, 1, 1, 0, 0},
+    {"conv2x2_stride2",    32, 32, 4, 16, 2, 2, 2,  8, 2, 2, 1, 1, 0, 0, false, 0.0f},
     // Dilation=2：覆盖 StrideDilationW/H CSR。
-    {"conv2x2_dilation2",  32, 18, 4, 16, 2, 2, 2,  8, 1, 1, 2, 2, 0, 0},
+    {"conv2x2_dilation2",  32, 18, 4, 16, 2, 2, 2,  8, 1, 1, 2, 2, 0, 0, false, 0.0f},
+    // conv2da：覆盖 O_old + Conv(I, K) 的后处理累加路径。
+    {"conv2da_output_acc", 32, 17, 2, 16, 1, 2, 2,  8, 1, 1, 1, 1, 0, 0, true, 1.5f},
 };
 
 static inline int wiStride(const ConvCase& c) { return c.ciBytes; }
@@ -103,6 +107,11 @@ static inline uint32_t matCSRWriteInst(int offset)
 static inline uint32_t matConv2DInst()
 {
     return (0b0001000 << 25) | (0b010 << 12) | 0xb;
+}
+
+static inline uint32_t matConv2DAInst()
+{
+    return (0b0001000 << 25) | (0b011 << 12) | 0xb;
 }
 
 // Bank Count
@@ -258,7 +267,7 @@ static inline void initConvTensor(const ConvCase& c)
     for(int h = 0; h < c.ho; h++) {
         for(int w = 0; w < c.wo; w++) {
             for(int co = 0; co < c.co; co++) {
-                setOutputElemFP32(c, h, w, co, 0.0f);
+                setOutputElemFP32(c, h, w, co, c.outputInit);
             }
         }
     }
@@ -305,7 +314,8 @@ static int checkConvTensor(const ConvCase& c)
     for(int h = 0; h < c.ho; h++) {
         for(int w = 0; w < c.wo; w++) {
             for(int co = 0; co < c.co; co++) {
-                caseErrorCount += handleOCompare(c, h, w, co, calcConvRef(c, h, w, co));
+                float ref = calcConvRef(c, h, w, co) + (c.accumulate ? c.outputInit : 0.0f);
+                caseErrorCount += handleOCompare(c, h, w, co, ref);
             }
         }
     }
@@ -355,7 +365,7 @@ static inline void driveInstReq()
         dut->instReq_bits_rs1Data = IAddr;
         dut->instReq_bits_rs2Data = KAddr;
         dut->instReq_bits_rdData = OAddr;
-        dut->instReq_bits_instWord = matConv2DInst();
+        dut->instReq_bits_instWord = convCases[caseIdx].accumulate ? matConv2DAInst() : matConv2DInst();
     }
 }
 

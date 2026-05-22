@@ -47,7 +47,7 @@ class MatConvProducerTaskGen(
    *  - 与 GEMM Producer 的主要区别仅在地址生成：
    *      Input  地址对应 I[ho * StrideH + kh * DilationH - PadU, wo * StrideW + kw * DilationW - PadL, ci]
    *      Kernel 地址对应 K[kh, kw, ci, co]
-   *  - 当前 MatConvTaskGen 首版限制 PadL/PadU 为 0，因为 load path 还没有 padding zero-fill/mask。
+   *  - 当前首版要求 CiBytes 按 cK 对齐，因为 load path 还没有 tail mask 和 padding zero-fill。
    */
   val io = IO(new Bundle {
     val cmdIn = Flipped(Decoupled(new MatConvProducerTaskGenCmd(params)))
@@ -92,6 +92,12 @@ class MatConvProducerTaskGen(
   val curBaseMinor = Reg(UInt(params.MNKWidth.W))
   val curSubMajor = Reg(UInt(sMajor.W))
   val curSubMinor = Reg(UInt(sMinor.W))
+  val curBaseKh = Reg(UInt(params.MNKWidth.W))
+  val curBaseKw = Reg(UInt(params.MNKWidth.W))
+  val curBaseCiByte = Reg(UInt(params.MNKWidth.W))
+  val curKh = Reg(UInt(params.MNKWidth.W))
+  val curKw = Reg(UInt(params.MNKWidth.W))
+  val curCiByte = Reg(UInt(params.MNKWidth.W))
   // 子分块边界计算
   val lastSubMajor = curSubMajor === (sMajor - 1).U
   val lastSubMinor = curSubMinor === (sMinor - 1).U
@@ -109,6 +115,40 @@ class MatConvProducerTaskGen(
   // 结束情况
   finish := lastMajor & lastMinor & lastRepeat & io.cmdOut.fire
 
+  val lastCiByte = cmd.ciByteDec1 + 1.U - params.cK.U
+  def nextKIndex(kh: UInt, kw: UInt, ciByte: UInt): (UInt, UInt, UInt) = {
+    val nextKh = Wire(UInt(params.MNKWidth.W))
+    val nextKw = Wire(UInt(params.MNKWidth.W))
+    val nextCiByte = Wire(UInt(params.MNKWidth.W))
+    nextKh := kh
+    nextKw := kw
+    nextCiByte := ciByte + params.cK.U
+    when(ciByte === lastCiByte) {
+      nextCiByte := 0.U
+      when(kw === cmd.taskWk) {
+        nextKw := 0.U
+        nextKh := kh + 1.U
+      }.otherwise {
+        nextKw := kw + 1.U
+      }
+    }
+    (nextKh, nextKw, nextCiByte)
+  }
+
+  val nextCurK = nextKIndex(curKh, curKw, curCiByte)
+  val nextBaseKh = Wire(Vec(sMinor + 1, UInt(params.MNKWidth.W)))
+  val nextBaseKw = Wire(Vec(sMinor + 1, UInt(params.MNKWidth.W)))
+  val nextBaseCiByte = Wire(Vec(sMinor + 1, UInt(params.MNKWidth.W)))
+  nextBaseKh(0) := curBaseKh
+  nextBaseKw(0) := curBaseKw
+  nextBaseCiByte(0) := curBaseCiByte
+  for(i <- 0 until sMinor) {
+    val next = nextKIndex(nextBaseKh(i), nextBaseKw(i), nextBaseCiByte(i))
+    nextBaseKh(i + 1) := next._1
+    nextBaseKw(i + 1) := next._2
+    nextBaseCiByte(i + 1) := next._3
+  }
+
   when(io.cmdIn.fire) {
     valid := 1.B
   }.elsewhen(finish) {
@@ -122,6 +162,12 @@ class MatConvProducerTaskGen(
     curBaseMinor := 0.U
     curSubMajor := 0.U
     curSubMinor := 0.U
+    curBaseKh := 0.U
+    curBaseKw := 0.U
+    curBaseCiByte := 0.U
+    curKh := 0.U
+    curKw := 0.U
+    curCiByte := 0.U
   }.elsewhen(io.cmdOut.fire) {
     when(lastMajor | lastSubMajor) {
       curSubMajor := 0.U
@@ -132,44 +178,50 @@ class MatConvProducerTaskGen(
           when(lastRepeat) {
             curRepeat := 0.U
             curBaseMinor := curBaseMinor + sMinor.U
+            curBaseKh := nextBaseKh(sMinor)
+            curBaseKw := nextBaseKw(sMinor)
+            curBaseCiByte := nextBaseCiByte(sMinor)
+            curKh := nextBaseKh(sMinor)
+            curKw := nextBaseKw(sMinor)
+            curCiByte := nextBaseCiByte(sMinor)
           }.otherwise {
             curRepeat := curRepeat + 1.U
+            curKh := curBaseKh
+            curKw := curBaseKw
+            curCiByte := curBaseCiByte
           }
         }.otherwise {
           curBaseMajor := curBaseMajor + sMajor.U
+          curKh := curBaseKh
+          curKw := curBaseKw
+          curCiByte := curBaseCiByte
         }
       }.otherwise {
         curSubMinor := curSubMinor + 1.U
+        curKh := nextCurK._1
+        curKw := nextCurK._2
+        curCiByte := nextCurK._3
       }
     }.otherwise {
       curSubMajor := curSubMajor + 1.U
     }
   }
 
-  // curMinor 表示虚拟 K tile，下沉到地址生成时解码为 kh/kw/ciByte。
-  val kByte = curMinor * params.cK.U
-  val ciByteCount = cmd.ciByteDec1 + 1.U
-  val wkCount = cmd.taskWk + 1.U
-  val kernelPoint = kByte / ciByteCount
-  val ciByte = kByte % ciByteCount
-  val kh = kernelPoint / wkCount
-  val kw = kernelPoint % wkCount
-
   // Kernel:
   //   K_addr = K_base + kh * HkStride + kw * WkStride + ciByte + coTile * cN * CoStride
   //   DPALoadCmd.stride = CoStride，使 tile 内 cN 个 Co 通道沿 Co 维展开。
-  val kernelHOffset = kh * cmd.hkStride
-  val kernelWOffset = kw * cmd.wkStride
+  val kernelHOffset = curKh * cmd.hkStride
+  val kernelWOffset = curKw * cmd.wkStride
   val kernelCoOffset = curMajor * params.cN.U * cmd.coStride
-  val kernelAddr = cmd.addr + kernelHOffset + kernelWOffset + ciByte + kernelCoOffset
+  val kernelAddr = cmd.addr + kernelHOffset + kernelWOffset + curCiByte + kernelCoOffset
 
   // Input:
   //   ih = ho * StrideH + kh * DilationH - PadU
   //   iw = wo * StrideW + kw * DilationW - PadL
   //   I_addr = I_base + ih * HiStride + iw * WiStride + ciByte
-  val inputHOffset = cmd.ho * cmd.inputHoStride + kh * cmd.strideDilationH - cmd.padU * cmd.hiStride
-  val inputWOffset = curMajor * params.cM.U * cmd.inputWoStride + kw * cmd.strideDilationW - cmd.padL * cmd.wiStride
-  val inputAddr = cmd.addr + inputHOffset + inputWOffset + ciByte
+  val inputHOffset = cmd.ho * cmd.inputHoStride + curKh * cmd.strideDilationH - cmd.padU * cmd.hiStride
+  val inputWOffset = curMajor * params.cM.U * cmd.inputWoStride + curKw * cmd.strideDilationW - cmd.padL * cmd.wiStride
+  val inputAddr = cmd.addr + inputHOffset + inputWOffset + curCiByte
 
   io.cmdOut.bits.swizzle := cmd.swizzle
   if(isKernel) {
