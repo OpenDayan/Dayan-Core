@@ -6,7 +6,7 @@ import _root_.circt.stage.ChiselStage
 
 /*
 * 说明：
-*  - 该模块用于卷积任务拆分，内部例化两个 Conv Producer Task Gen，一个 Consumer Task Gen 及一个 Conv PostProcessTaskGen
+*  - 该模块用于卷积任务拆分，内部例化两个 Conv Producer Task Gen，一个 Consumer Task Gen 及一个 PostProcessTaskGen
 *  - 卷积映射为 M->Wo, N->Co, K->Hk*Wk*CiBytes；Ho 由本模块作为外层子任务循环。
 *  - 当前首版要求 Wo/Co/CiBytes 分别按 cM/cN/cK 对齐，且不支持 padding zero-fill。
 * */
@@ -96,7 +96,7 @@ class MatConvTaskGen(params: MatParams) extends Module {
   val c = Module(new MatConsumerTaskGen(params))
 
   // Post-Processor 例化
-  val pp = Module(new MatConvPostProcessTaskGen(params))
+  val pp = Module(new MatPostProcessTaskGen(params))
 
   // 连线
   io.ldA <> Queue(pA.io.cmdOut, 2)
@@ -161,14 +161,12 @@ class MatConvTaskGen(params: MatParams) extends Module {
   cCmd.bits.kTile := cmdTileK
   cCmd.bits.bf16 := cmd.bf16
 
-  val ppCmd = Wire(DecoupledIO(new MatConvPostProcessTaskGenCmd(params)))
-  ppCmd.bits.addr := cmd.cBaseAddr
-  ppCmd.bits.woStride := cmd.woStride
-  ppCmd.bits.hoStride := cmd.hoStride
+  val ppCmd = Wire(DecoupledIO(new MatPostProcessTaskGenCmd(params)))
+  ppCmd.bits.addr := cmd.cBaseAddr + curHo * cmd.hoStride
+  ppCmd.bits.stride := cmd.woStride
   ppCmd.bits.swizzle := cmd.CSwizzleMBS
-  ppCmd.bits.woTile := cmdTileM
-  ppCmd.bits.ho := curHo
-  ppCmd.bits.coTile := cmdTileN
+  ppCmd.bits.mTile := cmdTileM
+  ppCmd.bits.nTile := cmdTileN
   ppCmd.bits.repeat := cmdTileK >> params.log2SK
   ppCmd.bits.accumulate := cmd.accumulate
   ppCmd.bits.lastTask := lastSubTask

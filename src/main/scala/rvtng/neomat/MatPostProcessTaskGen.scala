@@ -13,6 +13,7 @@ class MatPostProcessTaskGenCmd(params: MatParams) extends Bundle {
   val nTile = UInt(params.MNKWidth.W) // N Tile Count dec 1
   val repeat = UInt(params.MNKWidth.W) // K Tile Count / sK dec 1
   val accumulate = Bool() // mma or mm ?
+  val lastTask = Bool()
 }
 
 // 后端实际执行的 Post Process 指令
@@ -114,6 +115,6 @@ class MatPostProcessTaskGen(params: MatParams) extends Module {
   io.cmdOut.bits.swizzle := cmd.swizzle
   io.cmdOut.bits.stride := cmd.stride
   io.cmdOut.bits.addr := cmd.addr + cmd.stride * curM * params.cM.U + (4 * params.cN).U * curN
-  io.cmdOut.bits.last := lastM & lastN & lastRepeat
+  io.cmdOut.bits.last := cmd.lastTask & lastM & lastN & lastRepeat
 
 }

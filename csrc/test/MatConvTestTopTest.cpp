@@ -70,25 +70,30 @@ struct ConvCase {
     int dilationH;
     int padL;
     int padU;
+    bool zeroStrideDilation;
     bool accumulate;
     float outputInit;
 };
 
 static const std::vector<ConvCase> convCases = {
     // 基础 1x1：覆盖 Wo/Co 多 tile 和 conv 指令/CSR/地址基础路径。
-    {"conv1x1_multi_tile", 32, 32, 1, 32, 1, 1, 1, 16, 1, 1, 1, 1, 0, 0, false, 0.0f},
+    {"conv1x1_multi_tile", 32, 32, 1, 32, 1, 1, 1, 16, 1, 1, 1, 1, 0, 0, false, false, 0.0f},
     // CiBytes=64：覆盖 Consumer/Producer 的 K tile 多于 1 个的情况。
-    {"conv1x1_ci64",       64, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, 0.0f},
+    {"conv1x1_ci64",       64, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f},
     // 2x2：覆盖 Hk/Wk/CiBytes 映射到 Consumer K 维后的完整卷积累加。
-    {"conv2x2_accumulate", 32, 17, 2, 16, 1, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, 0.0f},
+    {"conv2x2_accumulate", 32, 17, 2, 16, 1, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f},
     // Ho=2：覆盖 Ho 外层循环和 HiStride/HoStride。
-    {"conv2x2_ho2",        32, 17, 3, 16, 2, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, 0.0f},
+    {"conv2x2_ho2",        32, 17, 3, 16, 2, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f},
     // Stride=2：覆盖 inputWoStride/inputHoStride。
-    {"conv2x2_stride2",    32, 32, 4, 16, 2, 2, 2,  8, 2, 2, 1, 1, 0, 0, false, 0.0f},
+    {"conv2x2_stride2",    32, 32, 4, 16, 2, 2, 2,  8, 2, 2, 1, 1, 0, 0, false, false, 0.0f},
     // Dilation=2：覆盖 StrideDilationW/H CSR。
-    {"conv2x2_dilation2",  32, 18, 4, 16, 2, 2, 2,  8, 1, 1, 2, 2, 0, 0, false, 0.0f},
+    {"conv2x2_dilation2",  32, 18, 4, 16, 2, 2, 2,  8, 1, 1, 2, 2, 0, 0, false, false, 0.0f},
+    // StrideDilation CSR 写 0：覆盖硬件按 stride/dilation 回退计算组合步长。
+    {"conv2x2_sd_zero",    32, 18, 4, 16, 2, 2, 2,  8, 1, 1, 2, 2, 0, 0, true,  false, 0.0f},
+    // 3x3：覆盖更长的 Hk/Wk reduction 计数。
+    {"conv3x3_kernel",     32, 18, 3, 16, 1, 3, 3,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f},
     // conv2da：覆盖 O_old + Conv(I, K) 的后处理累加路径。
-    {"conv2da_output_acc", 32, 17, 2, 16, 1, 2, 2,  8, 1, 1, 1, 1, 0, 0, true, 1.5f},
+    {"conv2da_output_acc", 32, 17, 2, 16, 1, 2, 2,  8, 1, 1, 1, 1, 0, 0, false, true, 1.5f},
 };
 
 static inline int wiStride(const ConvCase& c) { return c.ciBytes; }
@@ -170,8 +175,8 @@ static inline std::vector<CSRWrite> buildCSRWrites(const ConvCase& c)
         {MAT_CSR_DILATION_H, c.dilationH},
         {MAT_CSR_STRIDE_W, c.strideW},
         {MAT_CSR_STRIDE_H, c.strideH},
-        {MAT_CSR_STRIDE_DILATION_W, wiStride(c) * c.dilationW},
-        {MAT_CSR_STRIDE_DILATION_H, hiStride(c) * c.dilationH},
+        {MAT_CSR_STRIDE_DILATION_W, c.zeroStrideDilation ? 0 : wiStride(c) * c.dilationW},
+        {MAT_CSR_STRIDE_DILATION_H, c.zeroStrideDilation ? 0 : hiStride(c) * c.dilationH},
     };
 }
 
