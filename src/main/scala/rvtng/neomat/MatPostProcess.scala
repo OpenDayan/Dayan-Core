@@ -126,7 +126,7 @@ class MatPostProcess(params: MatParams) extends Module {
     val swizzle = UInt(24.W)
     val clear = Bool()
     val last = Bool()
-    val valid = Bool()
+    val mValid = Bool()
     val nMask = UInt(params.cN.W)
   }
   val busWriteAddrQ = VecInit.tabulate(params.busWriteChannel)(i =>
@@ -173,7 +173,7 @@ class MatPostProcess(params: MatParams) extends Module {
     q.enq.bits.swizzle := writeCmd.swizzle
     q.enq.bits.clear := writeCmd.clear
     q.enq.bits.last := writeCmd.last && writeLast
-    q.enq.bits.valid := curMValid
+    q.enq.bits.mValid := curMValid
     q.enq.bits.nMask := writeCmd.nMask
   })
 
@@ -259,7 +259,7 @@ class MatPostProcess(params: MatParams) extends Module {
     tQ.bits.addr := aQ.deq.bits.addr
     tQ.bits.swizzle := aQ.deq.bits.swizzle
     tQ.bits.byteEnable := VecInit.tabulate(params.channelWidth) { i =>
-      aQ.deq.bits.valid & aQ.deq.bits.nMask(i / 4)
+      aQ.deq.bits.mValid & aQ.deq.bits.nMask(i / 4)
     }.asUInt
     lQ.deq.ready := tQ.fire
     rQ.deq.ready := tQ.fire & !aQ.deq.bits.clear

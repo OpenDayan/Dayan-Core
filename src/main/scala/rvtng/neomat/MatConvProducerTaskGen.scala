@@ -52,10 +52,10 @@ class MatConvProducerTaskGen(
   /*
    * 说明：
    *  - 该模块是卷积专用 Producer，控制流、Tile Register 分配/回收、Ack 顺序都沿用 MatProducerTaskGen。
-   *  - 与 GEMM Producer 的主要区别仅在地址生成：
+   *  - 与 GEMM Producer 的主要区别在地址生成：
    *      Input  地址对应 I[ho * StrideH + kh * DilationH - PadU, wo * StrideW + kw * DilationW - PadL, ci]
    *      Kernel 地址对应 K[kh, kw, ci, co]
-   *  - 当前支持 Input padding zero-fill，以及 Wo/Co/CiBytes tail。
+   *  - zeroMask / byteZeroMask 用于 padding 和 tail。
    */
   val io = IO(new Bundle {
     val cmdIn = Flipped(Decoupled(new MatConvProducerTaskGenCmd(params)))
@@ -123,6 +123,7 @@ class MatConvProducerTaskGen(
   // 结束情况
   finish := lastMajor & lastMinor & lastRepeat & io.cmdOut.fire
 
+  // Hk/Wk/CiBytes 展开后的 K 维下标递增
   val lastCiByte = (cmd.ciByteDec1 >> params.log2CK) << params.log2CK
   def nextKIndex(kh: UInt, kw: UInt, ciByte: UInt): (UInt, UInt, UInt) = {
     val nextKh = Wire(UInt(params.MNKWidth.W))
@@ -233,6 +234,7 @@ class MatConvProducerTaskGen(
   val inputHOffset = inputHBase - cmd.padU * cmd.hiStride
   val inputWOffset = inputWBase - cmd.padL * cmd.wiStride
   val inputAddr = cmd.addr + inputHOffset + inputWOffset + curCiByte
+  // zeroMask 置位时仍发起一次安全读请求，返回数据在 Tile Register 内清零。
   val inputSafeAddr = cmd.addr + curCiByte
 
   val inputHIndex = cmd.ho * cmd.strideH + curKh * cmd.dilationH
@@ -248,10 +250,10 @@ class MatConvProducerTaskGen(
   val inputZeroMask = VecInit(inputWInvalid.zip(outputWInvalid).map { case (padInvalid, tailInvalid) =>
     padInvalid | tailInvalid | inputHInvalid
   }).asUInt
-  val kByteZeroMask = VecInit.tabulate(params.channelWidth)(i => curCiByte + i.U > cmd.ciByteDec1).asUInt
+  val ciByteZeroMask = VecInit.tabulate(params.channelWidth)(i => curCiByte + i.U > cmd.ciByteDec1).asUInt
 
   io.cmdOut.bits.swizzle := cmd.swizzle
-  io.cmdOut.bits.byteZeroMask := kByteZeroMask
+  io.cmdOut.bits.byteZeroMask := ciByteZeroMask
   if(isKernel) {
     io.cmdOut.bits.stride := cmd.coStride
     io.cmdOut.bits.addr := kernelAddr
