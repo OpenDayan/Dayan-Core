@@ -237,15 +237,18 @@ class MatConvProducerTaskGen(
   // zeroMask 置位时仍发起一次安全读请求，返回数据在 Tile Register 内清零。
   val inputSafeAddr = cmd.addr + curCiByte
 
+  // ih = ho * StrideH + kh * DilationH - PadU；invalid = hi < 0 or hi >= Hi
   val inputHIndex = cmd.ho * cmd.strideH + curKh * cmd.dilationH
   val inputHBeforePad = inputHIndex < cmd.padU
   val inputHAfterPad = inputHIndex - cmd.padU
   val inputHInvalid = inputHBeforePad | (inputHAfterPad > cmd.taskHi)
 
+  //  iw = wo * StrideW + kw * DilationW - PadL;invalid = wi < 0 or wi >= Wi
   val inputWIndex = curMajor * params.cM.U * cmd.strideW + curKw * cmd.dilationW
   val inputWBeforePad = VecInit.tabulate(params.cM)(i => inputWIndex + i.U * cmd.strideW < cmd.padL)
   val inputWAfterPad = VecInit.tabulate(params.cM)(i => inputWIndex + i.U * cmd.strideW - cmd.padL)
   val inputWInvalid = VecInit.tabulate(params.cM)(i => inputWBeforePad(i) | (inputWAfterPad(i) > cmd.taskWi))
+  
   val outputWInvalid = VecInit.tabulate(params.cM)(i => curMajor * params.cM.U + i.U > cmd.taskWo)
   val inputZeroMask = VecInit(inputWInvalid.zip(outputWInvalid).map { case (padInvalid, tailInvalid) =>
     padInvalid | tailInvalid | inputHInvalid

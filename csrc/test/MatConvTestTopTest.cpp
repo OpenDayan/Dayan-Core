@@ -10,6 +10,7 @@
 #define MAX_SIM_TIME 200000
 #define MAX_ERROR 0.1
 #define TAIL_SENTINEL (-123.0f)
+#define ALIGNBYTE 32
 
 VerilatedContext *contextp;
 VMatConvTestTop *dut;
@@ -102,6 +103,8 @@ static const std::vector<ConvCase> convCases = {
     {"conv2x2_pad_left_up", 32, 16, 2, 16, 2, 2, 2,  8, 1, 1, 1, 1, 1, 1, false, false, 0.0f, false},
     // BF16 + Padding：覆盖 BF16 下 padding zero-fill。
     {"conv1x1_bf16_pad_l",  32, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 1, 0, false, false, 0.0f, true},
+    // 右/下边界 zero-fill：不需要 PadR/PadD，输出坐标越过输入边界时按 0 处理。
+    {"conv2x2_pad_right_down", 32, 16, 1, 16, 1, 2, 2, 8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
     // Wo tail：覆盖输出宽度不按 cM 对齐时的输入 zero-fill 和输出写回 mask。
     {"conv1x1_wo_tail",     32, 24, 1, 17, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
     // Wo tail + conv2da：覆盖尾块旧 O 读取和写回都不访问真实输出范围外。
@@ -114,13 +117,15 @@ static const std::vector<ConvCase> convCases = {
     {"conv1x1_ci_tail",      36, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
     // BF16 CiBytes tail：覆盖 BF16 逻辑通道数到物理字节数的尾块映射。
     {"conv1x1_bf16_ci_tail", 36, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, true},
+    // 较大规模：覆盖多 Ho、Wo tile、Co tile 和 K tile 的组合调度。
+    {"conv3x3_large",         64, 48, 8, 40, 6, 3, 3, 24, 1, 1, 1, 1, 1, 1, false, false, 0.0f, false},
     // 组合 tail：Wo/Co/CiBytes 同时不对齐。
     {"conv1x1_all_tail",     36, 24, 1, 17, 1, 1, 1,  9, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
 };
 
 static inline int elemBytes(const ConvCase& c) { return c.bf16 ? 2 : 1; }
 static inline int ciCount(const ConvCase& c) { return c.ciBytes / elemBytes(c); }
-static inline int paddedCiBytes(const ConvCase& c) { return ((c.ciBytes + 7) / 8) * 8; }
+static inline int paddedCiBytes(const ConvCase& c) { return ((c.ciBytes + ALIGNBYTE - 1) / ALIGNBYTE) * ALIGNBYTE; }
 static inline int paddedWo(const ConvCase& c) { return ((c.wo + 15) / 16) * 16; }
 static inline int paddedCo(const ConvCase& c) { return ((c.co + 7) / 8) * 8; }
 static inline int wiStride(const ConvCase& c) { return paddedCiBytes(c); }
