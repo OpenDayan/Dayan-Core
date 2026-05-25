@@ -147,7 +147,7 @@ class MatTop(params: MatParams) extends Module {
   tgen.cmdIn.bits.accumulate := taskAccumulate
   tgen.cmdIn.bits.aBaseAddr := io.instReq.bits.rs1Data
   tgen.cmdIn.bits.persistentMode := csr.sel.ctrl.PersistentMode
-  tgen.cmdIn.bits.taskCi := csr.sel.ctrl.taskCi
+  tgen.cmdIn.bits.taskCi := Mux(curIsBF16, Cat(csr.sel.ctrl.taskCi, 1.U(1.W))(params.MNKWidth - 1, 0), csr.sel.ctrl.taskCi)
   tgen.cmdIn.bits.taskWi := csr.sel.ctrl.taskWi
   tgen.cmdIn.bits.taskHi := csr.sel.ctrl.taskHi
   tgen.cmdIn.bits.taskWo := csr.sel.ctrl.taskWo

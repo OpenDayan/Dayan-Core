@@ -15,7 +15,7 @@ class MatConvProducerTaskGenCmd(params: MatParams) extends Bundle {
   val repeat = UInt(params.MNKWidth.W)
   val minor = UInt(params.MNKWidth.W) // Hk * Wk * CiBytes tile count dec 1
 
-  // Ho 由 MatConvTaskGen 外层循环传入，Hk/Wk/CiBytes 由本模块在 K 维解码。
+  // Ho 由 MatConvTaskGen 外层循环传入，Consumer K tile 由本模块解码为 Hk/Wk/Ci byte 地址。
   val ho = UInt(params.MNKWidth.W)
   val ciByteDec1 = UInt(params.MNKWidth.W)
   val taskWk = UInt(params.MNKWidth.W)
@@ -123,7 +123,7 @@ class MatConvProducerTaskGen(
   // 结束情况
   finish := lastMajor & lastMinor & lastRepeat & io.cmdOut.fire
 
-  // Hk/Wk/CiBytes 展开后的 K 维下标递增
+  // Consumer K tile 在 Producer 地址侧展开为 (kh, kw, ciByte)。
   val lastCiByte = (cmd.ciByteDec1 >> params.log2CK) << params.log2CK
   def nextKIndex(kh: UInt, kw: UInt, ciByte: UInt): (UInt, UInt, UInt) = {
     val nextKh = Wire(UInt(params.MNKWidth.W))

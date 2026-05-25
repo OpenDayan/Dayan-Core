@@ -7,7 +7,9 @@ import _root_.circt.stage.ChiselStage
 /*
 * 说明：
 *  - 该模块用于卷积任务拆分，内部例化两个 Conv Producer Task Gen，一个 Consumer Task Gen 及一个 PostProcessTaskGen
-*  - 卷积映射为 M->Wo, N->Co, K->Hk*Wk*CiBytes；Ho 由本模块作为外层子任务循环。
+*  - 卷积复用原 GEMM 的 Z 式 Consumer：M->Wo tile，N->Co tile，K tile 解释为 (Hk, Wk, Ci) 内部 tile。
+*  - 与 GEMM taskK 一样，cmd.taskCi 进入本模块前已经按 DataType 转为后端 K 维寻址尺度。
+*  - Ho 由本模块作为外层子任务循环。
 *  - padding 和 tail 由 Producer zeroMask / PostProcess mask 处理。
 * */
 class MatConvTaskGen(params: MatParams) extends Module {
@@ -24,20 +26,14 @@ class MatConvTaskGen(params: MatParams) extends Module {
     val ppAlloc = Flipped(Decoupled(Bool()))
   })
 
-  private val ciByteDec1 = Wire(UInt(params.MNKWidth.W))
-  ciByteDec1 := Mux(
-    io.cmdIn.bits.bf16,
-    Cat(io.cmdIn.bits.taskCi, 1.U(1.W))(params.MNKWidth - 1, 0),
-    io.cmdIn.bits.taskCi
-  )
-  val ciTile = ciByteDec1 >> params.log2CK
+  val ciTile = io.cmdIn.bits.taskCi >> params.log2CK
   val convKTileCount = (io.cmdIn.bits.taskHk + 1.U) * (io.cmdIn.bits.taskWk + 1.U) * (ciTile + 1.U)
-  val convKTileDec1 = convKTileCount(params.MNKWidth - 1, 0) - 1.U
+  val convKTile = convKTileCount(params.MNKWidth - 1, 0) - 1.U
 
   // 任务拆分逻辑
   val tileM = io.cmdIn.bits.taskWo >> params.log2CM
   val tileN = io.cmdIn.bits.taskCo >> params.log2CN
-  val tileK = convKTileDec1
+  val tileK = convKTile
   val inputWoStride = io.cmdIn.bits.wiStride * io.cmdIn.bits.strideW
   val inputHoStride = io.cmdIn.bits.hiStride * io.cmdIn.bits.strideH
   val strideDilationW = Mux(
@@ -66,7 +62,6 @@ class MatConvTaskGen(params: MatParams) extends Module {
   val cmdTileM = RegEnable(tileM, io.cmdIn.fire)
   val cmdTileN = RegEnable(tileN, io.cmdIn.fire)
   val cmdTileK = RegEnable(tileK, io.cmdIn.fire)
-  val cmdCiByteDec1 = RegEnable(ciByteDec1, io.cmdIn.fire)
   val cmdInputWoStride = RegEnable(inputWoStride, io.cmdIn.fire)
   val cmdInputHoStride = RegEnable(inputHoStride, io.cmdIn.fire)
   val cmdStrideDilationW = RegEnable(strideDilationW, io.cmdIn.fire)
@@ -74,7 +69,7 @@ class MatConvTaskGen(params: MatParams) extends Module {
   val cmdMMask = RegEnable(mTailMask, io.cmdIn.fire)
   val cmdNMask = RegEnable(nTailMask, io.cmdIn.fire)
 
-  // 卷积外层循环：Ho；Hk/Wk/CiBytes 作为 Consumer 的 K 维完成累加
+  // 卷积外层循环：Ho；每个 Ho 子任务内部仍按原 Consumer 的 Z 式 M/N/K tile 遍历。
   val curHo = Reg(UInt(params.MNKWidth.W))
 
   val lastHo = curHo === cmd.taskHo
@@ -129,7 +124,7 @@ class MatConvTaskGen(params: MatParams) extends Module {
   aCmd.bits.minor := cmdTileK
   aCmd.bits.repeat := 0.U
   aCmd.bits.ho := curHo
-  aCmd.bits.ciByteDec1 := cmdCiByteDec1
+  aCmd.bits.ciByteDec1 := cmd.taskCi
   aCmd.bits.taskWk := cmd.taskWk
   aCmd.bits.taskWo := cmd.taskWo
   aCmd.bits.taskWi := cmd.taskWi
@@ -158,7 +153,7 @@ class MatConvTaskGen(params: MatParams) extends Module {
   bCmd.bits.minor := cmdTileK
   bCmd.bits.repeat := cmdTileM >> params.log2SM
   bCmd.bits.ho := curHo
-  bCmd.bits.ciByteDec1 := cmdCiByteDec1
+  bCmd.bits.ciByteDec1 := cmd.taskCi
   bCmd.bits.taskWk := cmd.taskWk
   bCmd.bits.taskWo := cmd.taskWo
   bCmd.bits.taskWi := cmd.taskWi

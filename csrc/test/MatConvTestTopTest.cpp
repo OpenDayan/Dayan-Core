@@ -130,6 +130,11 @@ static inline int wkStride(const ConvCase& c) { return c.co * coStride(c); }
 static inline int hkStride(const ConvCase& c) { return c.wk * wkStride(c); }
 static inline int woStride(const ConvCase& c) { return paddedCo(c) * 4; }
 static inline int hoStride(const ConvCase& c) { return paddedWo(c) * woStride(c); }
+static inline int inputTensorElements(const ConvCase& c) { return c.hi * c.wi * ciCount(c); }
+static inline int kernelTensorElements(const ConvCase& c) { return c.hk * c.wk * c.co * ciCount(c); }
+static inline int outputTensorElements(const ConvCase& c) { return c.ho * c.wo * c.co; }
+static inline int outputPaddedElements(const ConvCase& c) { return c.ho * paddedWo(c) * paddedCo(c); }
+static inline bool isSummaryCase(const ConvCase& c) { return &c == &convCases.back(); }
 
 static inline uint32_t matCSRWriteInst(int offset)
 {
@@ -278,6 +283,38 @@ static inline void setOutputElemFP32(const ConvCase& c, int h, int w, int co, fl
     *addr = v;
 }
 
+static inline void printConvCaseSummary(const ConvCase& c)
+{
+    printf("[%s] DataType: %s, Instruction: %s\n", c.name, c.bf16 ? "BF16" : "FP8",
+        c.accumulate ? "conv2da" : "conv2d");
+    printf("[%s] Input  I[Hi=%d, Wi=%d, Ci=%d], elements=%d, physical bytes=%d\n",
+        c.name, c.hi, c.wi, ciCount(c), inputTensorElements(c), c.hi * c.wi * paddedCiBytes(c));
+    printf("[%s] Kernel K[Hk=%d, Wk=%d, Ci=%d, Co=%d], elements=%d, physical bytes=%d\n",
+        c.name, c.hk, c.wk, ciCount(c), c.co, kernelTensorElements(c),
+        c.hk * c.wk * c.co * coStride(c));
+    printf("[%s] Output O[Ho=%d, Wo=%d, Co=%d], elements=%d, padded O[Ho=%d, Wo=%d, Co=%d], padded elements=%d\n",
+        c.name, c.ho, c.wo, c.co, outputTensorElements(c),
+        c.ho, paddedWo(c), paddedCo(c), outputPaddedElements(c));
+    printf("[%s] Kernel: Hk=%d, Wk=%d; StrideH=%d, StrideW=%d; PadH=%d, PadW=%d; DilationH=%d, DilationW=%d\n",
+        c.name, c.hk, c.wk, c.strideH, c.strideW, c.padU, c.padL, c.dilationH, c.dilationW);
+    printf("[%s] Stride bytes: WiStride=%d, HiStride=%d, CoStride=%d, WkStride=%d, HkStride=%d, WoStride=%d, HoStride=%d\n",
+        c.name, wiStride(c), hiStride(c), coStride(c), wkStride(c), hkStride(c), woStride(c), hoStride(c));
+}
+
+static inline void printOutputTensor(const ConvCase& c)
+{
+    printf("[%s] Full valid output tensor O[Ho=%d, Wo=%d, Co=%d]:\n", c.name, c.ho, c.wo, c.co);
+    for(int h = 0; h < c.ho; h++) {
+        for(int w = 0; w < c.wo; w++) {
+            printf("[%s] O[h=%d, w=%d, :] =", c.name, h, w);
+            for(int co = 0; co < c.co; co++) {
+                printf(" %f", getOutputElemFP32(c, h, w, co));
+            }
+            printf("\n");
+        }
+    }
+}
+
 static inline float inputPattern(const ConvCase& c, int h, int w, int ci)
 {
     if(ci == 0) return (float)(1 + (h & 1));
@@ -394,6 +431,9 @@ static int checkConvTensor(const ConvCase& c)
     printf("[%s] O[0, 0, 1] = %f\n", c.name, getOutputElemFP32(c, 0, 0, 1));
     printf("[%s] O[0, 1, 0] = %f\n", c.name, getOutputElemFP32(c, 0, 1, 0));
     printf("[%s] O[0, 1, 1] = %f\n", c.name, getOutputElemFP32(c, 0, 1, 1));
+    if(isSummaryCase(c)) {
+        printOutputTensor(c);
+    }
     return caseErrorCount;
 }
 
@@ -415,6 +455,9 @@ static inline void beginCase(size_t idx)
     caseStartTime = 0;
     initConvTensor(c);
     printf("Start Conv Case %zu/%zu: %s\n", idx + 1, convCases.size(), c.name);
+    if(isSummaryCase(c)) {
+        printConvCaseSummary(c);
+    }
 }
 
 static inline void driveInstReq()

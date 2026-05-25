@@ -23,7 +23,7 @@ class MatTask(params: MatParams) extends Bundle {
   val CSwizzleMBS  = UInt(24.W)
   val persistentMode = UInt(2.W)
 
-  val taskCi = UInt(params.MNKWidth.W)
+  val taskCi = UInt(params.MNKWidth.W) // CONV Ci 已按 BF16 / FP8 的不同情况，对齐到后端 K 维寻址尺度
   val taskWi = UInt(params.MNKWidth.W)
   val taskHi = UInt(params.MNKWidth.W)
   val taskWo = UInt(params.MNKWidth.W)
