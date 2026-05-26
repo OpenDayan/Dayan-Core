@@ -16,6 +16,7 @@ def generateOneModuleMakefile(moduleName: str, modulePackage: str, AdditionDeps:
     str_builder += '''
 build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
 	verilator --threads {Threads} --output-split 3000 --compiler clang --build-jobs 0 --assert --trace --trace-structs --trace-fst \
+-Wno-UNOPTTHREADS \
 -CFLAGS -Wno-unknown-warning-option -CFLAGS -DVL_USER_FATAL -CFLAGS -DVL_USER_STOP -CFLAGS -Wno-narrowing '''
     str_builder += '''--top {Name} -Mdir build/V{Name} -y generated/{Name}/ --cc -f generated/{Name}/filelist.f \
 -CFLAGS -I../../csrc/utils/ -CFLAGS -I../../csrc/gen/ -CFLAGS -I../../csrc/DRAMsim3/src \
@@ -51,11 +52,15 @@ csrc/utils/cliUtils.cpp csrc/utils/DPIAXI4.cpp -LDFLAGS ../../csrc/DRAMsim3/libd
 
 str_builder = 'all:'
 for name in module_map:
+    if module_map[name].get('Disabled') == True:
+        continue
     if module_map[name].get('NeedEMU') != True:
         str_builder += ' wave/{Name}.fst'.format(Name = name)
 
 str_builder += '\n'
 for name in module_map:
+    if module_map[name].get('Disabled') == True:
+        continue
     deps = module_map[name].get('AdditionDeps')
     threads = 2
     if deps == None:
@@ -148,5 +153,7 @@ void vl_stop(const char* filename, int line, const char* func) {{
 '''.format(Name=moduleName)
 
 for name in module_map:
+    if module_map[name].get('Disabled') == True:
+        continue
     with open('generated/testbenchTemplate/{Name}Test.cpp'.format(Name = name), 'w') as f:
         f.write(generateOneTestbenchTemplate(name))

@@ -38,7 +38,7 @@
         "Package": "rvtng.fpmath.DPArray"
     },
     "GroupXBar": {
-        "Package": "rvtng.utils"
+        "Package": "rvtng.uram"
     },
     "MatTestTop": {
         "Package": "rvtng.neomat"
@@ -56,7 +56,9 @@
     },
     "RISCVCoreTestTop": {
         "Package": "rvcore",
-        "Threads": 4
+        "Threads": 4,
+        "Disabled": true,
+        "DisabledReason": "rvcore.RISCVCoreTestTop source is not present in the current tree"
     },
     "TestFPUnpackPack": {
         "Package": "rvtng.fpmath"
@@ -65,7 +67,7 @@
         "Package": "rvtng.utils"
     },
     "U8m2n2k1U4m2n2k2Mul": {
-        "Package": "rvtng.fpmath"
+        "Package": "rvtng.fpmath.DPArray"
     },
     "VecTinyTestTop": {
         "Package": "rvtng.vec",
@@ -84,13 +86,19 @@
         "Package": "rvtng.neomat"
     },
     "MatExec": {
-        "Package": "rvtng.neomat"
+        "Package": "rvtng.neomat",
+        "Disabled": true,
+        "DisabledReason": "csrc/test/MatExecTest.cpp is not present; generated template is not used by UnitTest.mk"
     },
     "MatTileRegisters": {
-        "Package": "rvtng.neomat"
+        "Package": "rvtng.neomat",
+        "Disabled": true,
+        "DisabledReason": "csrc/test/MatTileRegistersTest.cpp is not present; generated template is not used by UnitTest.mk"
     },
     "RVTNGNoVecTop": {
-        "Package": "rvtng.top"
+        "Package": "rvtng.top",
+        "Disabled": true,
+        "DisabledReason": "legacy top has no csrc/test/RVTNGNoVecTopTest.cpp and currently has DMA/URAM Vec width mismatch"
     },
     "RVTNGNoVecTestTop": {
         "Package": "rvtng.top",
@@ -105,7 +113,9 @@
         "NeedEMU": true
     },
     "BasicXBar":{
-        "Package": "rvtng.utils"
+        "Package": "rvtng.utils",
+        "Disabled": true,
+        "DisabledReason": "no rvtng.utils.BasicXBar entry point or csrc/test/BasicXBarTest.cpp; current source entry is rvtng.uram.NBBasicXBar"
     },
     "SignedFPToFPModule": {
         "Package": "rvtng.fpmath"

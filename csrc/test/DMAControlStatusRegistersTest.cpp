@@ -23,7 +23,7 @@ static inline void mainLoop()
     if(rand() & 1) {
         // Write
         read = 0;
-        dut->instReq_bits_rd = rand();
+        dut->instReq_bits_rdData = rand();
     } else {
         // Read
         read = 1;
