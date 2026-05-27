@@ -6,7 +6,7 @@ import _root_.circt.stage.ChiselStage
 
 class MatTask(params: MatParams) extends Bundle {
   val bf16 = Bool()
-  val opMode = UInt(3.W) // ISA mode: mm=000, mma=001, conv2d=010, conv2da=011；inst[14:12]
+  val opMode = UInt(3.W) // ISA mode: mm=000, mma=001, conv2d=010, conv2da=011; inst[14:12]
   val isConv = Bool()
   val accumulate = Bool()
   val aBaseAddr = UInt(params.addrWidth.W)

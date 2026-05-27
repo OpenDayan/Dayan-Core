@@ -76,11 +76,20 @@ struct ConvCase {
     bool accumulate;
     float outputInit;
     bool bf16;
+    int iSwizzleMBS = 0;
+    int kSwizzleMBS = 0;
+    int oSwizzleMBS = 0;
 };
+
+static constexpr int SWZ_I = (8 << 16) | (2 << 8) | 5;
+static constexpr int SWZ_K = (8 << 16) | (2 << 8) | 6;
+static constexpr int SWZ_O = (8 << 16) | (2 << 8) | 7;
 
 static const std::vector<ConvCase> convCases = {
     // 基础 1x1：覆盖 Wo/Co 多 tile 和 conv 指令/CSR/地址基础路径。
     {"conv1x1_multi_tile", 32, 32, 1, 32, 1, 1, 1, 16, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
+    // 非零 Swizzle：覆盖 I/K/O 三路 load/store 物理地址扰动。
+    {"conv1x1_swizzle",    32, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false, SWZ_I, SWZ_K, SWZ_O},
     // CiBytes=64：覆盖 Consumer/Producer 的 K tile 多于 1 个的情况。
     {"conv1x1_ci64",       64, 16, 1, 16, 1, 1, 1,  8, 1, 1, 1, 1, 0, 0, false, false, 0.0f, false},
     // 2x2：覆盖 Hk/Wk/CiBytes 映射到 Consumer K 维后的完整卷积累加。
@@ -202,9 +211,9 @@ static inline std::vector<CSRWrite> buildCSRWrites(const ConvCase& c)
         {MAT_CSR_CO_STRIDE, coStride(c)},
         {MAT_CSR_WO_STRIDE, woStride(c)},
         {MAT_CSR_HO_STRIDE, hoStride(c)},
-        {MAT_CSR_I_SWIZZLE_MBS, 0},
-        {MAT_CSR_K_SWIZZLE_MBS, 0},
-        {MAT_CSR_O_SWIZZLE_MBS, 0},
+        {MAT_CSR_I_SWIZZLE_MBS, c.iSwizzleMBS},
+        {MAT_CSR_K_SWIZZLE_MBS, c.kSwizzleMBS},
+        {MAT_CSR_O_SWIZZLE_MBS, c.oSwizzleMBS},
         {MAT_CSR_DATA_TYPE, c.bf16 ? 0 : 1},
         {MAT_CSR_PAD_L, c.padL},
         {MAT_CSR_PAD_U, c.padU},
@@ -217,19 +226,43 @@ static inline std::vector<CSRWrite> buildCSRWrites(const ConvCase& c)
     };
 }
 
-static inline int inputAddr(const ConvCase& c, int h, int w, int ci)
+static inline int swizzleAddr(int addr, int mbs)
+{
+    int S = mbs & 0xff;
+    int B = (mbs >> 8) & 0xff;
+    int M = (mbs >> 16) & 0xff;
+    int mask = B == 0 ? 0 : ((1 << B) - 1);
+    return addr ^ ((addr >> S) & (mask << M));
+}
+
+static inline int inputLogicalAddr(const ConvCase& c, int h, int w, int ci)
 {
     return IAddr + h * hiStride(c) + w * wiStride(c) + ci * elemBytes(c);
 }
 
-static inline int kernelAddr(const ConvCase& c, int kh, int kw, int co, int ci)
+static inline int kernelLogicalAddr(const ConvCase& c, int kh, int kw, int co, int ci)
 {
     return KAddr + kh * hkStride(c) + kw * wkStride(c) + co * coStride(c) + ci * elemBytes(c);
 }
 
-static inline int outputAddr(const ConvCase& c, int h, int w, int co)
+static inline int outputLogicalAddr(const ConvCase& c, int h, int w, int co)
 {
     return OAddr + h * hoStride(c) + w * woStride(c) + co * 4;
+}
+
+static inline int inputAddr(const ConvCase& c, int h, int w, int ci)
+{
+    return swizzleAddr(inputLogicalAddr(c, h, w, ci), c.iSwizzleMBS);
+}
+
+static inline int kernelAddr(const ConvCase& c, int kh, int kw, int co, int ci)
+{
+    return swizzleAddr(kernelLogicalAddr(c, kh, kw, co, ci), c.kSwizzleMBS);
+}
+
+static inline int outputAddr(const ConvCase& c, int h, int w, int co)
+{
+    return swizzleAddr(outputLogicalAddr(c, h, w, co), c.oSwizzleMBS);
 }
 
 static inline float getInputElem(const ConvCase& c, int h, int w, int ci)
@@ -304,6 +337,8 @@ static inline void printConvCaseSummary(const ConvCase& c)
         c.name, c.hk, c.wk, c.strideH, c.strideW, c.padU, c.padL, c.dilationH, c.dilationW);
     printf("[%s] Stride bytes: WiStride=%d, HiStride=%d, CoStride=%d, WkStride=%d, HkStride=%d, WoStride=%d, HoStride=%d\n",
         c.name, wiStride(c), hiStride(c), coStride(c), wkStride(c), hkStride(c), woStride(c), hoStride(c));
+    printf("[%s] Swizzle MBS: I=0x%06x, K=0x%06x, O=0x%06x\n",
+        c.name, c.iSwizzleMBS, c.kSwizzleMBS, c.oSwizzleMBS);
 }
 
 static inline void printOutputTensor(const ConvCase& c)

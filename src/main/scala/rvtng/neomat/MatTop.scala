@@ -136,7 +136,7 @@ class MatTop(params: MatParams) extends Module {
 
   // mat tgen cmdIn generation
   private val curIsBF16 = csr.sel.ctrl.DataType === 0.U
-  private val taskMode = io.instReq.bits.instWord(14, 12)//mode: mm=000, mma=001, conv2d=010, conv2da=011
+  private val taskMode = io.instReq.bits.instWord(14, 12) // mode: mm=000, mma=001, conv2d=010, conv2da=011
   private val taskIsConv = taskMode(1)
   private val taskAccumulate = taskMode(0)
   csr.sel.addr := io.instReq.bits.instWord(27, 25)
