@@ -87,16 +87,6 @@ static inline void setDefaults()
     dut->io_calc_bits_bf16 = 0;
     dut->io_calc_bits_clear = 0;
     dut->io_calc_bits_writeback = 0;
-    dut->io_calc_bits_tileM = 0;
-    dut->io_calc_bits_tileN = 0;
-    dut->io_calc_bits_tileK = 0;
-    dut->io_calc_bits_aScaleBaseAddr = 0;
-    dut->io_calc_bits_bScaleBaseAddr = 0;
-    dut->io_calc_bits_scaleWiStride = 0;
-    dut->io_calc_bits_scaleHiStride = 0;
-    dut->io_calc_bits_scaleWkStride = 0;
-    dut->io_calc_bits_scaleHkStride = 0;
-    dut->io_calc_bits_scaleCoStride = 0;
     dut->io_result_ready = 1;
     dut->io_busAReq_ready = 1;
     dut->io_busBReq_ready = 1;

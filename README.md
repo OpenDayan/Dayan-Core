@@ -1,12 +1,23 @@
 RVT-New
-=======================
+=======
 
 新 RVT 指令集设计实现仓库，使用 Chisel 6.6.0。
 
 ## 构建方式：
+
 使用 `make UnitTest.mk` 构建单元测试 Makefile 文件
 
 使用 `make -j all` 在 Verilator 中执行所有测试
+
+也可以直接运行下面的命令行
+
+```bash
+cd RVNPU/rvt
+make UnitTest.mk
+make -j all 2>&1 | tee unit_all.log
+grep -n "PASS" unit_all.log
+grep -nE "FAILED|Fatal|Error|ASSERT|Aborting|Stop|No rule|No such|undefined|error:" unit_all.log
+```
 
 ## 查看波形
 
