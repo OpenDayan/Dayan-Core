@@ -86,14 +86,10 @@
         "Package": "rvtng.neomat"
     },
     "MatExec": {
-        "Package": "rvtng.neomat",
-        "Disabled": true,
-        "DisabledReason": "csrc/test/MatExecTest.cpp is not present; generated template is not used by UnitTest.mk"
+        "Package": "rvtng.neomat"
     },
     "MatTileRegisters": {
-        "Package": "rvtng.neomat",
-        "Disabled": true,
-        "DisabledReason": "csrc/test/MatTileRegistersTest.cpp is not present; generated template is not used by UnitTest.mk"
+        "Package": "rvtng.neomat"
     },
     "RVTNGNoVecTop": {
         "Package": "rvtng.top",
