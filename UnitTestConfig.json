@@ -108,10 +108,8 @@
         "Package": "rvtng.vpu",
         "NeedEMU": true
     },
-    "BasicXBar":{
-        "Package": "rvtng.utils",
-        "Disabled": true,
-        "DisabledReason": "no rvtng.utils.BasicXBar entry point or csrc/test/BasicXBarTest.cpp; current source entry is rvtng.uram.NBBasicXBar"
+    "NBBasicXBar":{
+        "Package": "rvtng.uram"
     },
     "SignedFPToFPModule": {
         "Package": "rvtng.fpmath"

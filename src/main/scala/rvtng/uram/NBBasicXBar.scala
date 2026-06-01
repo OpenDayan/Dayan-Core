@@ -107,6 +107,6 @@ object NBBasicXBar extends App {
       "-strip-debug-info",
       "-preserve-aggregate=vec",
       "--split-verilog",
-      "-o=generated/BasicXBar")
+      "-o=generated/NBBasicXBar")
   )
 }
