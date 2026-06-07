@@ -73,14 +73,14 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     instQueue.io.enq <> TU.io.cmdout
     private val sb = Module(new VpuScoreboard(params))
 
-    private val decodeVecScoreboardReq = (instReq.bits.instWord(6, 0) === "h0b".U) &
+    private val decodeVpuScoreboardReq = (instReq.bits.instWord(6, 0) === "h0b".U) &
                                          (instReq.bits.instWord(31, 27) === 0b00001.U) &
                                          (instReq.bits.instWord(26, 25) === 1.U) &
                                          (instReq.bits.instWord(24, 15) === 0.U) &
                                          ((instReq.bits.instWord(14, 12) === 0.U) | (instReq.bits.instWord(14, 12) === 5.U))
     // Old 64-bit sb.bar compatibility is intentionally disabled.
     // private val decodeLegacyCompReq = instReq.bits.instWord(63, 56) === "hff".U
-    private val decodeCompReq   = decodeVecScoreboardReq
+    private val decodeCompReq   = decodeVpuScoreboardReq
 
     val raw_cmd = Wire(Decoupled(new GemminiCmd(reservation_station_entries)))
     raw_cmd.valid := instReq.valid && !decodeCompReq
