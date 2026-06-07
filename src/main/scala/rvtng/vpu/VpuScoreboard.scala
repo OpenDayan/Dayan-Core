@@ -31,10 +31,17 @@ class VpuScoreboard(params: VpuParams) extends Module {
   }
 
   private val sbInst = Wire(DecoupledIO(new ScoreBoardInst))
+  private val isVecScoreboardBar = (instReq.bits.instWord(6, 0) === "h0b".U) &
+                                   (instReq.bits.instWord(31, 27) === 0b00001.U) &
+                                   (instReq.bits.instWord(26, 25) === 1.U) &
+                                   (instReq.bits.instWord(24, 15) === 0.U) &
+                                   (instReq.bits.instWord(14, 12) === 5.U)
+  // Old 64-bit sb.bar compatibility is intentionally disabled.
+  // private val isLegacyBar = instReq.bits.instWord(52)
   sbInst.valid := instReq.valid
   instReq.ready := sbInst.ready
   sbInst.bits.isCount := isCounter
-  sbInst.bits.isBar   := instReq.bits.instWord(52)
+  sbInst.bits.isBar   := isVecScoreboardBar
   sbInst.bits.rd      := instReq.bits.instWord(11, 7)
   sbInst.bits.rdData  := instReq.bits.rdData
 

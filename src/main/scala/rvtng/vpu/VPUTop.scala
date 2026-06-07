@@ -71,8 +71,16 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     val ReadReqQueue = Module(new Queue(UInt(3.W), 16))
 
     instQueue.io.enq <> TU.io.cmdout
+    private val sb = Module(new VpuScoreboard(params))
 
-    private val decodeCompReq   = instReq.bits.instWord(63, 56) === "hff".U
+    private val decodeVecScoreboardReq = (instReq.bits.instWord(6, 0) === "h0b".U) &
+                                         (instReq.bits.instWord(31, 27) === 0b00001.U) &
+                                         (instReq.bits.instWord(26, 25) === 1.U) &
+                                         (instReq.bits.instWord(24, 15) === 0.U) &
+                                         ((instReq.bits.instWord(14, 12) === 0.U) | (instReq.bits.instWord(14, 12) === 5.U))
+    // Old 64-bit sb.bar compatibility is intentionally disabled.
+    // private val decodeLegacyCompReq = instReq.bits.instWord(63, 56) === "hff".U
+    private val decodeCompReq   = decodeVecScoreboardReq
 
     val raw_cmd = Wire(Decoupled(new GemminiCmd(reservation_station_entries)))
     raw_cmd.valid := instReq.valid && !decodeCompReq
@@ -84,13 +92,11 @@ class VPUTop[T <: Data](params: VpuParams)(implicit ev: Arithmetic[T]) extends M
     raw_cmd.bits.tcfgrs := DontCare
     raw_cmd.bits.from_conv_fsm := false.B
     raw_cmd.bits.from_matmul_fsm := false.B
-    instReq.ready := raw_cmd.ready
+    instReq.ready := Mux(decodeCompReq, sb.instReq.ready, raw_cmd.ready)
 
     TU.io.cmdin <> raw_cmd
 
     //inst resp source: tcsr, sb
-    private val sb = Module(new VpuScoreboard(params))
-
     val respArb = Module(new Arbiter(instResp.bits.cloneType, 2)).io
     respArb.in(0) <> TU.io.instResp
     respArb.in(1) <> sb.instResp

@@ -27,12 +27,15 @@ class RVTNGInstDispatch extends Module {
 
   private val decodeIs64B = inst(6, 0) === "h3f".U
   private val decodeIs32B = inst(6, 0) === "h0b".U
+  private val decodeIsVecScoreboard = decodeIs32B & (inst(31, 27) === 0b00001.U) & (inst(26, 25) === 1.U) &
+                                      (inst(24, 15) === 0.U) & ((inst(14, 12) === 0.U) | (inst(14, 12) === 5.U))
 
   private val decodeIsScoreboard = decodeIsTCSRorScoreboard & inst(26, 25) === 3.U & decodeIs32B
   private val decodeIsMat = ((decodeIsTCSRorScoreboard & inst(26, 25) === 0.U) | (inst(31, 28) === 1.U)) & decodeIs32B
   private val decodeIsDma = ((decodeIsTCSRorScoreboard & inst(26, 25) === 2.U) | (inst(31, 29) === 1.U)) & decodeIs32B
-  private val decodeIsVec = ((decodeIsTCSRorScoreboard & inst(26, 25) === 1.U) | (inst(31, 30) > 0.U))   & decodeIs32B
-  private val decodeIsVpu = decodeIs64B
+  private val decodeIsVec = (((decodeIsTCSRorScoreboard & inst(26, 25) === 1.U) | (inst(31, 30) > 0.U))   & decodeIs32B) &
+                            !decodeIsVecScoreboard
+  private val decodeIsVpu = decodeIs64B | decodeIsVecScoreboard
   private val illegal = !(decodeIsScoreboard | decodeIsMat | decodeIsDma | decodeIsVec | decodeIsVpu)
   chisel3.assert(!(illegal & instQ.valid))
 
