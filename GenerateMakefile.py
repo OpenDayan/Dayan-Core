@@ -22,7 +22,7 @@ build/V{Name}/V{Name}: generated/{Name}/filelist.f build/V{Name}
 -CFLAGS -I../../csrc/utils/ -CFLAGS -I../../csrc/gen/ -CFLAGS -I../../csrc/DRAMsim3/src \
 -CFLAGS -I../../csrc/DRAMsim3/ext/headers -CFLAGS -g \
 --exe csrc/test/{Name}Test.cpp{ADDITION_DEPS}
-	$(MAKE) CXX=clang++-15 CC=clang-15 -C build/V{Name} -f V{Name}.mk V{Name}
+	$(MAKE) CXX=clang++ CC=clang -C build/V{Name} -f V{Name}.mk V{Name}
 
 .PHONY: generated/{Name}/filelist.f
 generated/{Name}/filelist.f:
