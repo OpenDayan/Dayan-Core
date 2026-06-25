@@ -25,7 +25,7 @@ class TilelinkUHToAXI(val tlParms: TLBundleParameters) extends Module {
   axi4.ar.bits.id   := tlRd.a.bits.source
   axi4.ar.bits.size := log2Ceil(tlParms.dataBits / 8).U
   axi4.ar.bits.len  := 0.U
-  axi4.ar.bits.burst := 0.U
+  axi4.ar.bits.burst := 1.U
 
   private val awQ = Wire(axi4.aw.cloneType)
   private val wQ  = Wire(axi4.w.cloneType)
@@ -40,7 +40,7 @@ class TilelinkUHToAXI(val tlParms: TLBundleParameters) extends Module {
   awQ.bits.id   := tlWr.a.bits.source
   awQ.bits.size := log2Ceil(tlParms.dataBits / 8).U
   awQ.bits.len  := 0.U
-  awQ.bits.burst := 0.U
+  awQ.bits.burst := 1.U
 
   wQ.valid := tlWr.a.valid & awQ.ready
   wQ.bits.data  := tlWr.a.bits.data
