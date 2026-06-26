@@ -1,6 +1,6 @@
 [submodule "csrc/DRAMsim3"]
 	path = csrc/DRAMsim3
-	url = https://git.rvnpu.cn/rvnpu/DRAMsim3.git
+	url = ../DRAMsim3.git
 [submodule "dependencies/berkeley-hardfloat"]
 	path = dependencies/berkeley-hardfloat
 	url = https://github.com/ucb-bar/berkeley-hardfloat.git
