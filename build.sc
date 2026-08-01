@@ -70,3 +70,40 @@ trait Rvtng
     )
   }
 }
+
+object license extends Module {
+  private val marker = "SPDX-License-Identifier: MulanPSL-2.0"
+  private val thirdPartyMarker =
+    "Redistribution and use in source and binary forms"
+
+  private def scalaFiles =
+    os.walk(os.pwd / "src").filter(path => os.isFile(path) && path.ext == "scala")
+
+  private def managedScalaFiles =
+    scalaFiles.filterNot(path => os.read(path).contains(thirdPartyMarker))
+
+  def create() = T.command {
+    val header = os.read(os.pwd / "license-header.txt").stripTrailing() + "\n\n"
+    val updated = managedScalaFiles.filter { path =>
+      val content = os.read(path)
+      if (content.contains(marker)) {
+        false
+      } else {
+        os.write.over(path, header + content)
+        true
+      }
+    }
+    T.log.info(s"Added license header to ${updated.size} Scala files")
+  }
+
+  def check() = T.command {
+    val missing = managedScalaFiles.filterNot(path => os.read(path).contains(marker))
+    if (missing.nonEmpty) {
+      missing.foreach(path => T.log.error(path.relativeTo(os.pwd).toString))
+      throw new RuntimeException(
+        s"${missing.size} Scala files are missing license headers"
+      )
+    }
+    T.log.info("All managed Scala files contain license headers")
+  }
+}
