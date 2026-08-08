@@ -18,7 +18,7 @@ package dayan.rvtng.vpu
 
 import chisel3._
 import chisel3.util._
-import GemminiISA._
+import VpuIsa._
 import Util._
 
 import rcputils._

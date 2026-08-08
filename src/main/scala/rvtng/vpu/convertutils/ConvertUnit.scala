@@ -18,7 +18,7 @@
 
 // import chisel3._
 // import chisel3.util._
-// import dayan.rvtng.vpu.GemminiISA._
+// import dayan.rvtng.vpu.VpuIsa._
 // import dayan.rvtng.vpu.Util._
 // import org.chipsalliance.cde.config.Parameters
 // import midas.targetutils.PerfCounter

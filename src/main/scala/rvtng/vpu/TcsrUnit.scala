@@ -18,12 +18,12 @@ package dayan.rvtng.vpu
 
 import chisel3._
 import chisel3.util._
-import dayan.rvtng.vpu.GemminiISA._
+import dayan.rvtng.vpu.VpuIsa._
 import chisel3.Reg
 import chisel3.util.Decoupled
 import chisel3.when
 import dayan.rvtng.vpu.GemminiCmd
-import dayan.rvtng.vpu.GemminiISA.tcsr_xchg_nmask_cmd
+import dayan.rvtng.vpu.VpuIsa.tcsr_xchg_nmask_cmd
 import dayan.rvtng.vpu.tcsrcontent
 import chisel3.Bundle
 import chisel3.Flipped
