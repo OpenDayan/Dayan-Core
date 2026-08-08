@@ -14,7 +14,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.bus
+package dayan.rvtng.bus
 
 // See LICENSE.SiFive for license details.
 

@@ -14,7 +14,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.fpmath.signedFP
+package dayan.rvtng.fpmath.signedFP
 
 import chisel3._
 

@@ -14,12 +14,12 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.bus
+package dayan.rvtng.bus
 
 import chisel3._
 import chisel3.util._
-import rvtng.bus.TLMessages._
-import rvtng.uram._
+import dayan.rvtng.bus.TLMessages._
+import dayan.rvtng.uram._
 
 class TilelinkUHToURAM(val tlParms: TLBundleParameters, val uramAddrBits: Int, val uramPortPerChannel: Int) extends Module {
   // tl can be mapped to URAM - R+RResp / W+WResp, with no Burst Transaction, no ID reuse.

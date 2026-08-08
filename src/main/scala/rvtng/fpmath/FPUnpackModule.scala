@@ -14,11 +14,11 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.fpmath
+package dayan.rvtng.fpmath
 
 import chisel3._
 import chisel3.util._
-import rvtng.mat.DPArrayTop
+import dayan.rvtng.mat.DPArrayTop
 import _root_.circt.stage.ChiselStage
 
 class FPUnpackModule(wE: Int, wF: Int, bias: Int) extends Module {

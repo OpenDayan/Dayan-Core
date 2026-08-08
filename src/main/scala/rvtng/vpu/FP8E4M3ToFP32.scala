@@ -16,7 +16,7 @@
 
 // FP8 E4M3 to FP32
 
-package rvtng.vpu
+package dayan.rvtng.vpu
 
 import chisel3._
 import chisel3.util._

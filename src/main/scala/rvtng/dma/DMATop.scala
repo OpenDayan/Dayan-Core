@@ -14,13 +14,13 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.dma
+package dayan.rvtng.dma
 
 import chisel3._
 import chisel3.util._
-import rvtng.bus._
-import rvtng.top.{ScoreboardComp, TensorInst, TensorResp}
-import rvtng.uram.{Adv2R1WURAM, AdvURAMReq, AdvURAMResp, AdvURAMWResp}
+import dayan.rvtng.bus._
+import dayan.rvtng.top.{ScoreboardComp, TensorInst, TensorResp}
+import dayan.rvtng.uram.{Adv2R1WURAM, AdvURAMReq, AdvURAMResp, AdvURAMWResp}
 import _root_.circt.stage.ChiselStage
 
 case class DMAParams(

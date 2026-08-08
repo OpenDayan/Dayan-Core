@@ -14,7 +14,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.utils
+package dayan.rvtng.utils
 
 import chisel3._
 import chisel3.util._

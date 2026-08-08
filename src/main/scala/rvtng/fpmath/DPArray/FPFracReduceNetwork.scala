@@ -14,11 +14,11 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.fpmath.DPArray
+package dayan.rvtng.fpmath.DPArray
 
 import chisel3._
 import chisel3.util._
-import rvtng.fpmath.converter
+import dayan.rvtng.fpmath.converter
 
 // wF: Width of Fraction Input
 // wI: Width of Fraction Shifter

@@ -14,7 +14,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.bus
+package dayan.rvtng.bus
 
 import chisel3._
 import chisel3.reflect.DataMirror

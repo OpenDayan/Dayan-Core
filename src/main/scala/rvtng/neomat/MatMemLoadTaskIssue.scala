@@ -14,12 +14,12 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.neomat
+package dayan.rvtng.neomat
 
 import chisel3._
 import chisel3.util._
-import rvtng.utils.PartialAssign
-import rvtng.uram.{AdvURAMReq, AdvURAMResp, SwizzleAddr}
+import dayan.rvtng.utils.PartialAssign
+import dayan.rvtng.uram.{AdvURAMReq, AdvURAMResp, SwizzleAddr}
 
 class MatMemLoadTaskIssue(params: MatParams, srcCount: Int, regIdWidth: Int, posWidth: Int) extends Module {
   val ports = (params.busChannel * params.channelWidth) / 8

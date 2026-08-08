@@ -14,12 +14,12 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.uram
+package dayan.rvtng.uram
 
 import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
-import rvtng.utils._
+import dayan.rvtng.utils._
 
 // Real URAM Implement, 8B Request / Port.
 // Read  Latency is 3(Input Switch) + 2(UltraRAM/SRAM) + 1(Output Switch) + 1(Output) == 7 Cycles

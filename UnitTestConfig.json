@@ -1,15 +1,15 @@
 {
     "Adv2R1WURAM": {
-        "Package": "rvtng.uram"
+        "Package": "dayan.rvtng.uram"
     },
     "DMAControlStatusRegisters": {
-        "Package": "rvtng.dma"
+        "Package": "dayan.rvtng.dma"
     },
     "DMAReorderTransposeBuffer": {
-        "Package": "rvtng.dma"
+        "Package": "dayan.rvtng.dma"
     },
     "DMATestTop": {
-        "Package": "rvtng.dma",
+        "Package": "dayan.rvtng.dma",
         "AdditionDeps": {
             "csrc/DRAMsim3/libdramsim3.a": {
                 "deps": "",
@@ -20,13 +20,13 @@
         "NeedEMU": true
     },
     "DPArrayCalcTaskSpilt": {
-        "Package": "rvtng.mat"
+        "Package": "dayan.rvtng.mat"
     },
     "FakeURAM": {
-        "Package": "rvtng.uram"
+        "Package": "dayan.rvtng.uram"
     },
     "FP8BF16FusedDPArray": {
-        "Package": "rvtng.fpmath.DPArray",
+        "Package": "dayan.rvtng.fpmath.DPArray",
         "AdditionDeps": {
             "csrc/gen/FP8BF16FusedDPArrayTestBF16Gen.hpp csrc/gen/FP8BF16FusedDPArrayTestCheckGen.hpp": {
                 "deps": "csrc/gen/FP8BF16FusedDPArrayTestMatrixGen.py",
@@ -35,19 +35,19 @@
         }
     },
     "FP8BF16FusedDPUnit": {
-        "Package": "rvtng.fpmath.DPArray"
+        "Package": "dayan.rvtng.fpmath.DPArray"
     },
     "GroupXBar": {
-        "Package": "rvtng.uram"
+        "Package": "dayan.rvtng.uram"
     },
     "MatTestTop": {
-        "Package": "rvtng.neomat"
+        "Package": "dayan.rvtng.neomat"
     },
     "MatConvTestTop": {
-        "Package": "rvtng.neomat"
+        "Package": "dayan.rvtng.neomat"
     },
     "RVTNGTestTop": {
-        "Package": "rvtng.top",
+        "Package": "dayan.rvtng.top",
         "AdditionDeps": {
             "csrc/DRAMsim3/libdramsim3.a": {}
         },
@@ -61,43 +61,43 @@
         "DisabledReason": "rvcore.RISCVCoreTestTop source is not present in the current tree"
     },
     "TestFPUnpackPack": {
-        "Package": "rvtng.fpmath"
+        "Package": "dayan.rvtng.fpmath"
     },
     "Transposer": {
-        "Package": "rvtng.utils"
+        "Package": "dayan.rvtng.utils"
     },
     "U8m2n2k1U4m2n2k2Mul": {
-        "Package": "rvtng.fpmath.DPArray"
+        "Package": "dayan.rvtng.fpmath.DPArray"
     },
     "VecTinyTestTop": {
-        "Package": "rvtng.vec",
+        "Package": "dayan.rvtng.vec",
         "NeedEMU": true
     },
     "KulischAccumulatorTestTop": {
-        "Package": "rvtng.fpmath.signedFP"
+        "Package": "dayan.rvtng.fpmath.signedFP"
     },
     "GetMaxDiffTop": {
-        "Package": "rvtng.fpmath"
+        "Package": "dayan.rvtng.fpmath"
     },
     "MatProducerTaskGen": {
-        "Package": "rvtng.neomat"
+        "Package": "dayan.rvtng.neomat"
     },
     "MatTaskGen": {
-        "Package": "rvtng.neomat"
+        "Package": "dayan.rvtng.neomat"
     },
     "MatExec": {
-        "Package": "rvtng.neomat"
+        "Package": "dayan.rvtng.neomat"
     },
     "MatTileRegisters": {
-        "Package": "rvtng.neomat"
+        "Package": "dayan.rvtng.neomat"
     },
     "RVTNGNoVecTop": {
-        "Package": "rvtng.top",
+        "Package": "dayan.rvtng.top",
         "Disabled": true,
         "DisabledReason": "legacy top has no csrc/test/RVTNGNoVecTopTest.cpp and currently has DMA/URAM Vec width mismatch"
     },
     "RVTNGNoVecTestTop": {
-        "Package": "rvtng.top",
+        "Package": "dayan.rvtng.top",
         "AdditionDeps": {
             "csrc/DRAMsim3/libdramsim3.a": {}
         },
@@ -105,19 +105,19 @@
         "Threads": 4
     },
     "VPUTestTop":{
-        "Package": "rvtng.vpu",
+        "Package": "dayan.rvtng.vpu",
         "NeedEMU": true
     },
     "NBBasicXBar":{
-        "Package": "rvtng.uram"
+        "Package": "dayan.rvtng.uram"
     },
     "SignedFPToFPModule": {
-        "Package": "rvtng.fpmath"
+        "Package": "dayan.rvtng.fpmath"
     },
     "NeoSyncBarChannel": {
-        "Package": "rvtng.uram"
+        "Package": "dayan.rvtng.uram"
     },
     "Neo2R1WURAM": {
-        "Package": "rvtng.uram"
+        "Package": "dayan.rvtng.uram"
     }
 }

@@ -14,10 +14,10 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.mat
+package dayan.rvtng.mat
 
-import rvtng.fpmath.{SignedFPToFPModule, FPUnpackModule}
-import rvtng.utils.RF1R1WRam
+import dayan.rvtng.fpmath.{SignedFPToFPModule, FPUnpackModule}
+import dayan.rvtng.utils.RF1R1WRam
 import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._

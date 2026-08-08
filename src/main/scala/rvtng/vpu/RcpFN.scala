@@ -14,7 +14,7 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.vpu
+package dayan.rvtng.vpu
 
 import rcputils._
 

@@ -15,7 +15,7 @@
  */
 
 
-package rvtng.vpu
+package dayan.rvtng.vpu
 
 import chisel3._
 

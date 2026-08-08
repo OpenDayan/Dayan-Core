@@ -14,13 +14,13 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.vec
+package dayan.rvtng.vec
 
 import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
-import rvtng.top._
-import rvtng.uram._
+import dayan.rvtng.top._
+import dayan.rvtng.uram._
 
 case class VecParams(
                     maxInstCount: Int = 512,

@@ -14,13 +14,13 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.vec
+package dayan.rvtng.vec
 
 import _root_.circt.stage.ChiselStage
-import rvtng.utils.RF1R1RWAsyncRamGen
+import dayan.rvtng.utils.RF1R1RWAsyncRamGen
 import chisel3._
 import chisel3.util._
-import rvtng.top.{TensorInst, TensorResp}
+import dayan.rvtng.top.{TensorInst, TensorResp}
 
 class VecCSRStorage(params: VecParams) extends Bundle {
   val Block = UInt(8.W)

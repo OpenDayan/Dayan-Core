@@ -14,12 +14,12 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.neomat
+package dayan.rvtng.neomat
 
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
-import rvtng.fpmath.signedFP._
+import dayan.rvtng.fpmath.signedFP._
 
 // 注意：该模块用于矩阵乘法后处理，包括简单激活、反量化、累加等操作
 // 目前仅实现累加

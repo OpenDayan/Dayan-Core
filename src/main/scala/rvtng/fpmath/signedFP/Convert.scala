@@ -14,11 +14,11 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.fpmath.signedFP
+package dayan.rvtng.fpmath.signedFP
 
 import chisel3._
 import chisel3.util._
-import rvtng.fpmath._
+import dayan.rvtng.fpmath._
 import hardfloat._
 
 object SignedFPFrom {

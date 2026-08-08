@@ -14,12 +14,12 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.dma
+package dayan.rvtng.dma
 
 import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
-import rvtng.top.{TensorInst, TensorResp, ScoreboardComp}
+import dayan.rvtng.top.{TensorInst, TensorResp, ScoreboardComp}
 
 /*
 * 需求：

@@ -18,8 +18,8 @@
 
 // import chisel3._
 // import chisel3.util._
-// import rvtng.vpu.GemminiISA._
-// import rvtng.vpu.Util._
+// import dayan.rvtng.vpu.GemminiISA._
+// import dayan.rvtng.vpu.Util._
 // import org.chipsalliance.cde.config.Parameters
 // import midas.targetutils.PerfCounter
 // import freechips.rocketchip.util.SeqToAugmentedSeq

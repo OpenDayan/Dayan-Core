@@ -14,13 +14,13 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.fpmath.DPArray
+package dayan.rvtng.fpmath.DPArray
 
 import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
-import rvtng.fpmath.U8U4FusedMxNyKzMul
-import rvtng.utils.UnsignedMulBase
+import dayan.rvtng.fpmath.U8U4FusedMxNyKzMul
+import dayan.rvtng.utils.UnsignedMulBase
 
 class U8m2n2k1U4m2n2k2Mul(tM: Int, tN: Int, tK: Int) extends Module with U8U4FusedMxNyKzMul{
   require(tM == 2)

@@ -14,10 +14,10 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.mat
+package dayan.rvtng.mat
 
-import rvtng.uram.{Adv2R1WURAM, AdvURAMReq, AdvURAMResp, AdvURAMWResp}
-import rvtng.top._
+import dayan.rvtng.uram.{Adv2R1WURAM, AdvURAMReq, AdvURAMResp, AdvURAMWResp}
+import dayan.rvtng.top._
 
 import chisel3._
 import chisel3.util._

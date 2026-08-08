@@ -14,12 +14,12 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.neomat
+package dayan.rvtng.neomat
 
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
-import rvtng.utils.RF1R1WRamGenEN
+import dayan.rvtng.utils.RF1R1WRamGenEN
 
 // 这个模块是 Tile Register 的实现，注意， Tile Register 的数据是单周期读出的 SRAM 组织。
 // 接口包含：

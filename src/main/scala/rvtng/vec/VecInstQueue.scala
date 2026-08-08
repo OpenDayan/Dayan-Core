@@ -14,14 +14,14 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.vec
+package dayan.rvtng.vec
 
 import chisel3._
 import chisel3.util._
 import chisel3.util.experimental.decode._
 import _root_.circt.stage.ChiselStage
-import rvtng.top.TensorInst
-import rvtng.utils._
+import dayan.rvtng.top.TensorInst
+import dayan.rvtng.utils._
 
 class VecInst(params: VecParams) extends VecDecoded(params) {
   val rs1Data = UInt(64.W)

@@ -14,11 +14,11 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.vec
+package dayan.rvtng.vec
 
 import chisel3._
 import chisel3.util._
-import rvtng.utils.PartialAssign
+import dayan.rvtng.utils.PartialAssign
 
 // 双级流水 Regfile，读取数据并等待送入之后的 FU 进行执行
 

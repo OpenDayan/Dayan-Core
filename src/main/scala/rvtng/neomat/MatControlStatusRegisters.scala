@@ -14,12 +14,12 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.neomat
+package dayan.rvtng.neomat
 
-import rvtng.utils.RF1R1RWAsyncRamGen
+import dayan.rvtng.utils.RF1R1RWAsyncRamGen
 import chisel3._
 import chisel3.util._
-import rvtng.top.{TensorInst, TensorResp}
+import dayan.rvtng.top.{TensorInst, TensorResp}
 
 class MatCSRStorage(params: MatParams) extends Bundle {
   // spec Table 4.1 对应的新寄存器实现，用别名保留原有命名

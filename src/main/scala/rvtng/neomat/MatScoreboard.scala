@@ -14,9 +14,9 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.neomat
+package dayan.rvtng.neomat
 
-import rvtng.top._
+import dayan.rvtng.top._
 
 import chisel3._
 import chisel3.util._

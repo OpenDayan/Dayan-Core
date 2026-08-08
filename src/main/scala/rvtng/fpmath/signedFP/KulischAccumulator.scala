@@ -14,13 +14,13 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.fpmath.signedFP
+package dayan.rvtng.fpmath.signedFP
 
 import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
 import hardfloat._
-import rvtng.fpmath.GetMaxDiffTop
+import dayan.rvtng.fpmath.GetMaxDiffTop
 
 case class KulischAccConfig(
   inExpWidth: Int = 8,

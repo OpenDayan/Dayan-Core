@@ -14,12 +14,12 @@
  * See the Mulan PSL v2 for more details.
  */
 
-package rvtng.uram
+package dayan.rvtng.uram
 
 import _root_.circt.stage.ChiselStage
 import chisel3._
 import chisel3.util._
-import rvtng.utils._
+import dayan.rvtng.utils._
 
 class NeoSyncBarChannel[TS <: Data, TD <: Data](channelWidth: Int, fifoSize: Int, genS: TS, genD: TD) extends Module {
   val io = IO(new Bundle{
