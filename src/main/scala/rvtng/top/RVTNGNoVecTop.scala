@@ -178,8 +178,7 @@ object RVTNGNoVecTop extends App {
   )
 }
 
-class RVTNGNoVecTestTop() extends Module {
-  private val matParams = MatParams(cM = 8, cN = 8, cK = 32)
+class RVTNGNoVecTestTop(matParams: MatParams = MatParams()) extends Module {
   private val vecParams = VecParams()
   private val dmaParams = DMAParams()
   private val core = Module(new RVTNGNoVecTop(matParams, vecParams, dmaParams))

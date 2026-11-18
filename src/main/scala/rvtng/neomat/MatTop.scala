@@ -19,8 +19,15 @@ package dayan.rvtng.neomat
 import chisel3._
 import chisel3.util._
 import _root_.circt.stage.ChiselStage
+import dayan.rvtng.fpmath.signedFP.SignedFP
 import dayan.rvtng.top.{ScoreboardComp, TensorInst, TensorResp}
 import dayan.rvtng.uram._
+
+sealed trait MatComputeType
+object MatComputeType {
+  case object FP8BF16 extends MatComputeType
+  case object Int8 extends MatComputeType
+}
 
 case class MatParams(
   // 地址位宽
@@ -38,8 +45,15 @@ case class MatParams(
   // 写总线异构参数
   busWriteChannel: Int = 2,
   // TCSR Bank 个数
-  tcsrBanks: Int = 8
+  tcsrBanks: Int = 8,
+  // 静态选择实际例化的运算器
+  computeType: MatComputeType = MatComputeType.FP8BF16
 ) {
+  def accumulatorType: Data = computeType match {
+    case MatComputeType.FP8BF16 => new SignedFP(wE, wF)
+    case MatComputeType.Int8 => SInt(32.W)
+  }
+
   // Tile 寄存器数量
   val log2SM = log2Ceil(sM)
   val log2SN = log2Ceil(sN)
@@ -151,7 +165,10 @@ class MatTop(params: MatParams) extends Module {
   respArb.in(1) <> sb.instResp
 
   // mat tgen cmdIn generation
-  private val curIsBF16 = csr.sel.ctrl.DataType === 0.U
+  private val curIsBF16 = params.computeType match {
+    case MatComputeType.FP8BF16 => csr.sel.ctrl.DataType === 0.U
+    case MatComputeType.Int8 => false.B
+  }
   private val taskMode = io.instReq.bits.instWord(14, 12) // mode: mma=000, mm=001, conv2d=010, conv2da=011
   private val taskIsConv = taskMode(1)
   private val taskAccumulate = Mux(taskIsConv, taskMode(0), !taskMode(0))

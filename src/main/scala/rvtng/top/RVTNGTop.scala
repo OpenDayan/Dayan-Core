@@ -145,8 +145,7 @@ class RVTNGTop(matParams: MatParams, vecParams: VecParams, dmaParams: DMAParams,
   sb.instResp <> disp.sbResp
 }
 
-class RVTNGTestTop() extends Module {
-  private val matParams = MatParams(cM = 8, cN = 8, cK = 32)
+class RVTNGTestTop(matParams: MatParams = MatParams()) extends Module {
   private val vecParams = VecParams()
   private val dmaParams = DMAParams()
   private val vpuParams = VpuParams()

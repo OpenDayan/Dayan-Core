@@ -39,7 +39,7 @@ class MatPostProcess(params: MatParams) extends Module {
     val ppAlloc = Decoupled(Bool())
 
     // 来自 MatExec 的执行结果流水，全速率
-    val result = Flipped(Decoupled(Vec(params.cM * params.cN, MatInnerSingedFP(params))))
+    val result = Flipped(Decoupled(Vec(params.cM * params.cN, params.accumulatorType)))
 
     // URAM 读取接口，全速率
     val busRReq = Decoupled(new MatInnerTileReadReq(params, params.log2CountCTile, log2CReadTransactionCount))
@@ -58,7 +58,7 @@ class MatPostProcess(params: MatParams) extends Module {
 
   // bus 读取结果队列
   val busReadInQ = VecInit.tabulate(params.cM)(i => {
-    val m = Module(new Queue(Vec(params.cN, MatInnerSingedFP(params)), params.sM * params.sN)).io
+    val m = Module(new Queue(Vec(params.cN, params.accumulatorType), params.countCTile)).io
     m
   })
   for(i <- 0 until params.cM) {
@@ -68,13 +68,16 @@ class MatPostProcess(params: MatParams) extends Module {
       Mux(io.busRResp(i % params.busChannel).zero | io.busRResp(i % params.busChannel).byteZeroMask(j),
         0.U, io.busRResp(i % params.busChannel).data(j))
     }
-    val extFP32 = busReadData.asTypeOf(Vec(params.cN, UInt(32.W)))
-    busReadInQ(i).enq.bits := VecInit(extFP32.map(SignedFPFrom(params.wE, params.wF, _)))
+    val extC = busReadData.asTypeOf(Vec(params.cN, UInt(32.W)))
+    busReadInQ(i).enq.bits := (params.computeType match {
+      case MatComputeType.FP8BF16 => VecInit(extC.map(SignedFPFrom(params.wE, params.wF, _)))
+      case MatComputeType.Int8 => VecInit(extC.map(_.asSInt))
+    })
     busReadInQ(i).deq.ready := 0.B
   }
   // 重整 bus 读取结果
   val busReadQ = VecInit.tabulate(params.busWriteChannel)(i => {
-    val m = Module(new Queue(Vec(params.cN, MatInnerSingedFP(params)), 2)).io
+    val m = Module(new Queue(Vec(params.cN, params.accumulatorType), 2)).io
     m
   })
   for(i <- 0 until params.busWriteChannel) {
@@ -100,20 +103,20 @@ class MatPostProcess(params: MatParams) extends Module {
   // result 结果队列
   io.result.ready := 1.B
   val resultInQ = VecInit.tabulate(params.cM)(i => {
-    val m = Module(new Queue(Vec(params.cN, MatInnerSingedFP(params)), params.sM * params.sN)).io
+    val m = Module(new Queue(Vec(params.cN, params.accumulatorType), params.countCTile)).io
     m
   })
   for(i <- 0 until params.cM) {
     val m = resultInQ(i)
     m.enq.valid := io.result.valid
-    m.enq.bits := io.result.bits.asTypeOf(Vec(params.cM, Vec(params.cN, MatInnerSingedFP(params))))(i)
+    m.enq.bits := io.result.bits.asTypeOf(Vec(params.cM, Vec(params.cN, params.accumulatorType)))(i)
     chisel3.assert(!(m.enq.valid & !m.enq.ready))
     m.deq.ready := 0.B
   }
 
   // 重整输入
   val resultQ = VecInit.tabulate(params.busWriteChannel)(i => {
-    val m = Module(new Queue(Vec(params.cN, MatInnerSingedFP(params)), 2)).io
+    val m = Module(new Queue(Vec(params.cN, params.accumulatorType), 2)).io
     m
   })
   for(i <- 0 until params.busWriteChannel) {
@@ -153,7 +156,25 @@ class MatPostProcess(params: MatParams) extends Module {
   // pp cmdIn 信号拆分两组队列，分别负责 load 和 store 事务完成
   val loadCmdQ = Module(new Queue(new DPAPostProcessCmd(params), 2)).io
   val storeCmdQ = Module(new Queue(new DPAPostProcessCmd(params), 2)).io
-  io.cmdIn.ready := loadCmdQ.enq.ready & storeCmdQ.enq.ready
+  val writeOrderReady = params.computeType match {
+    case MatComputeType.FP8BF16 => true.B
+    case MatComputeType.Int8 =>
+      // A following K group can read the same C tile while its previous write is in flight.
+      val pendingWrites = io.busWResp.map { resp =>
+        val position = RegInit(0.U(log2CWriteTransactionCount.W))
+        val tileDone = resp.valid && position === (cWriteTransactionCount - 1).U
+        when(resp.valid) {
+          position := Mux(tileDone, 0.U, position + 1.U)
+        }
+        val pending = RegInit(0.U(log2Ceil(params.countCTile + 1).W))
+        pending := pending + io.cmdIn.fire.asUInt - tileDone.asUInt
+        pending
+      }
+      val hasRoom = pendingWrites.map(_ < params.countCTile.U).reduce(_ && _)
+      val writesDrained = pendingWrites.map(_ === 0.U).reduce(_ && _)
+      hasRoom && (io.cmdIn.bits.clear || writesDrained)
+  }
+  io.cmdIn.ready := loadCmdQ.enq.ready & storeCmdQ.enq.ready & writeOrderReady
   loadCmdQ.enq.valid  := io.cmdIn.fire & !io.cmdIn.bits.clear
   storeCmdQ.enq.valid := io.cmdIn.fire
   loadCmdQ.enq.bits := io.cmdIn.bits
@@ -255,22 +276,28 @@ class MatPostProcess(params: MatParams) extends Module {
   resultQ.zip(busReadQ).zip(busWriteAddrQ).zip(busWReqPipe).foreach(iter => {
     val (((lQ, rQ), aQ), tQ) = iter
     tQ.valid := lQ.deq.valid & aQ.deq.valid & (aQ.deq.bits.clear | rQ.deq.valid)
-    // TODO: 换用更好的浮点加法器
-    tQ.bits.data := VecInit(lQ.deq.bits.zip(rQ.deq.bits).map(adders => {
-      val fpAdder = Module(new KulischAccumulator(KulischAccConfig(
-        numInputs = 2,
-        inExpWidth = params.wE,
-        inSigWidth = params.wF,
-        outExpWidth = params.wE,
-        outSigWidth = params.wF + 1
-      )))
-      val zeroFp = Wire(adders._2.cloneType)
-      zeroFp.exp := (BigInt(-1) << (params.wE-1)).S(params.wE.W)
-      zeroFp.frac := 0.S
-      fpAdder.io.in(0) := adders._1
-      fpAdder.io.in(1) := Mux(aQ.deq.bits.clear, zeroFp, adders._2)
-      FNFromSignedFP(fpAdder.io.out)
-    })).asTypeOf(tQ.bits.data)
+    tQ.bits.data := VecInit(lQ.deq.bits.zip(rQ.deq.bits).map { case (result, oldC) =>
+      params.computeType match {
+        case MatComputeType.FP8BF16 =>
+          val fpAdder = Module(new KulischAccumulator(KulischAccConfig(
+            numInputs = 2,
+            inExpWidth = params.wE,
+            inSigWidth = params.wF,
+            outExpWidth = params.wE,
+            outSigWidth = params.wF + 1
+          )))
+          val zeroFp = Wire(new SignedFP(params.wE, params.wF))
+          zeroFp.exp := (BigInt(-1) << (params.wE - 1)).S(params.wE.W)
+          zeroFp.frac := 0.S
+          fpAdder.io.in(0) := result.asTypeOf(zeroFp)
+          fpAdder.io.in(1) := Mux(aQ.deq.bits.clear, zeroFp, oldC.asTypeOf(zeroFp))
+          FNFromSignedFP(fpAdder.io.out)
+
+        case MatComputeType.Int8 =>
+          val acc = Mux(aQ.deq.bits.clear, 0.S, oldC.asTypeOf(SInt(32.W)))
+          (result.asTypeOf(SInt(32.W)) + acc).asUInt
+      }
+    }).asTypeOf(tQ.bits.data)
     tQ.bits.last := aQ.deq.bits.last
     tQ.bits.addr := aQ.deq.bits.addr
     tQ.bits.swizzle := aQ.deq.bits.swizzle
